@@ -15,14 +15,19 @@ parser.add_argument('--report', type=Path, required=True)
 args = parser.parse_args()
 root = args.package.resolve()
 system = Path(os.environ['WINDIR']) / 'System32'
-binary = root / 'build'
+binary = root
 report = {'package': str(root), 'checks': {}, 'imports': {}}
 checks = report['checks']
-required = ['Start.cmd', 'build/rep_player.exe', 'build/rep_export.exe',
-            'build/ffmpeg.exe', 'assets/shaders/manifest.json',
-            'ui_design/data/skill-name-map.json', 'THIRD_PARTY.txt', 'PACKAGE_FILES.json']
+required = ['rep_player.exe', 'resources/ffmpeg.exe', 'resources/licenses/THIRD_PARTY.txt']
 checks['required_files'] = all((root / path).is_file() for path in required)
-for exe in binary.glob('*.exe'):
+checks['minimal_root'] = {path.name for path in root.iterdir()} == {'rep_player.exe', 'resources'}
+if not checks['required_files']:
+    report['pass'] = False
+    args.report.parent.mkdir(parents=True, exist_ok=True)
+    args.report.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf8')
+    print(json.dumps({'checks': checks, 'pass': False}))
+    raise SystemExit(1)
+for exe in (root / 'rep_player.exe', root / 'resources' / 'ffmpeg.exe'):
     imports = []
     queue = [exe]
     visited = set()
@@ -37,7 +42,7 @@ for exe in binary.glob('*.exe'):
         for entry in getattr(pe, 'DIRECTORY_ENTRY_IMPORT', []) + getattr(pe, 'DIRECTORY_ENTRY_DELAY_IMPORT', []):
             name = entry.dll.decode('ascii').lower()
             imports.append(name)
-            bundled = binary / name
+            bundled = exe.parent / name
             if bundled.is_file():
                 queue.append(bundled)
             elif not (name.startswith(('api-ms-win-', 'ext-ms-win-')) or (system / name).is_file()):
@@ -52,6 +57,11 @@ checks['no_user_data_or_client_assets'] = not any(
     or path.relative_to(root).parts[0].lower() in ('runtime', 'cache', 'exports', 'validation')
     or path.name.lower() in ('dfo.exe', 'dnf.exe', 'bink2w64.dll')
     for path in root.rglob('*') if path.is_file())
+player_bytes = (root / 'rep_player.exe').read_bytes()
+checks['no_developer_absolute_paths'] = not any(
+    value.encode(encoding) in player_bytes
+    for value in ('D:\\115us', 'D:\\DNF115us', 'E:\\DNFAutoPlay', 'C:\\Users\\CAO', 'C:\\Windows\\Fonts')
+    for encoding in ('utf8', 'utf-16le'))
 
 # The regular GUI must open with an unavailable client path on a fresh installation.
 # Read only this process's window; close it normally so no other applications are touched.
@@ -63,7 +73,9 @@ user.GetClassLongPtrW.argtypes = [wintypes.HWND, ctypes.c_int]
 user.GetClassLongPtrW.restype = ctypes.c_size_t
 user.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
 user.SendMessageW.restype = wintypes.LPARAM
-process = subprocess.Popen([str(binary / 'rep_player.exe'), '--client', str(root / 'no-installed-client')], cwd=system)
+user.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+user.EnumChildWindows.argtypes = [wintypes.HWND, ctypes.c_void_p, wintypes.LPARAM]
+process = subprocess.Popen([str(binary / 'rep_player.exe')], cwd=system)
 window = None
 try:
     deadline = time.monotonic() + 15
@@ -87,6 +99,15 @@ try:
     checks['fresh_launch_without_client'] = bool(window)
     checks['window_large_and_small_icons'] = bool(window and user.GetClassLongPtrW(window, -14) and user.GetClassLongPtrW(window, -34))
     if window:
+        texts = []
+        @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+        def child_text(hwnd, _):
+            title = ctypes.create_unicode_buffer(1024)
+            user.GetWindowTextW(hwnd, title, len(title))
+            texts.append(title.value)
+            return True
+        user.EnumChildWindows(window, child_text, 0)
+        checks['first_start_requires_client_choice'] = '请选择客户端目录' in texts or 'Select a client folder' in texts
         user.SendMessageW(window, 0x0010, 0, 0)  # WM_CLOSE
     process.wait(timeout=15)
     checks['normal_gui_shutdown'] = process.returncode == 0

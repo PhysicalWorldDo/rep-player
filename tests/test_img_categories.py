@@ -12,7 +12,7 @@ class NativeImgRemovalTests(unittest.TestCase):
     def test_bulk_removal_preserves_effects_and_can_restore_everything(self):
         report = ROOT / 'validation' / ('ui_img_filters_' + uuid.uuid4().hex[:8] + '.json')
         process = subprocess.Popen(
-            [str(ROOT / 'build' / 'rep_player.exe'), '--ui-img-filter-test', str(report)],
+            [str(ROOT / 'build' / 'rep_player.exe'), '--ui-img-filter-test', str(report), '--client', r'D:\115us\client'],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=ROOT)
         try:
             stdout, stderr = process.communicate(timeout=40)

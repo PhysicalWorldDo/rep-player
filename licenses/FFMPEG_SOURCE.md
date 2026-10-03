@@ -1,8 +1,8 @@
 # FFmpeg 对应源码
 
-运行包中的 `build/ffmpeg.exe` 是未修改的 BtbN Windows x64 静态 GPLv3 构建。播放器通过独立进程调用它。二进制、源代码版本与构建输入对应关系见 [THIRD_PARTY.txt](../THIRD_PARTY.txt)。
+运行包中的 `resources/ffmpeg.exe` 是未修改的 BtbN Windows x64 静态 GPLv3 构建。播放器通过独立进程调用它。二进制、源代码版本与构建输入对应关系见 [THIRD_PARTY.txt](../THIRD_PARTY.txt)。
 
-[v1.0.0 Release](https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.0.0) 附带较小的构建源码包和校验清单；完整依赖源码使用原分发者的固定下载链接，不重复上传大附件：
+[v1.0.1 Release](https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.0.1) 只附带用户运行 ZIP；构建源码、完整依赖源码和校验清单使用原分发者的固定下载链接：
 
 - [构建源码包](https://github.com/Reubencfernandes/Open-Video-Craft/releases/download/v1.0.3/Open-Video-Craft-1.0.3-Windows-FFmpeg-Build-Sources.tar.gz)：固定版本 BtbN 构建脚本和 FFmpeg 源码，约 17 MB。
 - [完整依赖源码缓存](https://github.com/Reubencfernandes/Open-Video-Craft/releases/download/v1.0.3/Open-Video-Craft-1.0.3-Windows-FFmpeg-Dependency-Sources.tar)：全部依赖的源码下载缓存，包括各自许可，约 1.9 GB。

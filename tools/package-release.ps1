@@ -1,5 +1,5 @@
 param(
-    [string]$Version = '1.0.0',
+    [string]$Version = '1.0.1',
     [Parameter(Mandatory = $true)][string]$FFmpegDirectory
 )
 $ErrorActionPreference = 'Stop'
@@ -8,35 +8,20 @@ $packageName = "rep-player-v$Version-windows-x64"
 $distRoot = Join-Path $taskRoot 'dist'
 $packageRoot = Join-Path $distRoot $packageName
 if (Test-Path -LiteralPath $packageRoot) { throw "Package directory already exists: $packageRoot. Use a fresh version or preserve it under a different name before rerunning." }
-New-Item -ItemType Directory -Path (Join-Path $packageRoot 'build') -Force | Out-Null
-$files = @('rep_player.exe', 'rep_export.exe', 'rep_gpu.exe', 'rep_validate.exe', 'rep_resources.exe', 'rep_catalog.exe')
-foreach ($name in $files) {
-    Copy-Item -LiteralPath (Join-Path $taskRoot "build\$name") -Destination (Join-Path $packageRoot "build\$name")
+$zipPath = Join-Path $distRoot "$packageName.zip"
+if (Test-Path -LiteralPath $zipPath) { throw "Archive already exists: $zipPath" }
+New-Item -ItemType Directory -Path (Join-Path $packageRoot 'resources\licenses') -Force | Out-Null
+Copy-Item -LiteralPath (Join-Path $taskRoot 'build\rep_player.exe') -Destination (Join-Path $packageRoot 'rep_player.exe')
+# The release uses the selected static FFmpeg build; no external runtime DLLs.
+Copy-Item -LiteralPath (Join-Path $FFmpegDirectory 'ffmpeg.exe') -Destination (Join-Path $packageRoot 'resources\ffmpeg.exe')
+foreach ($name in @('FREETYPE_FTL.txt', 'FREETYPE_LICENSE.txt', 'FREETYPE_BDF_NOTICE.txt', 'FREETYPE_PCF_NOTICE.txt', 'ZLIB_1.2.11.txt', 'FFMPEG_GPLv3.txt', 'FFMPEG_BUILD.txt')) {
+    Copy-Item -LiteralPath (Join-Path $taskRoot "licenses\$name") -Destination (Join-Path $packageRoot 'resources\licenses')
 }
-# Pass a directory containing the chosen FFmpeg binary and all of its runtime DLLs.
-Copy-Item -LiteralPath (Join-Path $FFmpegDirectory 'ffmpeg.exe') -Destination (Join-Path $packageRoot 'build\ffmpeg.exe')
-Get-ChildItem -LiteralPath $FFmpegDirectory -File -Filter '*.dll' | ForEach-Object {
-    Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $packageRoot 'build')
-}
-foreach ($name in @('Start.cmd', 'README.md', 'README.txt', 'BUILDING.md', 'RELEASE_NOTES.md', 'THIRD_PARTY.txt')) {
-    Copy-Item -LiteralPath (Join-Path $taskRoot $name) -Destination (Join-Path $packageRoot $name)
-}
-Copy-Item -LiteralPath (Join-Path $taskRoot 'licenses') -Destination (Join-Path $packageRoot 'licenses') -Recurse
-New-Item -ItemType Directory -Path (Join-Path $packageRoot 'assets\shaders') -Force | Out-Null
-$shaderManifest = Get-Content -LiteralPath (Join-Path $taskRoot 'assets\shaders\manifest.json') -Raw | ConvertFrom-Json
-$shaderNames = $shaderManifest | ForEach-Object { $_.vs; $_.ps } | Sort-Object -Unique
-foreach ($name in $shaderNames) {
-    Copy-Item -LiteralPath (Join-Path $taskRoot "assets\shaders\$name") -Destination (Join-Path $packageRoot 'assets\shaders')
-}
-Copy-Item -LiteralPath (Join-Path $taskRoot 'assets\shaders\manifest.json') -Destination (Join-Path $packageRoot 'assets\shaders')
-Copy-Item -LiteralPath (Join-Path $taskRoot 'assets\icon') -Destination (Join-Path $packageRoot 'assets\icon') -Recurse
-New-Item -ItemType Directory -Path (Join-Path $packageRoot 'ui_design\data') -Force | Out-Null
-Copy-Item -LiteralPath (Join-Path $taskRoot 'ui_design\data\skill-name-map.json') -Destination (Join-Path $packageRoot 'ui_design\data')
+Copy-Item -LiteralPath (Join-Path $taskRoot 'licenses\LLVM_MINGW') -Destination (Join-Path $packageRoot 'resources\licenses\LLVM_MINGW') -Recurse
+Copy-Item -LiteralPath (Join-Path $taskRoot 'THIRD_PARTY.txt') -Destination (Join-Path $packageRoot 'resources\licenses\THIRD_PARTY.txt')
 $manifest = Get-ChildItem -LiteralPath $packageRoot -File -Recurse | ForEach-Object {
     [pscustomobject]@{ path = $_.FullName.Substring($packageRoot.Length + 1).Replace('\', '/'); bytes = $_.Length }
 }
-$manifest | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath (Join-Path $packageRoot 'PACKAGE_FILES.json') -Encoding utf8
-$zipPath = Join-Path $distRoot "$packageName.zip"
-if (Test-Path -LiteralPath $zipPath) { throw "Archive already exists: $zipPath" }
-Compress-Archive -LiteralPath $packageRoot -DestinationPath $zipPath -CompressionLevel Optimal
+$manifest | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath (Join-Path $distRoot "$packageName.files.json") -Encoding utf8
+Compress-Archive -Path (Join-Path $packageRoot '*') -DestinationPath $zipPath -CompressionLevel Optimal
 Write-Output $zipPath

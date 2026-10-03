@@ -1,4 +1,5 @@
 #include "export.hpp"
+#include "runtime_paths.hpp"
 #include <algorithm>
 #include <cwctype>
 #include <fstream>
@@ -16,10 +17,6 @@ public:
     HANDLE get()const{return value_;}
     void reset(HANDLE value=nullptr){if(value_&&value_!=INVALID_HANDLE_VALUE)CloseHandle(value_);value_=value;}
 };
-std::filesystem::path executableDirectory(){
-    wchar_t name[32768]{};if(!GetModuleFileNameW(nullptr,name,32768))throw Error("Cannot find bundled export encoder");
-    return std::filesystem::path(name).parent_path();
-}
 std::wstring quote(const std::wstring& value){
     std::wstring out=L"\"";size_t slashes=0;
     for(wchar_t c:value){if(c==L'\\'){slashes++;continue;}out.append(c==L'\"'?slashes*2+1:slashes,L'\\');slashes=0;out+=c;}
@@ -78,7 +75,7 @@ ExportResult exportReplay(Gpu& gpu,Assets& assets,const std::filesystem::path& c
     const std::filesystem::path& replayPath,const ExportOptions& options,
     const std::function<void(const ExportProgress&)>& progress,const std::function<bool()>& cancelled){
     if(options.fps!=30&&options.fps!=60)throw Error("Export frame rate must be 30 or 60 fps");
-    auto executable=executableDirectory(),root=executable.parent_path();
+    auto root=applicationDirectory();
     auto directory=options.outputDirectory.empty()?root/L"exports":options.outputDirectory;
     if(directory.is_relative())directory=root/directory;
     if(!within(root,directory))throw Error("Export directory must be inside rep_player");
@@ -93,7 +90,7 @@ ExportResult exportReplay(Gpu& gpu,Assets& assets,const std::filesystem::path& c
     auto output=directory/(name+suffix),staging=directory/(name+L".partial"+suffix);
     if(std::filesystem::exists(output))throw Error("Export destination already exists; choose another file name");
     if(std::filesystem::exists(staging))throw Error("Partial export already exists; choose another file name");
-    auto ffmpeg=executable/L"ffmpeg.exe";if(!std::filesystem::is_regular_file(ffmpeg))throw Error("Bundled FFmpeg export encoder is missing");
+    auto ffmpeg=ffmpegExecutable();if(!std::filesystem::is_regular_file(ffmpeg))throw Error("Bundled FFmpeg export encoder is missing");
     auto checkCancelled=[&](){if(cancelled&&cancelled())throw Error("Export cancelled");};
     checkCancelled();ExportProgress update;update.stage=L"Preparing";if(progress)progress(update);
     Replay replay(replayPath);Scene scene;int32_t duration=0;uint64_t sceneCount=0;

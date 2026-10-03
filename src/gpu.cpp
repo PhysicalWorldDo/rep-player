@@ -1,5 +1,6 @@
 #include "gpu.hpp"
 #include "shader_registry.hpp"
+#include "resource_data.hpp"
 #include <d3dcompiler.h>
 #include <d3d11shader.h>
 #include <algorithm>
@@ -31,7 +32,8 @@ Gpu::Program& Gpu::program(int id) {
     // The registered MaskBlur VS has a generic POSITION output. Its complete
     // instruction body matches the client's common VS; use that original VS
     // with its SV_POSITION declaration so this path rasterizes under D3D11.
-    auto vs=readFile(shaderPath_/wide(id==83?"8d1b89311bfc5917b728c08c.vs.dxbc":record->vs)),ps=readFile(shaderPath_/wide(record->ps));auto p=std::make_unique<Program>();
+    auto shader=[&](const char* name){auto bytes=resourceData(L"SHADER_"+wide(name));if(!bytes.empty())return Bytes(bytes.begin(),bytes.end());return readFile(shaderPath_/wide(name));};
+    auto vs=shader(id==83?"8d1b89311bfc5917b728c08c.vs.dxbc":record->vs),ps=shader(record->ps);auto p=std::make_unique<Program>();
     check(device_->CreateVertexShader(vs.data(),vs.size(),nullptr,p->vertex.out()),"CreateOriginalVertexShader");
     if(id==-1){
         const char* source=R"hlsl(

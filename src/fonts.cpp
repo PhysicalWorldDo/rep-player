@@ -1,13 +1,19 @@
 #include "fonts.hpp"
 #include <algorithm>
 #include <cmath>
+#include <windows.h>
 
 namespace rep {
+static std::filesystem::path systemTahoma(){
+    wchar_t directory[MAX_PATH]{};
+    if(!GetWindowsDirectoryW(directory,MAX_PATH))throw Error("Cannot find Windows font directory");
+    return std::filesystem::path(directory)/L"Fonts"/L"tahoma.ttf";
+}
 static std::filesystem::path fontPath(const std::filesystem::path& root,int id,int weight) {
     const wchar_t* name=nullptr;
     switch(id){case 1:name=L"DNFForgedBlade-Light.ttf";break;case 2:name=L"DNFForgedBlade-Medium.ttf";break;case 3:name=L"DNFForgedBlade-Bold.ttf";break;case 4:name=L"NotoSansKR-Regular.ttf";break;case 5:name=L"NotoSansKR-Medium.ttf";break;case 6:name=L"NotoSansKR-Bold.ttf";break;case 36:name=L"DNFBitBitv2.ttf";break;}
     if(name&&std::filesystem::exists(root/name))return root/name;
-    if(id==0||id==7||id==8||id==34||id==35){auto p=root/L"tahoma.ttf";return std::filesystem::exists(p)?p:std::filesystem::path(L"C:\\Windows\\Fonts\\tahoma.ttf");}
+    if(id==0||id==7||id==8||id==34||id==35){auto p=root/L"tahoma.ttf";return std::filesystem::exists(p)?p:systemTahoma();}
     if(!name){auto p=root/L"DNFForgedBlade-Medium.ttf";if(std::filesystem::exists(p))return p;p=root/L"gulim.ttc";if(std::filesystem::exists(p))return p;}
     // Chinese clients register a different font family. Resolve only files in
     // the selected client, retaining the original face when it is available.
@@ -16,7 +22,7 @@ static std::filesystem::path fontPath(const std::filesystem::path& root,int id,i
     for(auto candidate:{preferred,bold?L"NotoSansCJKsc-Bold.otf":L"NotoSansCJKsc-Regular.otf",L"NotoSansSC-Regular.otf",L"NotoSansCJKsc-Regular.otf",L"gulim.ttc"}){
         auto p=root/candidate;if(std::filesystem::exists(p))return p;
     }
-    return L"C:\\Windows\\Fonts\\tahoma.ttf";
+    return systemTahoma();
 }
 static void ftCheck(FT_Error e){if(e)throw Error("FreeType error "+std::to_string(e));}
 Rasterizer::Rasterizer(std::filesystem::path root):root_(std::move(root)){ftCheck(FT_Init_FreeType(&library_));}

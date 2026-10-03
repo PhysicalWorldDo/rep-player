@@ -12,7 +12,7 @@ class NativeUiRevisionTests(unittest.TestCase):
     def test_frame_steps_splitters_hierarchy_scrollbars_and_backgrounds(self):
         report = ROOT / 'validation' / ('ui_revision_' + uuid.uuid4().hex[:8] + '.json')
         process = subprocess.Popen(
-            [str(ROOT / 'build' / 'rep_player.exe'), '--ui-revision-test', str(report)],
+            [str(ROOT / 'build' / 'rep_player.exe'), '--ui-revision-test', str(report), '--client', r'D:\115us\client'],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             text=True, encoding='utf8', errors='replace', cwd=ROOT)
         try:

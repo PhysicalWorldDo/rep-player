@@ -10,7 +10,7 @@ class NativeUiFeatureTests(unittest.TestCase):
     def test_pause_search_language_client_and_image_visibility(self):
         report = ROOT / 'validation' / 'ui_features.json'
         result = subprocess.Popen([str(ROOT / 'build' / 'rep_player.exe'),
-                                   '--ui-feature-test', str(report)],
+                                   '--ui-feature-test', str(report), '--client', r'D:\115us\client'],
                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         try:
             result.communicate(timeout=45)

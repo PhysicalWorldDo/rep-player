@@ -1,6 +1,6 @@
 # 构建方法
 
-本工程使用 C++20、Win32 和 D3D11，目标为 Windows x64。发布包可直接运行；只有从源码编译时才需要下列工具和开发依赖。
+本工程使用 C++20、Win32 和 D3D11，目标为 Windows x64。用户运行包双击根目录 `rep_player.exe` 即可；以下内容用于源码开发和打包。
 
 ## 获取源码
 
@@ -11,46 +11,51 @@ git clone https://github.com/PhysicalWorldDo/rep-player.git
 Set-Location .\rep-player
 ```
 
-源码不包含客户端原始 REP、NPK、IMG、字体、视频、Bink DLL 或游戏程序。构建完成后的播放验证需要自己准备完整客户端，目录结构见 [README.md](README.md)。
+源码不包含客户端原始录像、图像、字体、视频、Bink DLL 或游戏程序。播放验证需要自己准备完整客户端，目录结构见 [README.md](README.md)。
 
 ## 准备依赖
 
-便携编译器不纳入 Git 仓库。依赖准备脚本下载固定版本的编译器和源码，构建静态 zlib / FreeType 并放入工程目录：
+依赖准备脚本下载固定版本的编译器和源码，构建静态 zlib / FreeType 并放入工程目录：
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\setup-dependencies.ps1
 ```
 
-本版本构建依赖如下；运行时第三方组件的来源与许可见 [THIRD_PARTY.txt](THIRD_PARTY.txt) 和 `licenses`。
-
 | 组件 | 版本 / 用途 |
 | --- | --- |
-| LLVM MinGW | `llvm-mingw-20260616-ucrt-x86_64`，Clang 22.1.8，编译 C++20 与 Windows 资源 |
-| zlib | 1.2.11 头文件和静态库，用于 REP 压缩流 |
-| FreeType | 2.12.1 头文件和静态构建库，用于字体 |
+| LLVM MinGW | `llvm-mingw-20260616-ucrt-x86_64`，Clang 22.1.8，编译 C++20 和 Windows 资源 |
+| zlib | 1.2.11，用于 REP 压缩流 |
+| FreeType | 2.12.1，静态构建，用于字体 |
 
-准备后应存在 `toolchain\llvm-mingw-20260616-ucrt-x86_64\bin\clang++.exe`、`vendor\zlib\libz.a` 和 `vendor\freetype\libfreetype.a`。FreeType 保留官方默认字体模块，通过 `FT_CONFIG_OPTION_SYSTEM_ZLIB` 共用静态 zlib 1.2.11 支持压缩 PCF，关闭外部 PNG、BZip2、Brotli 和 HarfBuzz；该构建不需要原 Anaconda FreeType、libpng 或 zlib DLL。脚本无参数，每次运行都重新编译两个静态库；已下载的源码和工具链会复用。
+准备后应存在 `toolchain\llvm-mingw-20260616-ucrt-x86_64\bin\clang++.exe`、`vendor\zlib\libz.a` 和 `vendor\freetype\libfreetype.a`。FreeType 保留默认字体模块，通过 `FT_CONFIG_OPTION_SYSTEM_ZLIB` 共用静态 zlib 支持压缩 PCF；关闭外部 PNG、BZip2、Brotli 和 HarfBuzz 集成。脚本无参数，每次重新编译两个静态库，复用已下载的源码和工具链。
 
-FFmpeg 用于 AVI 解码和视频 / PNG 导出，依赖准备脚本不安装它。播放器源码编译本身不需要 FFmpeg。运行导出前，可以从本项目 v1.0.0 运行 ZIP 提取已核对来源的静态 FFmpeg：
+FFmpeg 用于 AVI 解码和素材导出，编译播放器本身不需要它。可从 v1.0.1 运行 ZIP 提取同版静态 FFmpeg，供开发目录运行及打包使用：
 
 ```powershell
-curl.exe --fail --location --output .\dependency-cache\runtime.zip https://github.com/PhysicalWorldDo/rep-player/releases/download/v1.0.0/rep-player-v1.0.0-windows-x64.zip
+New-Item -ItemType Directory -Path .\dependency-cache -Force | Out-Null
+curl.exe --fail --location --output .\dependency-cache\runtime.zip https://github.com/PhysicalWorldDo/rep-player/releases/download/v1.0.1/rep-player-v1.0.1-windows-x64.zip
 Expand-Archive -LiteralPath .\dependency-cache\runtime.zip -DestinationPath .\dependency-cache\runtime -Force
 New-Item -ItemType Directory -Path .\build -Force | Out-Null
-Copy-Item -LiteralPath .\dependency-cache\runtime\rep-player-v1.0.0-windows-x64\build\ffmpeg.exe -Destination .\build\ffmpeg.exe -Force
+Copy-Item -LiteralPath .\dependency-cache\runtime\resources\ffmpeg.exe -Destination .\build\ffmpeg.exe -Force
 ```
 
-版本为 `n8.1.2-29-g703dcc25b9-20260721`，支持 libx264、ProRes 4444 和 PNG。较小的构建源码包作为 Release 附件提供，完整依赖源码缓存链接到上游固定版本；查看 [FFMPEG_SOURCE.md](licenses/FFMPEG_SOURCE.md) 可重建该第三方工具。它通过独立进程调用，未链接入播放器。
+FFmpeg 版本保持 `n8.1.2-29-g703dcc25b9-20260721`，支持 libx264、ProRes 4444 和 PNG，通过独立进程调用。其构建源码和完整依赖源码均使用上游固定下载链接，本项目 v1.0.1 Release 不重复附带大源码包；来源和重建方法见 [FFMPEG_SOURCE.md](licenses/FFMPEG_SOURCE.md)。
 
-## 编译
+## 编译与开发运行
 
-关闭从本工程 `build\rep_player.exe` 启动的播放器后，在工程根目录执行：
+关闭从本工程启动的播放器后，在工程根目录执行：
 
 ```powershell
 .\build.ps1
 ```
 
-脚本按源码和头文件时间增量编译，链接播放器和辅助工具：
+如执行策略阻止脚本，可使用单次命令：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1
+```
+
+脚本按源码和头文件时间增量编译，生成以下开发产物：
 
 | 输出 | 用途 |
 | --- | --- |
@@ -61,50 +66,58 @@ Copy-Item -LiteralPath .\dependency-cache\runtime\rep-player-v1.0.0-windows-x64\
 | `build\rep_gpu.exe` | GPU 创建与渲染验证 |
 | `build\rep_catalog.exe` | 双语名称与目录检查 |
 
-运行 `Start.cmd` 或 `build\rep_player.exe`。必须保留 FFmpeg、`assets\shaders` 和 `ui_design\data\skill-name-map.json` 的相对位置。播放器运行不需要构建工具链或 Python。
+直接运行 `.\build\rep_player.exe`。程序会识别源码工程的 `build.ps1` / `build` 布局，继续使用工程根目录的 `runtime` 和 `exports`，保留已有本地设置。用户发布包则以根目录 EXE 所在位置作为程序目录。
 
-## 生成运行包
+名称表、173 个注册着色器文件和应用图标由构建嵌入 EXE。源文件仍保留在源码树中用于维护与重建，用户运行包无需 `ui_design`、`assets` 或 `build`。资源生成由 PowerShell 构建流程完成，无需为编译安装 Python。开发命令行与验证工具继续保留，但不进入用户 ZIP。
 
-在编译并准备好 `build\ffmpeg.exe` 后执行：
+## 生成用户运行包
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\package-release.ps1 -Version 1.0.0 -FFmpegDirectory .\build
-```
-
-本次正式包使用 `dist\ffmpeg-runtime` 作为 FFmpegDirectory，该目录仅有静态 `ffmpeg.exe`。若本地 `build` 保留历史第三方 DLL，请改用只放当前 FFmpeg 及其必需 DLL 的新目录，避免带入旧 DLL。脚本按清单复制 EXE、运行资源和许可证，输出 `dist\rep-player-v1.0.0-windows-x64.zip`；同名目录或 ZIP 已存在时会停止，请使用新版本名或先保留旧包。
-
-若 PowerShell 执行策略阻止脚本，可对单次命令使用进程级设置：
+编译并准备好 `build\ffmpeg.exe` 后执行：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\package-release.ps1 -Version 1.0.1 -FFmpegDirectory .\build
 ```
+
+FFmpegDirectory 指向包含当前静态 `ffmpeg.exe` 的目录，脚本只复制该 EXE，不复制历史 DLL。脚本按运行清单生成 `dist\rep-player-v1.0.1-windows-x64.zip`，ZIP 内直接包含：
+
+```text
+rep_player.exe
+resources\
+├─ ffmpeg.exe
+└─ licenses\
+```
+
+不额外套版本名称文件夹。许可证目录提供第三方许可、通知和来源链接。ZIP 不带辅助验证 EXE、开发文档、启动 CMD、设计资料、图标 PNG / ICO、包内清单或预生成的用户设置。打包目录或 ZIP 同名已存在时，脚本会停止；需要保留旧包后使用新的输出版本。
 
 ## 基本验证
 
-在工程根目录执行 GPU 创建检查：
+工程根目录的 GPU 创建检查：
 
 ```powershell
 .\build\rep_gpu.exe --smoke
 ```
 
-该命令验证 shader program 能在硬件 D3D11 设备上创建；创建成功不能替代逐像素或完整录像验证。检查自己客户端的一份 REP：
+这验证着色器 program 能在硬件 D3D11 设备上创建，不能替代逐像素或完整录像验证。检查自己的录像：
 
 ```powershell
-.\build\rep_validate.exe --dump "D:\MyDNFClient\Replay\SkillReplay\Swordman\BloodyRave.rep"
+$CLIENT = Read-Host '输入完整客户端根目录'
+.\build\rep_validate.exe --dump (Join-Path $CLIENT 'Replay\SkillReplay\Swordman\BloodyRave.rep')
 ```
 
-随后启动播放器，选择完整客户端根，检查自动播放、暂停、前后帧、切换、重播及素材导出。
+请改为客户端中实际存在的录像。开发命令行导出示例：
+
+```powershell
+.\build\rep_export.exe --client $CLIENT --replay (Join-Path $CLIENT 'Replay\SkillReplay\Swordman\BloodyRave.rep') --format mov --fps 60 --alpha 1 --output .\exports --name BloodyRave
+```
+
+随后完整解压用户 ZIP 到其他可写目录，直接启动根 EXE，检查客户端选择、名称显示、播放、暂停、前后帧、重播和导出。运行依赖须以解压包自身验证。
 
 ## 研发测试与历史证据
 
-`tests` 和 `tools` 包含研发验证工具。Python 仅用于测试和报告生成，播放器运行不依赖 Python。历史完整测试还依赖 NumPy、Pillow、特定本机客户端及独立的旧 Python 播放器基准；其中部分命令使用研发机器路径，不能直接当作全新机器上的构建步骤。
-
-需要匹配测试输入后，可运行：
+`tests` 和 `tools` 保留研发验证工具。Python 只用于测试和报告，播放器运行不依赖 Python。完整历史测试还需要 NumPy、Pillow、指定客户端输入及独立的旧 Python 播放器基准，需先配置实际存在的输入再执行：
 
 ```powershell
 python -m unittest discover -s tests -v
 ```
 
-历史协议差分、代表录像、着色器像素、UI 和导出证据的范围见 [RELEASE_NOTES.md](RELEASE_NOTES.md) 及 `HANDOFF.md`。客户端输入保持只读；新的设置、缓存、导出和验证报告应放在本工程目录内。
-
-Git 不追踪 `build`、`toolchain`、`runtime`、缓存、导出素材和本机验证输出。发布包包含实际运行依赖，源码仓库通过依赖准备脚本恢复构建环境。
+历史协议、GPU、UI 和导出证据的范围见 [RELEASE_NOTES.md](RELEASE_NOTES.md) 及 `HANDOFF.md`，其中本地研发记录不是普通用户的运行前提。客户端输入保持只读，新设置、缓存、导出和验证报告放在工程内。Git 不追踪 `build`、`toolchain`、`runtime`、缓存、导出素材或本机验证输出。

@@ -1,4 +1,5 @@
 #include "catalog.hpp"
+#include "resource_data.hpp"
 #include <algorithm>
 #include <cctype>
 #include <variant>
@@ -46,8 +47,15 @@ public:
 };
 std::string key(std::string path){return canonical(std::move(path));}
 }
+Catalog::Catalog(){
+    auto bytes=resourceData(L"SKILL_NAME_MAP");if(bytes.empty())throw Error("embedded skill-name-map resource missing");
+    loadNames(std::string_view(reinterpret_cast<const char*>(bytes.data()),bytes.size()));
+}
 Catalog::Catalog(const std::filesystem::path& nameMap){
-    auto bytes=readFile(nameMap);auto json=Parser(std::string_view(reinterpret_cast<const char*>(bytes.data()),bytes.size())).parse();
+    auto bytes=readFile(nameMap);loadNames(std::string_view(reinterpret_cast<const char*>(bytes.data()),bytes.size()));
+}
+void Catalog::loadNames(std::string_view text){
+    auto json=Parser(text).parse();
     auto entries=std::get_if<Json::Array>(&json.field("entries").value);if(!entries)throw Error("skill-name-map entries missing");
     for(const auto& row:*entries){SkillItem item;item.relativePath=row.field("relativePath").string();item.job=row.field("job").string();item.jobZh=row.field("jobZh").string();item.english=row.field("english").string();item.zh=row.field("zh").string();item.vpName=row.field("vpName").string();item.displayZh=row.field("displayZh").string();item.displayEn=row.field("displayEn").string();
         if(auto aliases=std::get_if<Json::Array>(&row.field("aliases").value))for(const auto& alias:*aliases)item.aliases.push_back(alias.string());

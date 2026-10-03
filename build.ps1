@@ -5,6 +5,7 @@ $resourceCompiler = Join-Path (Split-Path $compiler) 'llvm-windres.exe'
 if (!(Test-Path -LiteralPath $compiler)) { throw 'Run tools\setup-dependencies.ps1 first to prepare the pinned compiler.' }
 $buildPath = Join-Path $taskRoot 'build'
 New-Item -ItemType Directory -Path $buildPath -Force | Out-Null
+& (Join-Path $taskRoot 'tools\generate-app-resources.ps1')
 $options = @('-std=c++20','-O2','-Wall','-Wextra','-DNOMINMAX','-DUNICODE','-D_UNICODE','-municode','-static','-I',(Join-Path $taskRoot 'vendor\zlib'),'-I',(Join-Path $taskRoot 'vendor\freetype\include'))
 $sources = @('protocol','resources','gpu','bindings','fonts','movies','engine','catalog','export','ui_playback','validate','resource_validate','gpu_validate','catalog_validate','export_validate','app')
 $headerTime = (Get-ChildItem -LiteralPath (Join-Path $taskRoot 'src') -Filter '*.hpp' | Sort-Object LastWriteTime -Descending | Select-Object -First 1).LastWriteTime

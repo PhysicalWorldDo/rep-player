@@ -1,4 +1,5 @@
 #include "movies.hpp"
+#include "runtime_paths.hpp"
 #include <algorithm>
 #include <cmath>
 #include <fstream>
@@ -13,7 +14,7 @@ struct Movies::Instance {
     void closePipe(){if(pipe)CloseHandle(pipe);pipe=nullptr;if(process){if(WaitForSingleObject(process,20)==WAIT_TIMEOUT)TerminateProcess(process,0);CloseHandle(process);}process=nullptr;}
 };
 Movies::Movies(std::filesystem::path client,std::filesystem::path cache):client_(std::move(client)),cache_(std::move(cache)){
-    std::filesystem::create_directories(cache_);wchar_t module[32768]{};GetModuleFileNameW(nullptr,module,32768);ffmpeg_=std::filesystem::path(module).parent_path()/L"ffmpeg.exe";
+    std::filesystem::create_directories(cache_);ffmpeg_=ffmpegExecutable();
 }
 Movies::~Movies(){reset();if(bink_)FreeLibrary(bink_);}
 void Movies::reset(){instances_.clear();}

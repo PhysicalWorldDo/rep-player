@@ -13,7 +13,7 @@ class NativeUiTests(unittest.TestCase):
         exe=ROOT/'build'/'rep_player.exe'
         self.assertTrue(exe.is_file(),'native window is not implemented')
         report=ROOT/'validation'/'ui_smoke.json'
-        result=subprocess.run([str(exe),'--ui-test',str(report)],timeout=65,capture_output=True)
+        result=subprocess.run([str(exe),'--ui-test',str(report),'--client',r'D:\115us\client'],timeout=65,capture_output=True)
         self.assertEqual(result.returncode,0,result.stderr.decode(errors='replace'))
         out=json.loads(report.read_text(encoding='utf8'))
         self.assertEqual(out['tree_replays'],3064)
@@ -26,7 +26,7 @@ class NativeUiTests(unittest.TestCase):
         # First scene renders successfully; second scene has an unbalanced push.
         path.write_bytes(pack_replay(1.7,{0:struct.pack('<I',17),1:struct.pack('<3I',0,1,0)},[(30,(0,),b''),(60,(1,),b'')]))
         report=ROOT/'validation'/'ui_recovery.json'
-        result=subprocess.run([str(ROOT/'build'/'rep_player.exe'),'--ui-test',str(report),str(path)],timeout=65,capture_output=True)
+        result=subprocess.run([str(ROOT/'build'/'rep_player.exe'),'--ui-test',str(report),str(path),'--client',r'D:\115us\client'],timeout=65,capture_output=True)
         self.assertEqual(result.returncode,0,result.stderr.decode(errors='replace'))
         out=json.loads(report.read_text(encoding='utf8'))
         self.assertTrue(out['recovered_after_scene_error'] and out['autoplay'] and out['frozen'])
