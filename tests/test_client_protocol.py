@@ -10,6 +10,8 @@ import uuid
 sys.dont_write_bytecode = True
 sys.path.insert(0, r'D:\DNF115us\skill_player')
 from test_rep_protocol_versions import pack_replay
+from test_npk_reader import npk, img_header, rec
+from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -59,6 +61,37 @@ class ClientProtocolTests(unittest.TestCase):
         ], capture_output=True, text=True, encoding='utf-8', timeout=30)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('codepage', result.stderr.lower())
+
+    def test_v18_grid57_export_preserves_extent_scale_alpha_and_last_scene(self):
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from test_protocol_render_adaptation import grid57
+        image = img_header(2, 36, 1) + rec(16, 5, 4, 4, 64, x=2, y=2, full_w=12, full_h=12)
+        image += bytes([0, 0, 255, 255]) * 16
+        (self.client / 'ImagePacks2' / 'sprite_grid.NPK').write_bytes(npk(image, 'sprite/grid/frame.img'))
+        header = b'\x0b\0' + struct.pack('<8h', *([32, 32] * 4))
+        header += b'\x0c' + struct.pack('<H', 6) + bytes(126)
+        replay = self.folder / 'grid57_18.rep'
+        replay.write_bytes(pack_replay(1.8, {0: grid57(1.8), 1: grid57(1.8, source_scale=(2, 1))},
+                                      [(0, (0,), b''), (100, (1,), b'')],
+                                      ['sprite/grid/frame.img'], header=header))
+        result = subprocess.run([
+            str(ROOT / 'build' / 'rep_export.exe'), '--client', str(self.client), '--replay', str(replay),
+            '--format', 'png', '--fps', '30', '--alpha', '1', '--output', str(self.folder),
+            '--name', self._testMethodName,
+        ], capture_output=True, text=True, encoding='utf-8', timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        data = json.loads(result.stdout)
+        self.assertEqual((data['frames'], data['executed_scenes']), (4, 2))
+        frames = sorted(Path(data['output']).glob('frame_*.png'))
+        self.assertEqual(len(frames), 4)
+        for path, rectangle in ((frames[0], (3, 4, 9, 10)), (frames[-1], (5, 4, 17, 10))):
+            pixels = Image.open(path).convert('RGBA')
+            self.assertEqual(pixels.size, (32, 32))
+            left, top, right, bottom = rectangle
+            for y in range(32):
+                for x in range(32):
+                    expected = (255, 0, 0, 255) if left <= x < right and top <= y < bottom else (0, 0, 0, 0)
+                    self.assertEqual(pixels.getpixel((x, y)), expected, (path.name, x, y))
 
     def test_gui_playback_and_inspection_use_same_dnf_profile(self):
         report = self.folder / 'ui.json'

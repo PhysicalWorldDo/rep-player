@@ -32,6 +32,16 @@ def grid57(version, extent=(14, 14), source_scale=(1, 1), position=(1, 2),
     return op(57, struct.pack('<I', 0) + params + arrays)
 
 
+def effect(kind, values=()):
+    body = b'\1' + struct.pack('<IIBII', kind, len(values), 0, 0, 0)
+    return op(19, body + struct.pack('<' + 'f' * len(values), *values))
+
+
+def context_mask(mode=0, enabled=True):
+    # Native54 serializer: offset2, scale2, facing, mode, bind-context flag.
+    return effect(54, (0, 0, 0, 0, 0, mode, float(enabled)))
+
+
 class ProtocolRenderAdaptationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -62,11 +72,14 @@ class ProtocolRenderAdaptationTests(unittest.TestCase):
         return lambda x, y: tuple(pixels[(y * 32 + x) * 4:(y * 32 + x) * 4 + 3])
 
     def assert_rectangle(self, pixel, rectangle):
-        left, top, right, bottom = rectangle
+        self.assert_rectangles(pixel, [rectangle])
+
+    def assert_rectangles(self, pixel, rectangles):
         for y in range(32):
             for x in range(32):
-                expected = (255, 0, 0) if left <= x < right and top <= y < bottom else (0, 0, 0)
-                self.assertEqual(pixel(x, y), expected, (x, y, rectangle))
+                visible = any(l <= x < r and t <= y < b for l, t, r, b in rectangles)
+                expected = (255, 0, 0) if visible else (0, 0, 0)
+                self.assertEqual(pixel(x, y), expected, (x, y, rectangles))
 
     def test_v18_grid57_uses_direct_target_extent(self):
         # Native >=1.8 forwards14 directly, stretching [2,4] from2 to4;
@@ -96,6 +109,75 @@ class ProtocolRenderAdaptationTests(unittest.TestCase):
         draw, aux = legacy(1, 2, scale=(1.5, 1.5))
         pixel = self.render(grid + draw, aux=aux)
         self.assert_rectangle(pixel, (3, 4, 9, 10))
+
+    def test_cn_context38_routes_draw_to_separate_render_texture(self):
+        draw, aux = legacy()
+        pixel = self.render(op(38) + draw, aux=aux, profile='dnf-july')
+        self.assert_rectangle(pixel, (0, 0, 0, 0))
+        self.assertEqual(self.report['context_allocations'], 1)
+        self.assertEqual(self.report['last_context'], 219)
+
+    def test_cn_context39_restores_output_without_pushing_an_effect(self):
+        mask, first = legacy()
+        draw, second = legacy(-2, -2, scale=(2, 2))
+        pixel = self.render(op(38) + mask + op(39) + draw,
+                            aux=first + second, profile='dnf-july')
+        self.assert_rectangle(pixel, (2, 2, 10, 10))
+        self.assertEqual(self.report['context_bindings'], 1)
+        self.assertEqual(self.report['last_context'], 81)
+
+    def test_cn_type54_binds_context_texture_only_when_flag_is_set(self):
+        mask, first = legacy()
+        draw, second = legacy(-2, -2, scale=(2, 2))
+        pixel = self.render(op(38) + mask + op(39) + context_mask() + draw,
+                            aux=first + second, profile='dnf-july')
+        self.assert_rectangle(pixel, (2, 2, 6, 6))
+        self.assertEqual(self.report['shader_counts'][54], 1)
+
+    def test_cn_context40_releases_actual_effect_stack(self):
+        mask, first = legacy()
+        draw, second = legacy(-2, -2, scale=(2, 2))
+        tail, third = legacy(12, 0)
+        raw = op(38) + mask + op(39) + context_mask() + draw + op(40) + tail
+        pixel = self.render(raw, aux=first + second + third, profile='dnf-july')
+        self.assert_rectangles(pixel, [(2, 2, 6, 6), (14, 2, 18, 6)])
+        self.assertEqual(self.report['context_releases'], 1)
+
+    def test_cn_context40_bypasses_phantom_count_unlike_opcode20(self):
+        mask, first = legacy()
+        draw, second = legacy(-2, -2, scale=(2, 2))
+        raw = op(38) + mask + op(39) + context_mask() + effect(8) + op(40) + draw + op(20)
+        pixel = self.render(raw, aux=first + second, profile='dnf-july')
+        self.assert_rectangle(pixel, (2, 2, 10, 10))
+        self.assertEqual(self.report['phantom_pushes'], 1)
+        self.assertEqual(self.report['context_releases'], 1)
+
+    def test_cn_context_allocator_caps_at_twelve_slots(self):
+        pixel = self.render(op(38) * 14, profile='dnf-july')
+        self.assert_rectangle(pixel, (0, 0, 0, 0))
+        self.assertEqual(self.report['context_allocations'], 14)
+        self.assertEqual(self.report['last_context'], 230)
+
+    def test_cn_camera_prepass_uses_saved_context_and_restores_it(self):
+        camera = op(50, struct.pack('<ffIfff', 0, 0, 0, 32, 32, 1))
+        self.render(op(38) + camera + op(39) + camera, profile='dnf-july')
+        self.assertEqual(sorted((v['context'], v['layer']) for v in self.report['camera_keys']),
+                         [(81, 0), (219, 0)])
+
+    def test_cn_inspection40_pops_actual_stack_even_with_phantom(self):
+        values = [0.] * 24
+        values[21] = 1
+        draw, aux = legacy()
+        self.render(effect(36, values) + effect(8) + op(40) + draw + op(20),
+                    aux=aux, profile='dnf-july')
+        self.assertFalse(any(v['role'] == 'shader-input' for v in self.report['inspection_images']))
+
+    def test_dfo_context38to40_remain_noops(self):
+        draw, aux = legacy()
+        pixel = self.render(op(38) + draw + op(39) + op(40), aux=aux)
+        self.assert_rectangle(pixel, (2, 2, 6, 6))
+        for field in ('context_allocations', 'context_bindings', 'context_releases'):
+            self.assertEqual(self.report[field], 0)
 
 
 if __name__ == '__main__':
