@@ -4,6 +4,7 @@
 #include <cstring>
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -35,6 +36,14 @@ std::string utf8(std::wstring_view text);
 std::wstring wide(std::string_view text, unsigned codepage=65001);
 std::string canonical(std::string text);
 
+enum class ProtocolProfile { Dfo, DnfJuly2026 };
+const char* profileName(ProtocolProfile profile);
+struct ReplayOptions {
+    ProtocolProfile profile=ProtocolProfile::Dfo;
+    std::optional<unsigned> resourceCodePage;
+    bool decodeResourceStrings=true;
+};
+
 struct Header {
     Bytes raw;
     std::array<uint16_t,8> recorded{};
@@ -57,6 +66,7 @@ struct Instruction {
     uint32_t opcode=0,offset=0,payloadBytes=0,auxBytes=0,storedSize=0;
     std::array<uint8_t,64> params{};
     bool hasParams=false;
+    bool nativeContextState=false;
     int64_t resource=-1;
     int32_t frame=0;
     uint32_t layer=0;
@@ -89,20 +99,25 @@ class Replay {
     uint64_t ordinal_=0;
 public:
     int version=10;
+    uint32_t versionBits=0;
+    ReplayOptions options;
     Header header;
     std::unordered_map<uint32_t,Command> dictionary;
     std::vector<std::string> rawResources,resources;
+    std::vector<Bytes> resourceBytes;
     std::vector<Command*> dense;
     uint64_t migrations=0;
-    explicit Replay(const std::filesystem::path& path);
+    explicit Replay(const std::filesystem::path& path,ReplayOptions options={});
     ~Replay();
     Replay(const Replay&)=delete;
     void rewind();
     bool next(Scene& scene);
     const Command* command(uint32_t id) const;
     std::string path(int64_t id) const;
+    unsigned effectiveCodePage() const;
+    bool resourceStringsDecoded() const { return options.decodeResourceStrings; }
     Statistics validate(bool retainTimestamps=false);
 };
 std::array<uint8_t,64> drawDefaults();
-Command decodeCommand(Bytes raw,int version,int minor);
+Command decodeCommand(Bytes raw,int version,int minor,ProtocolProfile profile=ProtocolProfile::Dfo);
 }

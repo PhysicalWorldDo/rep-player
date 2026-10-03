@@ -37,6 +37,16 @@ std::wstring wide(std::string_view t,unsigned cp) {
 std::string canonical(std::string s) {
     for(auto& c:s) { if(c=='\\') c='/'; else if(c>='A'&&c<='Z') c+=32; } return s;
 }
+const char* profileName(ProtocolProfile profile) {
+    return profile==ProtocolProfile::DnfJuly2026?"dnf-july":"dfo";
+}
+unsigned Replay::effectiveCodePage() const {
+    return options.resourceCodePage.value_or(options.profile==ProtocolProfile::DnfJuly2026?CP_ACP:949);
+}
+static std::string hexBytes(std::span<const uint8_t> bytes) {
+    constexpr char digits[]="0123456789abcdef";std::string out;out.reserve(bytes.size()*2);
+    for(auto byte:bytes){out.push_back(digits[byte>>4]);out.push_back(digits[byte&15]);}return out;
+}
 class Timeline {
     z_stream z_{};
     std::array<uint8_t,131072> buffer_{};
@@ -100,17 +110,27 @@ static Bytes padded(Reader& r,uint32_t size,Bytes defaults) {
     if(size>defaults.size()) throw Error("native payload exceeds ABI size");
     auto b=r.take(size); std::copy(b.begin(),b.end(),defaults.begin()); return defaults;
 }
-Command decodeCommand(Bytes raw,int v,int minor) {
+Command decodeCommand(Bytes raw,int v,int minor,ProtocolProfile profile) {
     Command c; c.raw=std::move(raw); Reader r(c.raw);
     while(r.remaining()) {
+        auto opcodeOffset=r.pos;
+        if(r.remaining()<4)throw Error("truncated opcode at byte "+std::to_string(opcodeOffset));
         Instruction i; i.opcode=r.get<uint32_t>(); i.offset=uint32_t(r.pos);
         auto op=i.opcode;
-        if(op>64) throw Error("unsupported opcode "+std::to_string(op));
+        if(op>64) throw Error("unsupported opcode "+std::to_string(op)+" at byte "+std::to_string(opcodeOffset));
+        try {
         switch(op) {
         case 0: {auto t=r.get<uint32_t>(); r.take(4); if((t&255)==7) r.take(8); break;}
-        case 1:case 8:case 9:case 11:case 12:case 17:case 20:case 22:case 25:
-        case 31:case 34:case 35:case 36:case 37:case 38:case 39:case 40:case 41:
+        case 1:case 8:case 9:case 11:case 12:case 17:case 20:
+        case 31:case 34:case 35:case 36:case 37:case 41:
         case 49:case 54:case 59:case 62:break;
+        case 22: {
+            if(profile==ProtocolProfile::DnfJuly2026){auto b=r.take(4);i.native.assign(b.begin(),b.end());}break;
+        }
+        case 25: {
+            if(profile==ProtocolProfile::DnfJuly2026){auto b=r.take(8);i.native.assign(b.begin(),b.end());i.resource=at<uint32_t>(b,0);}break;
+        }
+        case 38:case 39:case 40:i.nativeContextState=profile==ProtocolProfile::DnfJuly2026;break;
         case 2:r.take(8);break;
         case 3:case 4: {
             i.storedSize=r.get<uint32_t>(); if(i.storedSize>64) throw Error("draw payload exceeds ABI");
@@ -206,6 +226,7 @@ Command decodeCommand(Bytes raw,int v,int minor) {
         case 64:r.take(12);break;
         default:throw Error("unimplemented opcode");
         }
+        }catch(const Error& e){throw Error("opcode "+std::to_string(op)+" at byte "+std::to_string(opcodeOffset)+": "+e.what());}
         i.payloadBytes=uint32_t(r.pos-i.offset);c.auxBytes+=i.auxBytes;c.instructions.push_back(std::move(i));
     }
     return c;
@@ -250,13 +271,21 @@ static void migrate(Replay& r) {
         if(chosen){r.resources[id]=chosen->target;++r.migrations;}
     }
 }
-Replay::Replay(const std::filesystem::path& path) {
+Replay::Replay(const std::filesystem::path& path,ReplayOptions requestedOptions):options(requestedOptions) {
     auto data=readFile(path);Reader r(data);auto checksum=r.get<uint32_t>(),size=r.get<uint32_t>();
     if(size!=data.size()-8)throw Error("invalid REP declared file length");
     if(checksum!=crc(std::span(data).subspan(8)))throw Error("invalid REP payload CRC32");
     if(r.get<uint8_t>()!=1)throw Error("invalid REP version tag");
-    auto value=r.get<float>();version=int(std::round(value*10));
-    if(version<10||version>17||std::abs(value-version/10.f)>.00001f)throw Error("unsupported REP version");
+    versionBits=r.get<uint32_t>();
+    constexpr std::array<uint32_t,9> registeredVersions{
+        0x3f800000u,0x3f8ccccdu,0x3f99999au,0x3fa66666u,0x3fb33333u,
+        0x3fc00000u,0x3fcccccdu,0x3fd9999au,0x3fe66666u};
+    auto registered=std::find(registeredVersions.begin(),registeredVersions.end(),versionBits);
+    if(registered==registeredVersions.end()){
+        std::array<uint8_t,4> bits{uint8_t(versionBits>>24),uint8_t(versionBits>>16),uint8_t(versionBits>>8),uint8_t(versionBits)};
+        throw Error("unsupported REP version bits 0x"+hexBytes(bits));
+    }
+    version=10+int(registered-registeredVersions.begin());
     if(r.get<uint8_t>()!=0)throw Error("invalid REP header tag");
     header=decodeHeader(r.take(r.get<uint32_t>()),version);
     auto b=r.take(r.get<uint32_t>());compressedTimeline_.assign(b.begin(),b.end());
@@ -266,17 +295,24 @@ Replay::Replay(const std::filesystem::path& path) {
         auto id=d.get<uint32_t>();auto n=version>=15?d.get<uint16_t>():d.get<uint32_t>();auto s=d.take(n);Bytes raw(s.begin(),s.end());
         if(dictionary.contains(id))throw Error("duplicate dictionary ID");
         if(n>largest)largest=n;else {if(previous.size()<n)throw Error("short XOR predecessor");for(size_t k=0;k<n;k++)raw[k]^=previous[k];}
-        previous=raw;dictionary.emplace(id,decodeCommand(std::move(raw),version,header.minor));
+        previous=raw;
+        try{dictionary.emplace(id,decodeCommand(std::move(raw),version,header.minor,options.profile));}
+        catch(const Error& e){throw Error("command "+std::to_string(id)+": "+e.what());}
     }
-    count=d.get<uint32_t>();resources.reserve(count);
+    count=d.get<uint32_t>();resources.reserve(count);resourceBytes.reserve(count);
     while(count--) {
-        if(version>=15&&!d.get<uint8_t>()){resources.emplace_back();continue;}
+        auto resourceId=resources.size();
+        if(version>=15&&!d.get<uint8_t>()){resources.emplace_back();resourceBytes.emplace_back();continue;}
         auto n=version>=15?d.get<uint16_t>():d.get<uint32_t>();auto s=d.take(size_t(n)+1);
         if(s.back())throw Error("unterminated resource string");
+        resourceBytes.emplace_back(s.begin(),s.end()-1);
         auto end=std::find(s.begin(),s.end(),0);auto text=std::string_view(reinterpret_cast<const char*>(s.data()),end-s.begin());
-        resources.push_back(utf8(wide(text,949)));
+        if(options.decodeResourceStrings) {
+            try{resources.push_back(utf8(wide(text,effectiveCodePage())));}
+            catch(const Error& e){throw Error("resource string "+std::to_string(resourceId)+" codepage "+std::to_string(effectiveCodePage())+": "+e.what()+"; raw_hex="+hexBytes(resourceBytes.back()));}
+        }else resources.emplace_back();
     }
-    d.end();rawResources=resources;migrate(*this);
+    d.end();rawResources=resources;if(options.decodeResourceStrings)migrate(*this);
     uint32_t max=0;for(auto& [id,c]:dictionary)max=std::max(max,id);
     if(max<1000000){dense.resize(size_t(max)+1);for(auto& [id,c]:dictionary)dense[id]=&c;}
     rewind();
