@@ -70,7 +70,11 @@ $CLIENT = Read-Host '输入完整客户端根目录'
 .\rep_player.exe --client $CLIENT --open (Join-Path $CLIENT 'Replay\SkillReplay\Swordman\BloodyRave.rep')
 ```
 
-将录像相对路径替换为实际文件。播放器会根据客户端的 `DFO.exe` / `DNF.exe` 自动选择协议，支持 REP 1.0–1.8。自建资源目录可指定 `--profile dfo` 或 `--profile dnf-july`。文字显示或解码异常时，可按录像来源指定 `--codepage 949`、`--codepage 936` 或 `--codepage 65001`。
+将录像相对路径替换为实际文件。播放器会根据客户端的 `DFO.exe` / `DNF.exe` 自动选择协议，支持 REP 1.0–1.8。DFO 使用 `dfo`，DNF 使用 `dnf-compatible`；自建资源目录可用 `--profile` 指定。
+
+DNF 兼容模式仅对 REP 1.8 / minor 6 中完整、独立的 `4200000000` 字典命令进行跳过，窗口会提示“兼容播放”。该 opcode 66 的原生渲染作用尚未确认，画面可能与客户端不同。其他未知指令、非零载荷、嵌入命令及不同版本仍会报错。使用 `--profile dnf-july` 可恢复严格的 7.09 读取合同，保留对 66 的拒绝。
+
+文字显示或解码异常时，可按录像来源指定 `--codepage 949`、`--codepage 936` 或 `--codepage 65001`。
 
 ## 常见问题
 

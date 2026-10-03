@@ -25,6 +25,7 @@ int wmain(int argc,wchar_t** argv){try{
         [&](const rep::ExportProgress& progress){completed=progress.completedFrames;},[&](){return cancelAfter&&completed>=cancelAfter;});
     std::cout<<"{\"output\":"<<jsonString(rep::utf8(result.outputPath.wstring()))<<",\"width\":"<<result.width<<",\"height\":"<<result.height
         <<",\"fps\":"<<result.fps<<",\"frames\":"<<result.frames<<",\"duration_ms\":"<<result.durationMilliseconds
-        <<",\"executed_scenes\":"<<result.executedScenes<<",\"hidden_images\":"<<result.hiddenImageCount<<",\"alpha\":"<<(result.alpha?"true":"false")<<"}\n";
+        <<",\"executed_scenes\":"<<result.executedScenes<<",\"hidden_images\":"<<result.hiddenImageCount
+        <<",\"compatibility_ignored_instructions\":"<<result.compatibilityIgnoredInstructions<<",\"alpha\":"<<(result.alpha?"true":"false")<<"}\n";
     return 0;
 }catch(const std::exception& error){std::cerr<<error.what()<<'\n';return 1;}}

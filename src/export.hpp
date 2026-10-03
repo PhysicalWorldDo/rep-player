@@ -22,7 +22,7 @@ struct ExportProgress {
 struct ExportResult {
     std::filesystem::path outputPath;
     int width=0,height=0,fps=0,durationMilliseconds=0;
-    uint64_t frames=0,executedScenes=0,hiddenImageCount=0;
+    uint64_t frames=0,executedScenes=0,hiddenImageCount=0,compatibilityIgnoredInstructions=0;
     bool alpha=false;
 };
 // Call on the thread that owns gpu/assets. A separate device keeps UI playback live.

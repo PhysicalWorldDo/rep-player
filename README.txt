@@ -5,6 +5,7 @@ REP 播放器 1.0.3
 
 支持分层录像列表、中英技能搜索、打开指定 REP、逐帧查看、IMG 隐藏及 MOV / MP4 / PNG 导出。
 切换不同录像时释放旧素材缓存，视频临时文件使用后自动回收。
+DNF 默认启用有限兼容模式；出现“兼容播放”提示时，部分未识别指令已跳过，画面可能与客户端不同。
 
 完整使用说明：https://github.com/PhysicalWorldDo/rep-player/blob/main/README.md
 下载：https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.0.3

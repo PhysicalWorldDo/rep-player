@@ -19,9 +19,10 @@ static void output(rep::Replay& r,const rep::Statistics& s,bool dump,double ms,c
     <<",\"version_bits\":"<<quote(versionBits.str())<<",\"profile\":"<<quote(rep::profileName(r.options.profile))<<",\"resource_codepage\":"<<r.effectiveCodePage()
     <<",\"resource_strings_decoded\":"<<(r.resourceStringsDecoded()?"true":"false")<<",\"path\":"<<quote(rep::utf8(path.wstring()))
     <<",\"scenes\":"<<s.scenes<<",\"references\":"<<s.references<<",\"aux_bytes\":"<<s.auxBytes<<",\"command_count\":"<<r.dictionary.size()<<",\"resource_migrations\":"<<r.migrations
-    <<",\"timeline_crc32\":"<<s.timelineCrc<<",\"exact_eof\":true,\"milliseconds\":"<<ms<<",\"opcode_counts\":{";
-    bool first=true;for(int i=0;i<65;i++)if(s.opcodes[i]){if(!first)std::cout<<',';first=false;std::cout<<quote(std::to_string(i))<<':'<<s.opcodes[i];}std::cout<<'}';
-    std::cout<<",\"dictionary_opcode_counts\":{";first=true;for(int i=0;i<65;i++)if(s.dictionaryOpcodes[i]){if(!first)std::cout<<',';first=false;std::cout<<quote(std::to_string(i))<<':'<<s.dictionaryOpcodes[i];}std::cout<<'}';
+    <<",\"timeline_crc32\":"<<s.timelineCrc<<",\"exact_eof\":true,\"milliseconds\":"<<ms
+    <<",\"compatibility_ignored_commands\":"<<s.compatibilityIgnoredCommands<<",\"compatibility_ignored_references\":"<<s.compatibilityIgnoredReferences<<",\"opcode_counts\":{";
+    bool first=true;for(size_t i=0;i<s.opcodes.size();i++)if(s.opcodes[i]){if(!first)std::cout<<',';first=false;std::cout<<quote(std::to_string(i))<<':'<<s.opcodes[i];}std::cout<<'}';
+    std::cout<<",\"dictionary_opcode_counts\":{";first=true;for(size_t i=0;i<s.dictionaryOpcodes.size();i++)if(s.dictionaryOpcodes[i]){if(!first)std::cout<<',';first=false;std::cout<<quote(std::to_string(i))<<':'<<s.dictionaryOpcodes[i];}std::cout<<'}';
     if(dump){
         std::cout<<",\"timestamps\":[";first=true;for(auto t:s.timestamps){if(!first)std::cout<<',';first=false;std::cout<<t;}std::cout<<"],\"resources\":{";
         for(size_t n=0;n<r.resources.size();n++){if(n)std::cout<<',';std::cout<<quote(std::to_string(n))<<':'<<quote(r.resources[n]);}
@@ -29,7 +30,8 @@ static void output(rep::Replay& r,const rep::Statistics& s,bool dump,double ms,c
         std::vector<uint32_t> ids;for(auto& [id,c]:r.dictionary)ids.push_back(id);std::sort(ids.begin(),ids.end());first=true;
         for(auto id:ids){auto& c=r.dictionary.at(id);if(!first)std::cout<<',';first=false;std::cout<<"{\"id\":"<<id<<",\"raw_crc32\":"<<rep::crc(c.raw)<<",\"instructions\":[";
             bool f=true;for(auto& i:c.instructions){if(!f)std::cout<<',';f=false;std::cout<<"{\"opcode\":"<<i.opcode<<",\"payload_bytes\":"<<i.payloadBytes<<",\"aux_bytes\":"<<i.auxBytes
-                <<",\"resource_id\":"<<i.resource<<",\"native_hex\":"<<quote(hex(i.native))<<",\"native_context_state\":"<<(i.nativeContextState?"true":"false");
+                <<",\"resource_id\":"<<i.resource<<",\"native_hex\":"<<quote(hex(i.native))<<",\"native_context_state\":"<<(i.nativeContextState?"true":"false")
+                <<",\"compatibility_ignored\":"<<(i.compatibilityIgnored?"true":"false");
                 if(i.hasParams)std::cout<<",\"params_hex\":"<<quote(hex(i.params));std::cout<<'}';}std::cout<<"]}";}
         std::cout<<']';
     }std::cout<<"}\n";
@@ -46,6 +48,7 @@ int wmain(int argc,wchar_t** argv){
                 auto name=argument(index);
                 if(name==L"dfo")options.profile=rep::ProtocolProfile::Dfo;
                 else if(name==L"dnf-july")options.profile=rep::ProtocolProfile::DnfJuly2026;
+                else if(name==L"dnf-compatible")options.profile=rep::ProtocolProfile::DnfCompatible;
                 else throw rep::Error("unsupported protocol profile "+rep::utf8(name));
             }else if(arg==L"--codepage"){
                 auto text=std::wstring(argument(index));size_t used=0;auto value=std::stoul(text,&used,10);
@@ -64,7 +67,7 @@ int wmain(int argc,wchar_t** argv){
                 catch(const std::exception& e){std::cout<<"{\"path\":"<<quote(line)<<",\"profile\":"<<quote(rep::profileName(options.profile))<<",\"error\":"<<quote(e.what())<<"}\n";++failures;}
             }return failures?1:0;
         }
-        if(!input)throw rep::Error("usage: rep_validate [--dump] [--profile dfo|dnf-july] [--codepage N] [--structural] file.rep | --batch list.txt");
+        if(!input)throw rep::Error("usage: rep_validate [--dump] [--profile dfo|dnf-july|dnf-compatible] [--codepage N] [--structural] file.rep | --batch list.txt");
         auto start=std::chrono::steady_clock::now();rep::Replay r(*input,options);auto s=r.validate(dump);
         output(r,s,dump,std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-start).count(),*input);return 0;
     }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}

@@ -124,6 +124,7 @@ ExportResult exportReplay(Gpu& gpu,Assets& assets,const std::filesystem::path& c
     }
     update.stage=L"Encoding";if(progress)progress(update);encoder.finish(cancelled);checkCancelled();
     std::filesystem::rename(staging,output);result.executedScenes=executor.statistics.scenes;
+    result.compatibilityIgnoredInstructions=executor.statistics.compatibilityIgnoredInstructions;
     update.stage=L"Complete";if(progress)progress(update);return result;
 }
 }

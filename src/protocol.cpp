@@ -38,10 +38,11 @@ std::string canonical(std::string s) {
     for(auto& c:s) { if(c=='\\') c='/'; else if(c>='A'&&c<='Z') c+=32; } return s;
 }
 const char* profileName(ProtocolProfile profile) {
-    return profile==ProtocolProfile::DnfJuly2026?"dnf-july":"dfo";
+    if(profile==ProtocolProfile::DnfCompatible)return "dnf-compatible";
+    return dnfProfile(profile)?"dnf-july":"dfo";
 }
 unsigned Replay::effectiveCodePage() const {
-    return options.resourceCodePage.value_or(options.profile==ProtocolProfile::DnfJuly2026?CP_ACP:949);
+    return options.resourceCodePage.value_or(dnfProfile(options.profile)?CP_ACP:949);
 }
 static std::string hexBytes(std::span<const uint8_t> bytes) {
     constexpr char digits[]="0123456789abcdef";std::string out;out.reserve(bytes.size()*2);
@@ -117,7 +118,12 @@ Command decodeCommand(Bytes raw,int v,int minor,ProtocolProfile profile) {
         if(r.remaining()<4)throw Error("truncated opcode at byte "+std::to_string(opcodeOffset));
         Instruction i; i.opcode=r.get<uint32_t>(); i.offset=uint32_t(r.pos);
         auto op=i.opcode;
-        if(op>64) throw Error("unsupported opcode "+std::to_string(op)+" at byte "+std::to_string(opcodeOffset));
+        // User-approved compatibility fallback for a complete dictionary record
+        // observed in two REP1.8/minor6 inputs. This is not a native opcode ABI:
+        // never infer other values, embedded records, versions or payload sizes.
+        const bool compatibility66=profile==ProtocolProfile::DnfCompatible&&v==18&&minor==6
+            &&opcodeOffset==0&&c.raw.size()==5&&op==66&&c.raw[4]==0;
+        if(op>64&&!compatibility66) throw Error("unsupported opcode "+std::to_string(op)+" at byte "+std::to_string(opcodeOffset));
         try {
         switch(op) {
         case 0: {auto t=r.get<uint32_t>(); r.take(4); if((t&255)==7) r.take(8); break;}
@@ -125,12 +131,12 @@ Command decodeCommand(Bytes raw,int v,int minor,ProtocolProfile profile) {
         case 31:case 34:case 35:case 36:case 37:case 41:
         case 49:case 54:case 59:case 62:break;
         case 22: {
-            if(profile==ProtocolProfile::DnfJuly2026){auto b=r.take(4);i.native.assign(b.begin(),b.end());}break;
+            if(dnfProfile(profile)){auto b=r.take(4);i.native.assign(b.begin(),b.end());}break;
         }
         case 25: {
-            if(profile==ProtocolProfile::DnfJuly2026){auto b=r.take(8);i.native.assign(b.begin(),b.end());i.resource=at<uint32_t>(b,0);}break;
+            if(dnfProfile(profile)){auto b=r.take(8);i.native.assign(b.begin(),b.end());i.resource=at<uint32_t>(b,0);}break;
         }
-        case 38:case 39:case 40:i.nativeContextState=profile==ProtocolProfile::DnfJuly2026;break;
+        case 38:case 39:case 40:i.nativeContextState=dnfProfile(profile);break;
         case 2:r.take(8);break;
         case 3:case 4: {
             i.storedSize=r.get<uint32_t>(); if(i.storedSize>64) throw Error("draw payload exceeds ABI");
@@ -224,6 +230,7 @@ Command decodeCommand(Bytes raw,int v,int minor,ProtocolProfile profile) {
         case 60:r.take(16);break;
         case 61:r.take(32);break;
         case 64:r.take(12);break;
+        case 66:{auto b=r.take(1);i.native.assign(b.begin(),b.end());i.compatibilityIgnored=true;break;}
         default:throw Error("unimplemented opcode");
         }
         }catch(const Error& e){throw Error("opcode "+std::to_string(op)+" at byte "+std::to_string(opcodeOffset)+": "+e.what());}
@@ -296,7 +303,8 @@ Replay::Replay(const std::filesystem::path& path,ReplayOptions requestedOptions)
         if(dictionary.contains(id))throw Error("duplicate dictionary ID");
         if(n>largest)largest=n;else {if(previous.size()<n)throw Error("short XOR predecessor");for(size_t k=0;k<n;k++)raw[k]^=previous[k];}
         previous=raw;
-        try{dictionary.emplace(id,decodeCommand(std::move(raw),version,header.minor,options.profile));}
+        try{auto entry=dictionary.emplace(id,decodeCommand(std::move(raw),version,header.minor,options.profile));
+            for(const auto& instruction:entry.first->second.instructions)hasCompatibilityIgnored|=instruction.compatibilityIgnored;}
         catch(const Error& e){throw Error("command "+std::to_string(id)+": "+e.what());}
     }
     count=d.get<uint32_t>();resources.reserve(count);resourceBytes.reserve(count);
@@ -335,13 +343,13 @@ bool Replay::next(Scene& s) {
 }
 Statistics Replay::validate(bool keep) {
     rewind();Statistics st;st.migrations=migrations;
-    for(auto& [id,c]:dictionary)for(auto& i:c.instructions)st.dictionaryOpcodes[i.opcode]++;
+    for(auto& [id,c]:dictionary)for(auto& i:c.instructions){st.dictionaryOpcodes[i.opcode]++;if(i.compatibilityIgnored)st.compatibilityIgnoredCommands++;}
     std::unordered_map<uint32_t,uint64_t> uses;Scene s;
     while(next(s)) {
         st.scenes++;st.references+=s.ids.size();st.auxBytes+=s.aux.size();if(keep)st.timestamps.push_back(s.timestamp);
         for(auto id:s.ids)uses[id]++;
     }
-    for(auto [id,n]:uses)if(auto c=command(id))for(auto& i:c->instructions)st.opcodes[i.opcode]+=n;
+    for(auto [id,n]:uses)if(auto c=command(id))for(auto& i:c->instructions){st.opcodes[i.opcode]+=n;if(i.compatibilityIgnored)st.compatibilityIgnoredReferences+=n;}
     st.timelineCrc=timeline_->checksum;st.exactEof=true;return st;
 }
 }

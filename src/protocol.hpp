@@ -36,7 +36,8 @@ std::string utf8(std::wstring_view text);
 std::wstring wide(std::string_view text, unsigned codepage=65001);
 std::string canonical(std::string text);
 
-enum class ProtocolProfile { Dfo, DnfJuly2026 };
+enum class ProtocolProfile { Dfo, DnfJuly2026, DnfCompatible };
+inline bool dnfProfile(ProtocolProfile profile) { return profile!=ProtocolProfile::Dfo; }
 const char* profileName(ProtocolProfile profile);
 struct ReplayOptions {
     ProtocolProfile profile=ProtocolProfile::Dfo;
@@ -67,6 +68,7 @@ struct Instruction {
     std::array<uint8_t,64> params{};
     bool hasParams=false;
     bool nativeContextState=false;
+    bool compatibilityIgnored=false;
     int64_t resource=-1;
     int32_t frame=0;
     uint32_t layer=0;
@@ -87,7 +89,8 @@ struct Scene {
 };
 struct Statistics {
     uint64_t scenes=0,references=0,auxBytes=0,emptyBlendPops=0,migrations=0;
-    std::array<uint64_t,65> opcodes{},dictionaryOpcodes{};
+    std::array<uint64_t,67> opcodes{},dictionaryOpcodes{};
+    uint64_t compatibilityIgnoredCommands=0,compatibilityIgnoredReferences=0;
     std::vector<int32_t> timestamps;
     uint32_t timelineCrc=0;
     bool exactEof=false;
@@ -107,6 +110,7 @@ public:
     std::vector<Bytes> resourceBytes;
     std::vector<Command*> dense;
     uint64_t migrations=0;
+    bool hasCompatibilityIgnored=false;
     explicit Replay(const std::filesystem::path& path,ReplayOptions options={});
     ~Replay();
     Replay(const Replay&)=delete;

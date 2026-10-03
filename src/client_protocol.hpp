@@ -11,7 +11,8 @@ struct ClientProtocolSelection {
 inline ProtocolProfile clientProfile(std::wstring_view name) {
     if(name==L"dfo")return ProtocolProfile::Dfo;
     if(name==L"dnf-july")return ProtocolProfile::DnfJuly2026;
-    throw Error("Unknown replay profile; use dfo or dnf-july");
+    if(name==L"dnf-compatible")return ProtocolProfile::DnfCompatible;
+    throw Error("Unknown replay profile; use dfo, dnf-july or dnf-compatible");
 }
 inline unsigned clientCodePage(std::wstring_view text) {
     size_t used=0;
@@ -26,8 +27,8 @@ inline ReplayOptions clientReplayOptions(const std::filesystem::path& client,con
     else {
         const bool dfo=std::filesystem::is_regular_file(client/L"DFO.exe");
         const bool dnf=std::filesystem::is_regular_file(client/L"DNF.exe");
-        if(dfo&&dnf)throw Error("Client contains both DFO.exe and DNF.exe; select --profile dfo or dnf-july");
-        options.profile=dnf?ProtocolProfile::DnfJuly2026:ProtocolProfile::Dfo;
+        if(dfo&&dnf)throw Error("Client contains both DFO.exe and DNF.exe; select --profile dfo, dnf-july or dnf-compatible");
+        options.profile=dnf?ProtocolProfile::DnfCompatible:ProtocolProfile::Dfo;
     }
     options.resourceCodePage=selection.codePage;
     return options;

@@ -18,7 +18,7 @@ struct PlayerStatus {
     int64_t elapsed=0;
     uint64_t ordinal=0,frames=0,frameCount=0,skipped=0,captureSerial=0;
     double readySeconds=0,maxFrameMilliseconds=0,processReadySeconds=0,p50Frame=0,p95Frame=0,p99Frame=0,playbackSeconds=0;
-    bool frozen=false;
+    bool frozen=false,compatibilityIgnored=false;
     uint32_t finalCrc=0,frameCrc=0;
     std::vector<ImgCall> currentImages,allImages;
     std::unordered_set<std::string> hiddenImages;

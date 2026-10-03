@@ -106,13 +106,13 @@ $CLIENT = Read-Host '输入完整客户端根目录'
 
 请改为客户端中实际存在的录像。
 
-检查DNF来源时用 `--profile dnf-july`，DFO来源用 `--profile dfo`。仅验证结构且不解码字符串时加入 `--structural`；`--dump` 仍保留原字符串字节与使用的profile。`--codepage N` 可覆盖资源字符串代码页。批量检查接受UTF-8路径列表：
+检查DNF兼容播放时用 `--profile dnf-compatible`，严格7.09原生读取用 `--profile dnf-july`，DFO来源用 `--profile dfo`。仅验证结构且不解码字符串时加入 `--structural`；`--dump` 仍保留原字符串字节与使用的profile。`--codepage N` 可覆盖资源字符串代码页。批量检查接受UTF-8路径列表：
 
 ```powershell
 .\build\rep_validate.exe --profile dnf-july --structural --batch .\validation\paths.txt
 ```
 
-GUI、`rep_export` 和GPU验证工具也接受 `--profile` / `--codepage`。GUI及导出默认按所选客户端根下的程序名选择profile；验证工具默认DFO。`dnf-july`对应2026-07-09原生证据，不认证其他构建中的未知指令。
+GUI、`rep_export` 和GPU验证工具也接受 `--profile` / `--codepage`。GUI及导出默认按所选客户端根下的程序名选择profile（DNF为`dnf-compatible`）；验证工具默认DFO。`dnf-july`对应2026-07-09原生证据，不认证其他构建中的未知指令。`dnf-compatible`沿用已确认的DNF合同，仅对REP1.8/minor6、整条独立字典命令`4200000000`启用经用户批准的跳过策略；它不是已确认的原生66语义。验证JSON记录`compatibility_ignored_commands/references`，GPU及导出记录`compatibility_ignored_instructions`。
 
 开发命令行导出示例：
 
