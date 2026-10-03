@@ -63,7 +63,7 @@ struct Executor::State {
 struct Executor::Sprite {
     const Instruction* instruction=nullptr;
     uint32_t opcode=3,layer=0;int context=10,frameIndex=0;
-    bool explicitCamera=false,bypassZoom=false,offscreen=false,skipGrid=false,font=false,gradient=false,update=false,specialUv=false;
+    bool explicitCamera=false,bypassZoom=false,offscreen=false,skipGrid=false,directGridExtent=false,font=false,gradient=false,update=false,specialUv=false;
     int channel=0;uint32_t lower=0;
     int64_t resource=-1;
     std::shared_ptr<Frame> frame;
@@ -143,7 +143,7 @@ void Executor::draw(Sprite s,State& state){
     auto frame=*s.frame;
     if(!s.skipGrid){auto it=state.grids.find({s.resource,s.frameIndex});auto grid=s.grid?s.grid:(it!=state.grids.end()?std::optional{it->second}:std::nullopt);
         if(grid){
-            double targetX=frame.fullWidth-frame.width+frame.width*at<float>(s.params,20),targetY=frame.fullHeight-frame.height+frame.height*at<float>(s.params,24),sx=at<float>(s.params,52),sy=at<float>(s.params,56);
+            double targetX=s.directGridExtent?at<float>(s.params,20):frame.fullWidth-frame.width+frame.width*at<float>(s.params,20),targetY=s.directGridExtent?at<float>(s.params,24):frame.fullHeight-frame.height+frame.height*at<float>(s.params,24),sx=at<float>(s.params,52),sy=at<float>(s.params,56);
             std::vector<double> xs{double(frame.x),double(frame.x+frame.width)},ys{double(frame.y),double(frame.y+frame.height)};
             for(size_t i=0;i<grid->xs.size()/2*2;i++)xs.push_back(std::clamp<double>(grid->xs[i],frame.x,frame.x+frame.width));for(size_t i=0;i<grid->ys.size()/2*2;i++)ys.push_back(std::clamp<double>(grid->ys[i],frame.y,frame.y+frame.height));
             auto unique=[](auto& v){std::sort(v.begin(),v.end());v.erase(std::unique(v.begin(),v.end()),v.end());};unique(xs);unique(ys);
@@ -277,7 +277,7 @@ void Executor::execute(const Scene& scene){
             case 51:state.flagsStack.push_back(state.flags);state.flags=at<uint16_t>(payload,0);break;
             case 52:state.flags=state.flagsStack.empty()?0:state.flagsStack.back();if(!state.flagsStack.empty())state.flagsStack.pop_back();break;
             case 53:state.colorMode=at<uint16_t>(payload,0);state.color=at<uint32_t>(payload,2);break;
-            case 57:{auto s=sprite();s.params=drawDefaults();s.opcode=3;s.layer=i.layer;s.explicitCamera=true;s.x=at<float>(i.native,8);s.y=at<float>(i.native,12);put(s.params,20,at<float>(i.native,16));put(s.params,24,at<float>(i.native,20));put(s.params,16,at<float>(i.native,24));put(s.params,8,at<uint32_t>(i.native,28));put(s.params,52,at<float>(i.native,32));put(s.params,56,at<float>(i.native,36));Reader arrays(payload.subspan(4+(replay_->version<18?32:40)));auto nx=arrays.get<uint64_t>(),ny=arrays.get<uint64_t>();State::Grid value;while(nx--)value.xs.push_back(arrays.get<int32_t>());while(ny--)value.ys.push_back(arrays.get<int32_t>());s.grid=value;draw(std::move(s),state);break;}
+            case 57:{auto s=sprite();s.params=drawDefaults();s.opcode=3;s.layer=i.layer;s.explicitCamera=true;s.directGridExtent=replay_->version>=18;s.x=at<float>(i.native,8);s.y=at<float>(i.native,12);put(s.params,20,at<float>(i.native,16));put(s.params,24,at<float>(i.native,20));put(s.params,16,at<float>(i.native,24));put(s.params,8,at<uint32_t>(i.native,28));put(s.params,52,at<float>(i.native,32));put(s.params,56,at<float>(i.native,36));Reader arrays(payload.subspan(4+(replay_->version<18?32:40)));auto nx=arrays.get<uint64_t>(),ny=arrays.get<uint64_t>();State::Grid value;while(nx--)value.xs.push_back(arrays.get<int32_t>());while(ny--)value.ys.push_back(arrays.get<int32_t>());s.grid=value;draw(std::move(s),state);break;}
             case 58:capture(i,payload,false,state);break;
             case 59:localCapture_=false;break;
             case 60:for(int n=0;n<4;n++)state.clip[n]=at<int32_t>(payload,n*4);break;

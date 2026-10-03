@@ -21,6 +21,8 @@ ReplayInspection inspectReplayImages(Replay& replay,const std::function<bool()>&
 struct Camera {float x=0,y=0,width=800,height=600,zoom=1;};
 struct ExecutionStats {
     uint64_t scenes=0,references=0,primitives=0,nullResources=0,emptyImages=0,nullCaptures=0,nullCaches=0,audioEvents=0,phantomPushes=0,cameraUpdates=0,actorPoolUpdates=0,gridCells=0,stencilDraws=0,samplerDraws=0;
+    uint64_t contextAllocations=0,contextBindings=0,contextReleases=0;
+    int lastContext=10;
     std::array<uint64_t,65> opcodes{};
     std::array<uint64_t,67> effects{};
 };

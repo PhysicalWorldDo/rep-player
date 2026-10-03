@@ -3,6 +3,7 @@
 #include "fonts.hpp"
 #include "movies.hpp"
 #include "engine.hpp"
+#include "client_protocol.hpp"
 #include <chrono>
 #include <cmath>
 #include <iostream>
@@ -32,10 +33,21 @@ static void shaderFixture(rep::Gpu& gpu,rep::Binder& binder,rep::Replay* replay,
     std::cout<<"{\"type\":"<<e.type<<",\"program\":"<<material.program<<",\"draws\":"<<gpu.draws-before<<",\"parameters\":[";for(int n=0;n<6;n++){if(n)std::cout<<',';if(std::isfinite(material.parameters[n]))std::cout<<material.parameters[n];else std::cout<<"null";}std::cout<<"]}"<<std::endl;
 }
 int wmain(int argc,wchar_t** argv){try{
+    rep::ClientProtocolSelection selection;std::vector<wchar_t*> positional{argv[0]};
+    for(int n=1;n<argc;n++){
+        std::wstring_view key=argv[n];
+        if(key==L"--profile"||key==L"--codepage"){
+            if(n+1>=argc)throw rep::Error("Missing replay option value");
+            if(key==L"--profile")selection.profile=rep::clientProfile(argv[++n]);
+            else selection.codePage=rep::clientCodePage(argv[++n]);
+        }else positional.push_back(argv[n]);
+    }
+    argc=int(positional.size());argv=positional.data();
+    auto replayOptions=rep::clientReplayOptions({},selection);
     wchar_t name[32768];GetModuleFileNameW(nullptr,name,32768);auto root=std::filesystem::path(name).parent_path().parent_path();rep::Gpu gpu(root/L"assets"/L"shaders");
     if(argc>1&&std::wstring_view(argv[1])==L"--smoke")std::cout<<"{\"programs_created\":"<<gpu.createAllPrograms()<<",\"hardware\":true,\"adapter\":\""<<gpu.adapter<<"\"}\n";
     else if(argc==5&&std::wstring_view(argv[1])==L"--frame-step"){
-        rep::Assets assets(argv[3]);rep::Replay replay(argv[2]),scan(argv[2]),referenceReplay(argv[2]);auto inspection=rep::inspectReplayImages(scan);
+        rep::Assets assets(argv[3]);rep::Replay replay(argv[2],replayOptions),scan(argv[2],replayOptions),referenceReplay(argv[2],replayOptions);auto inspection=rep::inspectReplayImages(scan);
         rep::Executor executor(gpu,assets,root/L"runtime"/L"cache"),reference(gpu,assets,root/L"runtime"/L"cache");executor.setTransparent(true);executor.attach(replay);executor.setInspection(inspection);reference.setTransparent(true);
         rep::Playback playback;playback.attach(replay,executor);playback.start();std::istringstream actions(rep::utf8(argv[4]));std::string action;bool first=true;
         std::cout<<"{\"frame_count\":"<<inspection.scenes<<",\"snapshots\":[";
@@ -51,7 +63,7 @@ int wmain(int argc,wchar_t** argv){try{
         }std::cout<<"]}\n";
     }
     else if((argc>=5&&argc<=7)&&std::wstring_view(argv[1])==L"--engine-contract"){
-        auto folder=std::filesystem::path(argv[4]);rep::Assets assets(argv[3]);rep::Replay replay(argv[2]),inspectionReplay(argv[2]);auto inspection=rep::inspectReplayImages(inspectionReplay);rep::Executor executor(gpu,assets,root/L"runtime"/L"cache");executor.setTransparent(true);executor.attach(replay);executor.setInspection(inspection);rep::Playback playback;playback.attach(replay,executor);playback.start();playback.select(0);if(argc==7)playback.select(std::stoll(argv[6]));playback.pause();auto pausedBefore=playback.elapsedMilliseconds();Sleep(45);auto pausedAfter=playback.elapsedMilliseconds();
+        auto folder=std::filesystem::path(argv[4]);rep::Assets assets(argv[3]);rep::Replay replay(argv[2],replayOptions),inspectionReplay(argv[2],replayOptions);auto inspection=rep::inspectReplayImages(inspectionReplay);rep::Executor executor(gpu,assets,root/L"runtime"/L"cache");executor.setTransparent(true);executor.attach(replay);executor.setInspection(inspection);rep::Playback playback;playback.attach(replay,executor);playback.start();playback.select(0);if(argc==7)playback.select(std::stoll(argv[6]));playback.pause();auto pausedBefore=playback.elapsedMilliseconds();Sleep(45);auto pausedAfter=playback.elapsedMilliseconds();
         auto beforeTimestamp=playback.timestamp();auto visible=gpu.screenshot(executor.output(),true);executor.setHiddenImages({argc>=6?rep::utf8(argv[5]):"sprite/test/frame.img"});playback.refresh();auto hidden=gpu.screenshot(executor.output(),true);auto current=executor.currentImages();auto afterTimestamp=playback.timestamp();executor.setHiddenImages({});playback.refresh();auto restored=gpu.screenshot(executor.output(),true);playback.resume();Sleep(30);auto resumed=playback.elapsedMilliseconds();playback.seek(0);auto backward=playback.timestamp();playback.select(500);auto all=executor.allImages();
         auto save=[&](const wchar_t* name,const rep::Bytes& bytes){std::ofstream file(folder/name,std::ios::binary);file.write(reinterpret_cast<const char*>(bytes.data()),bytes.size());};save(L"visible.rgba",visible);save(L"hidden.rgba",hidden);
         auto images=[&](const std::vector<rep::ImgCall>& values){std::cout<<'[';bool first=true;for(auto& call:values){if(!first)std::cout<<',';first=false;std::cout<<"{\"path\":\""<<call.path<<"\",\"frame\":"<<call.frame<<",\"count\":"<<call.count<<",\"role\":\""<<call.role<<"\",\"drawn\":"<<(call.drawn?"true":"false")<<",\"hidden\":"<<(call.hidden?"true":"false")<<",\"registered\":"<<(call.registered?"true":"false")<<'}';}std::cout<<']';};
@@ -62,12 +74,12 @@ int wmain(int argc,wchar_t** argv){try{
         std::cout<<"{\"width\":"<<info.width<<",\"height\":"<<info.height<<",\"frames\":"<<info.frames<<",\"rate\":"<<info.rate<<",\"first_crc32\":"<<a<<",\"later_crc32\":"<<b<<",\"rewind_crc32\":"<<c<<"}\n";
     }
     else if(argc==4&&std::wstring_view(argv[1])==L"--select"){
-        rep::Assets assets(L"D:\\115us\\client\\ImagePacks2");rep::Replay replay(argv[2]);rep::Executor executor(gpu,assets,root/L"runtime"/L"cache");executor.attach(replay);rep::Playback playback;playback.attach(replay,executor);playback.start();std::istringstream times(rep::utf8(argv[3]));std::string value;std::vector<int> timestamps;std::vector<bool> changed;
+        rep::Assets assets(L"D:\\115us\\client\\ImagePacks2");rep::Replay replay(argv[2],replayOptions);rep::Executor executor(gpu,assets,root/L"runtime"/L"cache");executor.attach(replay);rep::Playback playback;playback.attach(replay,executor);playback.start();std::istringstream times(rep::utf8(argv[3]));std::string value;std::vector<int> timestamps;std::vector<bool> changed;
         while(std::getline(times,value,',')){changed.push_back(playback.select(std::stoll(value)));timestamps.push_back(playback.timestamp());}
         std::cout<<"{\"timestamps\":[";for(size_t n=0;n<timestamps.size();n++){if(n)std::cout<<',';std::cout<<timestamps[n];}std::cout<<"],\"changed\":[";for(size_t n=0;n<changed.size();n++){if(n)std::cout<<',';std::cout<<(changed[n]?"true":"false");}std::cout<<"],\"selected\":"<<playback.selected<<",\"skipped\":"<<playback.skipped<<",\"ended\":"<<(playback.ended()?"true":"false");playback.start();playback.select(0);std::cout<<",\"rewind_timestamp\":"<<playback.timestamp()<<"}\n";
     }
     else if((argc==3||argc==4)&&std::wstring_view(argv[1])==L"--text-layout"){
-        rep::Replay replay(argv[2]);rep::Scene scene;rep::Fonts fonts(argc==4?std::filesystem::path(argv[3]):std::filesystem::path(L"D:\\115us\\client\\Fonts"));std::vector<rep::GlyphQuad> quads;
+        rep::Replay replay(argv[2],replayOptions);rep::Scene scene;rep::Fonts fonts(argc==4?std::filesystem::path(argv[3]):std::filesystem::path(L"D:\\115us\\client\\Fonts"));std::vector<rep::GlyphQuad> quads;
         if(replay.next(scene)){rep::Reader aux(scene.aux);for(auto id:scene.ids)if(auto command=replay.command(id))for(const auto& i:command->instructions){float x=0,y=0;if(i.auxBytes){x=aux.get<int16_t>();y=aux.get<int16_t>();}if(i.opcode==5||i.opcode==48){if(i.opcode==48&&replay.header.minor<7){x=rep::at<float>(i.native,44);y=rep::at<float>(i.native,48);}auto text=fonts.prepare(i,replay,x,y);quads.insert(quads.end(),text.begin(),text.end());}}aux.end();}
         std::cout<<'[';bool first=true;for(const auto& q:quads){if(!first)std::cout<<',';first=false;std::cout<<"{\"x\":"<<q.x<<",\"y\":"<<q.y<<",\"scale\":"<<q.scale<<",\"width\":"<<q.frame->width<<",\"height\":"<<q.frame->height<<",\"rect\":[";for(int n=0;n<4;n++){if(n)std::cout<<',';std::cout<<q.frame->rect[n];}std::cout<<"],\"channel\":"<<q.channel<<",\"gradient\":"<<(q.gradient?"true":"false")<<"}";}std::cout<<"]\n";
     }
@@ -77,11 +89,12 @@ int wmain(int argc,wchar_t** argv){try{
         auto pixels=gpu.readback(target);std::cout<<"{\"formats\":["<<a->format<<','<<b->format<<"],\"alpha\":[";for(int y=0;y<4;y++){if(y)std::cout<<',';std::cout<<'[';for(int x=0;x<4;x++){if(x)std::cout<<',';std::cout<<int(pixels[(y*4+x)*4+3]);}std::cout<<']';}std::cout<<"]}\n";
     }
     else if(argc>=4&&std::wstring_view(argv[1])==L"--consume") {
-        auto begin=std::chrono::steady_clock::now();rep::Assets assets(argc>=6?std::filesystem::path(argv[5]):std::filesystem::path(L"D:\\115us\\client\\ImagePacks2"));rep::Replay replay(argv[2]);rep::Executor executor(gpu,assets,root/L"runtime"/L"cache");executor.attach(replay);executor.prepare();auto ready=std::chrono::steady_clock::now();rep::Scene scene;int32_t last=0;uint64_t bytes=0;double maxFrame=0;rep::Bytes snapshot;
+        auto begin=std::chrono::steady_clock::now();rep::Assets assets(argc>=6?std::filesystem::path(argv[5]):std::filesystem::path(L"D:\\115us\\client\\ImagePacks2"));rep::Replay replay(argv[2],replayOptions);rep::Executor executor(gpu,assets,root/L"runtime"/L"cache");executor.attach(replay);executor.prepare();auto ready=std::chrono::steady_clock::now();rep::Scene scene;int32_t last=0;uint64_t bytes=0;double maxFrame=0;rep::Bytes snapshot;
         while(replay.next(scene)){auto before=std::chrono::steady_clock::now();executor.execute(scene);gpu.flush();maxFrame=std::max(maxFrame,std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-before).count());last=scene.timestamp;bytes+=scene.aux.size();if(argc>=7&&scene.ordinal==uint64_t(std::stoull(argv[6])))snapshot=gpu.readback(executor.output());}
         auto pixels=gpu.readback(executor.output());double load=std::chrono::duration<double>(ready-begin).count(),seconds=std::chrono::duration<double>(std::chrono::steady_clock::now()-ready).count();std::ofstream out{std::filesystem::path(argv[3])};auto& s=executor.statistics;
         out<<"{\"version\":"<<replay.version/10.<<",\"minor\":"<<replay.header.minor<<",\"width\":"<<replay.header.width()<<",\"height\":"<<replay.header.height()<<",\"scenes\":"<<s.scenes<<",\"gpu_draws\":"<<gpu.draws<<",\"exact_eof\":true,\"prepare_seconds\":"<<load<<",\"execute_seconds\":"<<seconds<<",\"max_cpu_frame_ms\":"<<maxFrame<<",\"last_timestamp\":"<<last<<",\"aux_bytes\":"<<bytes<<",\"pixel_crc32\":"<<rep::crc(pixels);
         out<<",\"null_resources\":"<<s.nullResources<<",\"null_captures\":"<<s.nullCaptures<<",\"fallbacks\":"<<assets.fallbacks<<",\"actor_pool_updates\":"<<s.actorPoolUpdates<<",\"camera_updates\":"<<s.cameraUpdates<<",\"audio_events\":"<<s.audioEvents<<",\"phantom_pushes\":"<<s.phantomPushes<<",\"grid_cells\":"<<s.gridCells<<",\"stencil_draws\":"<<s.stencilDraws<<",\"sampler_draws\":"<<s.samplerDraws<<",\"null_caches\":"<<s.nullCaches;
+        out<<",\"context_allocations\":"<<s.contextAllocations<<",\"context_bindings\":"<<s.contextBindings<<",\"context_releases\":"<<s.contextReleases<<",\"last_context\":"<<s.lastContext;
         out<<",\"shader_counts\":[";for(size_t n=0;n<s.effects.size();n++){if(n)out<<',';out<<s.effects[n];}
         out<<"],\"opcodes\":[";for(size_t n=0;n<s.opcodes.size();n++){if(n)out<<',';out<<s.opcodes[n];}out<<"]}\n";
         if(argc>=5){auto& selected=snapshot.empty()?pixels:snapshot;std::ofstream raw(std::filesystem::path(argv[4]),std::ios::binary);raw.write(reinterpret_cast<const char*>(selected.data()),selected.size());}
@@ -95,10 +108,10 @@ int wmain(int argc,wchar_t** argv){try{
         atlas.refresh();std::cout<<"],\"atlas_crc32\":"<<rep::crc(atlas.pixels->rgba)<<"}\n";
     }
     else if(argc>3&&(std::wstring_view(argv[1])==L"--shader-fixture"||std::wstring_view(argv[1])==L"--shader-fixture-debug")) {
-        rep::Assets assets(L"D:\\115us\\client\\ImagePacks2");std::unique_ptr<rep::Replay> replay;if(argc>=5)replay=std::make_unique<rep::Replay>(argv[4]);rep::Binder binder(gpu,assets,replay.get());shaderFixture(gpu,binder,replay.get(),argv[2],argv[3],std::wstring_view(argv[1])==L"--shader-fixture-debug");
+        rep::Assets assets(L"D:\\115us\\client\\ImagePacks2");std::unique_ptr<rep::Replay> replay;if(argc>=5)replay=std::make_unique<rep::Replay>(argv[4],replayOptions);rep::Binder binder(gpu,assets,replay.get());shaderFixture(gpu,binder,replay.get(),argv[2],argv[3],std::wstring_view(argv[1])==L"--shader-fixture-debug");
     }
     else if(argc==3&&std::wstring_view(argv[1])==L"--shader-server"){
-        rep::Assets assets(L"D:\\115us\\client\\ImagePacks2");rep::Replay replay(argv[2]);rep::Binder binder(gpu,assets,&replay);std::string input,output;
+        rep::Assets assets(L"D:\\115us\\client\\ImagePacks2");rep::Replay replay(argv[2],replayOptions);rep::Binder binder(gpu,assets,&replay);std::string input,output;
         while(std::getline(std::cin,input)&&std::getline(std::cin,output))shaderFixture(gpu,binder,&replay,rep::wide(input),rep::wide(output));
     }
     return 0;
