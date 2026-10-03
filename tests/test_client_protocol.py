@@ -51,6 +51,15 @@ class ClientProtocolTests(unittest.TestCase):
         (custom / 'ImagePacks2').mkdir(parents=True)
         self.export(custom, '--profile', 'dnf-july', '--codepage', '949')
 
+    def test_export_rejects_partial_codepage_argument(self):
+        result = subprocess.run([
+            str(ROOT / 'build' / 'rep_export.exe'), '--client', str(self.client), '--replay', str(self.replay),
+            '--format', 'png', '--output', str(self.folder), '--name', self._testMethodName,
+            '--codepage', '949junk',
+        ], capture_output=True, text=True, encoding='utf-8', timeout=30)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('codepage', result.stderr.lower())
+
     def test_gui_playback_and_inspection_use_same_dnf_profile(self):
         report = self.folder / 'ui.json'
         result = subprocess.run([

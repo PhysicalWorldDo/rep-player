@@ -93,7 +93,7 @@ ExportResult exportReplay(Gpu& gpu,Assets& assets,const std::filesystem::path& c
     auto ffmpeg=ffmpegExecutable();if(!std::filesystem::is_regular_file(ffmpeg))throw Error("Bundled FFmpeg export encoder is missing");
     auto checkCancelled=[&](){if(cancelled&&cancelled())throw Error("Export cancelled");};
     checkCancelled();ExportProgress update;update.stage=L"Preparing";if(progress)progress(update);
-    Replay replay(replayPath);Scene scene;int32_t duration=0;uint64_t sceneCount=0;
+    Replay replay(replayPath,clientReplayOptions(client,options.protocol));Scene scene;int32_t duration=0;uint64_t sceneCount=0;
     while(replay.next(scene)){duration=std::max(duration,scene.timestamp);sceneCount++;checkCancelled();}
     if(!sceneCount)throw Error("REP has no scenes to export");replay.rewind();
     ExportResult result;result.outputPath=output;result.width=replay.header.width();result.height=replay.header.height();

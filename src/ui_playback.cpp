@@ -5,8 +5,8 @@
 #include <utility>
 
 namespace rep::ui {
-PlaybackController::PlaybackController(HWND canvas,std::filesystem::path root,std::filesystem::path client,bool test,Clock::time_point processStart)
-    :canvas_(canvas),root_(std::move(root)),client_(std::move(client)),test_(test),processStart_(processStart) {
+PlaybackController::PlaybackController(HWND canvas,std::filesystem::path root,std::filesystem::path client,bool test,Clock::time_point processStart,ClientProtocolSelection protocol)
+    :canvas_(canvas),root_(std::move(root)),client_(std::move(client)),protocol_(std::move(protocol)),test_(test),processStart_(processStart) {
     thread_=std::thread([this]{run();});
 }
 PlaybackController::~PlaybackController(){quitting_=true;generation_++;condition_.notify_all();if(thread_.joinable())thread_.join();}
@@ -43,10 +43,11 @@ void PlaybackController::run(){try{
             if(stop){std::lock_guard lock(mutex_);status_.phase=path.empty()?Phase::Empty:Phase::Stopped;status_.client=activeClient;}
             else try{
                 if(inspection.valid())inspection.wait();
-                auto opened=std::make_unique<Replay>(path);executor->attach(*opened);executor->setHiddenImages(hidden);executor->setTransparent(true);replay=std::move(opened);
+                auto options=clientReplayOptions(client,protocol_);
+                auto opened=std::make_unique<Replay>(path,options);executor->attach(*opened);executor->setHiddenImages(hidden);executor->setTransparent(true);replay=std::move(opened);
                 playback.attach(*replay,*executor);executor->prepare([&]{return quitting_||generation_!=generation;});
                 if(quitting_||generation_!=generation)continue;
-                inspectedGeneration=generation;inspection=std::async(std::launch::async,[this,path,generation]{Replay scan(path);return inspectReplayImages(scan,[this,generation]{return quitting_||generation_!=generation;});});
+                inspectedGeneration=generation;inspection=std::async(std::launch::async,[this,path,generation,options]{Replay scan(path,options);return inspectReplayImages(scan,[this,generation]{return quitting_||generation_!=generation;});});
                 playback.start();playingAt=Clock::now();auto before=Clock::now();playback.tick();present();auto after=Clock::now();
                 frameTimes={std::chrono::duration<double,std::milli>(after-before).count()};
                 {std::lock_guard lock(mutex_);status_.phase=Phase::Playing;status_.path=path.wstring();status_.client=activeClient;status_.readySeconds=std::chrono::duration<double>(after-requestedAt).count();status_.processReadySeconds=std::chrono::duration<double>(after-processStart_).count();status_.frames=1;status_.frameCount=0;status_.skipped=0;status_.ordinal=playback.ordinal();status_.timestamp=playback.timestamp();status_.elapsed=playback.elapsedMilliseconds();status_.width=replay->header.width();status_.height=replay->header.height();status_.maxFrameMilliseconds=frameTimes.back();status_.message.clear();status_.frozen=false;status_.duration=0;updateImages();}frozenChecked=false;

@@ -1,5 +1,6 @@
 #pragma once
 #include "engine.hpp"
+#include "client_protocol.hpp"
 #include <unordered_set>
 
 namespace rep {
@@ -11,6 +12,7 @@ struct ExportOptions {
     std::filesystem::path outputDirectory;
     std::wstring fileName;
     std::unordered_set<std::string> hiddenImages;
+    ClientProtocolSelection protocol;
 };
 struct ExportProgress {
     uint64_t completedFrames=0,totalFrames=0;

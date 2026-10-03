@@ -1,5 +1,6 @@
 #pragma once
 #include "engine.hpp"
+#include "client_protocol.hpp"
 #include <windows.h>
 #include <mutex>
 #include <condition_variable>
@@ -28,6 +29,7 @@ struct PlayerStatus {
 class PlaybackController {
     HWND canvas_;
     std::filesystem::path root_,client_,requested_;
+    ClientProtocolSelection protocol_;
     bool test_;
     Clock::time_point processStart_,requestedAt_;
     std::mutex mutex_;
@@ -42,7 +44,7 @@ class PlaybackController {
     PlayerStatus status_;
     void run();
 public:
-    PlaybackController(HWND canvas,std::filesystem::path root,std::filesystem::path client,bool test,Clock::time_point processStart);
+    PlaybackController(HWND canvas,std::filesystem::path root,std::filesystem::path client,bool test,Clock::time_point processStart,ClientProtocolSelection protocol={});
     ~PlaybackController();
     void open(const std::filesystem::path& path);
     void replay();
