@@ -1,3 +1,9 @@
+# 未发布 · 图层默认相机修复
+
+- 修复国服 `ImperialKnight/GaleSlash.rep` 等录像出现上下两个相同人物的问题。现代绘制层尚未通过 opcode 50 设置相机时，使用原生默认的单位投影和视口映射，避免把世界坐标错误地直接作为屏幕像素绘制；默认投影范围内的合法图形仍可显示。
+- 已配置相机、跨场景相机状态和旧式像素绘制保持原有行为，预览与导出共用修复。新增双 profile GPU 回归，并为已有像素几何测试显式设置相机。
+- 本次仅更新源码与本地构建，暂不发布 Release；已发布的 v1.0.2 下载包不包含此修复。
+
 # v1.0.2 · REP 1.8 与客户端协议适配
 
 发布日期：2026-10-03。下载见 [v1.0.2 Release](https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.0.2)。完整解压 `rep-player-v1.0.2-windows-x64.zip` 后，直接双击最外层 `rep_player.exe`；运行包继续仅包含播放器和 `resources`。

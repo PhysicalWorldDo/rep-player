@@ -180,7 +180,23 @@ void Executor::draw(Sprite s,State& state){
         if(eligible){auto& sampler=*state.sampler;if(sampler.flag==1)samplerOffsets_[context]={sampler.x,sampler.y};auto offset=samplerOffsets_[context];m.a*=sampler.sx;m.b*=sampler.sx;m.c*=sampler.sy;m.d*=sampler.sy;m.x=sampler.sx*(m.x-sampler.ox)+offset[0];m.y=sampler.sy*(m.y-sampler.oy)+offset[1];statistics.samplerDraws++;}else samplerOffsets_.erase(context);
     }
     double cameraZoom=1,cameraScaleX=1,cameraScaleY=1;
-    if(s.explicitCamera){auto it=cameras_.find({cameraId(s.context),s.layer});if(it!=cameras_.end()){const auto& c=it->second;if(c.width==0||c.height==0)return;double zoom=s.bypassZoom?1:c.zoom,sx=zoom*output_.image.width/c.width,sy=zoom*output_.image.height/c.height;cameraZoom=zoom;cameraScaleX=sx;cameraScaleY=sy;m.a*=sx;m.b*=sx;m.c*=sy;m.d*=sy;m.x=output_.image.width*.5+sx*(m.x-c.x-c.width*.5);m.y=output_.image.height*.5+sy*(m.y-c.y-c.height*.5);}}
+    if(s.explicitCamera){
+        auto it=cameras_.find({cameraId(s.context),s.layer});
+        if(it!=cameras_.end()){
+            const auto& c=it->second;if(c.width==0||c.height==0)return;
+            double zoom=s.bypassZoom?1:c.zoom;
+            cameraZoom=zoom;cameraScaleX=zoom*output_.image.width/c.width;cameraScaleY=zoom*output_.image.height/c.height;
+            m.x=output_.image.width*.5+cameraScaleX*(m.x-c.x-c.width*.5);
+            m.y=output_.image.height*.5+cameraScaleY*(m.y-c.y-c.height*.5);
+        }else{
+            // Native GameRenderCamera creates absent layer entries with identity
+            // view/projection (CN 148CA8E20 -> 148CA8800). Coordinates are clip
+            // space until opcode50 initializes that layer, not screen pixels.
+            cameraScaleX=output_.image.width*.5;cameraScaleY=-output_.image.height*.5;
+            m.x=(m.x+1)*cameraScaleX;m.y=(m.y-1)*cameraScaleY;
+        }
+        m.a*=cameraScaleX;m.b*=cameraScaleX;m.c*=cameraScaleY;m.d*=cameraScaleY;
+    }
     if(std::abs(m.a*m.d-m.b*m.c)<1e-12)return;
     if(s.params[12]>=1&&s.params[12]<=3&&!s.matrix){double px=at<float>(s.params,28),py=at<float>(s.params,32);if(px>=4.29e9&&py>=4.29e9){px=frame.fullWidth/2;py=frame.fullHeight/2;}
         if(frame.rotated&&!s.params[36]&&!s.sourceRect)source={0,0,float(frame.height),float(frame.width)};
