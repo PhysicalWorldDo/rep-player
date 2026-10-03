@@ -1,3 +1,7 @@
+当前发布：v1.0.2（2026-10-03）。现行使用方法以 README.md 为准，构建方法见 BUILDING.md，版本与支持边界见 RELEASE_NOTES.md。
+完整解压 rep-player-v1.0.2-windows-x64.zip 后，直接双击最外层 rep_player.exe。
+以下保留旧版发布与本地研发记录，其中的 Start.cmd、旧目录布局和旧版本号不作为当前运行包指引。
+
 v1.0.0 正式发布说明（2026-10-03）
 
 最新使用方法请优先阅读 README.md，构建方法见 BUILDING.md。

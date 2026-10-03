@@ -75,10 +75,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1
 编译并准备好 `build\ffmpeg.exe` 后执行：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\package-release.ps1 -Version 1.0.1 -FFmpegDirectory .\build
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\package-release.ps1 -Version 1.0.2 -FFmpegDirectory .\build
 ```
 
-FFmpegDirectory 指向包含当前静态 `ffmpeg.exe` 的目录，脚本只复制该 EXE，不复制历史 DLL。脚本按运行清单生成 `dist\rep-player-v1.0.1-windows-x64.zip`，ZIP 内直接包含：
+FFmpegDirectory 指向包含当前静态 `ffmpeg.exe` 的目录，脚本只复制该 EXE，不复制历史 DLL。脚本按运行清单生成 `dist\rep-player-v1.0.2-windows-x64.zip`，ZIP 内直接包含：
 
 ```text
 rep_player.exe
@@ -104,7 +104,17 @@ $CLIENT = Read-Host '输入完整客户端根目录'
 .\build\rep_validate.exe --dump (Join-Path $CLIENT 'Replay\SkillReplay\Swordman\BloodyRave.rep')
 ```
 
-请改为客户端中实际存在的录像。开发命令行导出示例：
+请改为客户端中实际存在的录像。
+
+检查DNF来源时用 `--profile dnf-july`，DFO来源用 `--profile dfo`。仅验证结构且不解码字符串时加入 `--structural`；`--dump` 仍保留原字符串字节与使用的profile。`--codepage N` 可覆盖资源字符串代码页。批量检查接受UTF-8路径列表：
+
+```powershell
+.\build\rep_validate.exe --profile dnf-july --structural --batch .\validation\paths.txt
+```
+
+GUI、`rep_export` 和GPU验证工具也接受 `--profile` / `--codepage`。GUI及导出默认按所选客户端根下的程序名选择profile；验证工具默认DFO。`dnf-july`对应2026-07-09原生证据，不认证其他构建中的未知指令。
+
+开发命令行导出示例：
 
 ```powershell
 .\build\rep_export.exe --client $CLIENT --replay (Join-Path $CLIENT 'Replay\SkillReplay\Swordman\BloodyRave.rep') --format mov --fps 60 --alpha 1 --output .\exports --name BloodyRave

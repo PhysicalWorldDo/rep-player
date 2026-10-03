@@ -4,7 +4,7 @@
 
 ## 下载与运行
 
-从 [v1.0.1 Release](https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.0.1) 下载 `rep-player-v1.0.1-windows-x64.zip`，完整解压到可写目录，**直接双击最外层的 `rep_player.exe`**。ZIP 内容直接位于解压目录：
+从 [v1.0.2 Release](https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.0.2) 下载 `rep-player-v1.0.2-windows-x64.zip`，完整解压到可写目录，**直接双击最外层的 `rep_player.exe`**。ZIP 内容直接位于解压目录：
 
 ```text
 解压目录\
@@ -85,6 +85,12 @@ $CLIENT = Read-Host '输入完整客户端根目录'
 ```
 
 请把录像相对路径替换为所选客户端中实际存在的文件。
+
+播放器根据所选客户端根目录中的 `DFO.exe` / `DNF.exe` 选择回放协议，支持已核实的 REP 1.0–1.8。自建资源目录或同时包含两个程序时，可显式指定 `--profile dfo` 或 `--profile dnf-july`；播放、IMG 检查和导出使用同一选择。
+
+资源字符串原字节保留。DFO 默认采用代码页949，DNF默认采用系统ANSI代码页；若录像文字解码报错或显示不正确，可按录像来源添加 `--codepage 949`、`--codepage 936` 或 `--codepage 65001`。界面的中文 / EN 按钮只切换界面语言。
+
+`dnf-july` 的原生证据来自2026-07-09构建，与当前WeGame程序并非同一映像。未知opcode66及历史48字节Movie23仍会报错并定位到命令；本版没有猜测这些结构。
 
 ## 常见问题
 
