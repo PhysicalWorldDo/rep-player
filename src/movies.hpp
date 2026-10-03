@@ -4,12 +4,13 @@
 namespace rep {
 struct MovieInfo {int width=0,height=0,frames=0;double rate=0;bool bink=false;};
 class Movies {
+    struct Payload;
     struct Instance;
     std::filesystem::path client_,cache_,ffmpeg_;
     std::unordered_map<uint64_t,std::unique_ptr<Instance>> instances_;
-    std::unordered_map<std::string,std::filesystem::path> payloads_;
+    std::unordered_map<std::string,std::weak_ptr<Payload>> payloads_;
     HMODULE bink_=nullptr;
-    std::filesystem::path payload(std::string path);
+    std::shared_ptr<Payload> payload(std::string path);
 public:
     uint64_t decoded=0,missing=0;
     Movies(std::filesystem::path client,std::filesystem::path cache);

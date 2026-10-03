@@ -1,38 +1,54 @@
 #include "movies.hpp"
 #include "runtime_paths.hpp"
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <fstream>
 #include <sstream>
 
 namespace rep {
+struct Movies::Payload {
+    std::filesystem::path path;bool owned=false;
+    ~Payload(){if(owned){std::error_code error;std::filesystem::remove(path,error);}}
+};
 struct Movies::Instance {
+    std::shared_ptr<Payload> payload;
     MovieInfo info;std::filesystem::path path;std::shared_ptr<Frame> frame;
     void* bink=nullptr;HMODULE library=nullptr;HANDLE pipe=nullptr,process=nullptr;
     int last=-1,next=0;
     ~Instance(){closePipe();if(bink){auto fn=reinterpret_cast<void(*)(void*)>(GetProcAddress(library,"BinkClose"));fn(bink);}}
-    void closePipe(){if(pipe)CloseHandle(pipe);pipe=nullptr;if(process){if(WaitForSingleObject(process,20)==WAIT_TIMEOUT)TerminateProcess(process,0);CloseHandle(process);}process=nullptr;}
+    void closePipe(){if(pipe)CloseHandle(pipe);pipe=nullptr;if(process){if(WaitForSingleObject(process,20)==WAIT_TIMEOUT){TerminateProcess(process,0);WaitForSingleObject(process,2000);}CloseHandle(process);}process=nullptr;}
 };
 Movies::Movies(std::filesystem::path client,std::filesystem::path cache):client_(std::move(client)),cache_(std::move(cache)){
     std::filesystem::create_directories(cache_);ffmpeg_=ffmpegExecutable();
 }
 Movies::~Movies(){reset();if(bink_)FreeLibrary(bink_);}
-void Movies::reset(){instances_.clear();}
+void Movies::reset(){instances_.clear();payloads_.clear();}
 std::vector<std::shared_ptr<Pixels>> Movies::pixels()const{std::vector<std::shared_ptr<Pixels>> out;for(auto& [id,instance]:instances_)out.push_back(instance->frame->texture);return out;}
 std::shared_ptr<Pixels> Movies::pixels(uint64_t id)const{auto it=instances_.find(id);return it==instances_.end()?nullptr:it->second->frame->texture;}
 void Movies::stop(uint64_t id){instances_.erase(id);}
 MovieInfo Movies::info(uint64_t id)const{auto it=instances_.find(id);return it==instances_.end()?MovieInfo{}:it->second->info;}
 uint32_t Movies::color(uint64_t id,uint32_t v,bool modern)const{return modern||!info(id).bink?0xffffffffu:((v&255)<<24)|0xffffff;}
-std::filesystem::path Movies::payload(std::string logical){
-    logical=canonical(logical);if(auto it=payloads_.find(logical);it!=payloads_.end())return it->second;
+std::shared_ptr<Movies::Payload> Movies::payload(std::string logical){
+    logical=canonical(logical);if(auto it=payloads_.find(logical);it!=payloads_.end())if(auto active=it->second.lock())return active;
     auto original=client_/wide(logical);if(!std::filesystem::is_regular_file(original))return {};
-    auto data=readFile(original);if(data.size()<32||std::memcmp(data.data(),"Neople Video Fil",16))return payloads_[logical]=original;
+    auto result=std::make_shared<Payload>();result->path=original;
+    auto data=readFile(original);if(data.size()<32||std::memcmp(data.data(),"Neople Video Fil",16)){payloads_[logical]=result;return result;}
     uint32_t version=at<uint32_t>(data,16),count=at<uint32_t>(data,20),size=at<uint32_t>(data,24),padded=at<uint32_t>(data,28);
     if(version!=1||count!=1||padded<size||padded%1024||data.size()<32ull+padded)throw Error("invalid Neople movie header");
     for(size_t i=1024;i<padded;i++)data[32+i]^=data[32+i-1024];
-    auto owned=cache_/(wide(std::to_string(crc(std::span(data).subspan(32,size))))+original.extension().wstring());
-    if(!std::filesystem::exists(owned)){std::ofstream out(owned,std::ios::binary);out.write(reinterpret_cast<const char*>(data.data()+32),size);if(!out)throw Error("cannot save owned movie payload");}
-    return payloads_[logical]=owned;
+    // Each decoder group owns a new file. Existing caches and client inputs are
+    // never reused or removed; preview and export may decode the same movie.
+    static std::atomic<uint64_t> sequence{0};HANDLE file;
+    do {
+        result->path=cache_/(L"movie-"+std::to_wstring(GetCurrentProcessId())+L"-"+std::to_wstring(sequence++)+original.extension().wstring());
+        file=CreateFileW(result->path.c_str(),GENERIC_WRITE,FILE_SHARE_READ,nullptr,CREATE_NEW,FILE_ATTRIBUTE_TEMPORARY,nullptr);
+    }while(file==INVALID_HANDLE_VALUE&&GetLastError()==ERROR_FILE_EXISTS);
+    if(file==INVALID_HANDLE_VALUE)throw Error("cannot create owned movie payload");result->owned=true;
+    size_t position=0;bool okay=true;
+    while(position<size){DWORD written=0;DWORD bytes=DWORD(std::min<size_t>(size-position,1024*1024));if(!WriteFile(file,data.data()+32+position,bytes,&written,nullptr)||!written){okay=false;break;}position+=written;}
+    CloseHandle(file);if(!okay)throw Error("cannot save owned movie payload");
+    payloads_[logical]=result;return result;
 }
 static MovieInfo aviInfo(const Bytes& data){
     MovieInfo result;
@@ -43,8 +59,8 @@ static MovieInfo aviInfo(const Bytes& data){
 static std::wstring quote(std::wstring v){std::wstring out=L"\"";size_t slash=0;for(wchar_t c:v){if(c==L'\\'){slash++;continue;}if(c==L'\"')out.append(slash*2+1,L'\\');else out.append(slash,L'\\');slash=0;out+=c;}out.append(slash*2,L'\\');out+=L'\"';return out;}
 std::shared_ptr<Frame> Movies::frame(std::string logical,uint64_t id,uint32_t timestamp){
     if(!instances_.contains(id)){
-        if(logical.empty())return {};auto path=payload(logical);if(path.empty()){missing++;return {};}
-        auto data=readFile(path);auto instance=std::make_unique<Instance>();instance->path=path;bool bink=data.size()>=4&&(!std::memcmp(data.data(),"KB2",3)||!std::memcmp(data.data(),"BIK",3));
+        if(logical.empty())return {};auto source=payload(logical);if(!source){missing++;return {};}auto path=source->path;
+        auto data=readFile(path);auto instance=std::make_unique<Instance>();instance->payload=std::move(source);instance->path=path;bool bink=data.size()>=4&&(!std::memcmp(data.data(),"KB2",3)||!std::memcmp(data.data(),"BIK",3));
         if(bink){if(!bink_){bink_=LoadLibraryW((client_/L"bink2w64.dll").c_str());if(!bink_)throw Error("cannot load client Bink2 decoder");}
             instance->library=bink_;auto open=reinterpret_cast<void*(*)(const char*,uint32_t)>(GetProcAddress(bink_,"BinkOpen"));auto native=path.string();instance->bink=open(native.c_str(),0);
             if(!instance->bink)throw Error("BinkOpen failed");auto fields=static_cast<uint32_t*>(instance->bink);instance->info={int(fields[0]),int(fields[1]),int(fields[2]),double(fields[5])/fields[6],true};
