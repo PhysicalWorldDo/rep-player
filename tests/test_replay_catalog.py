@@ -45,6 +45,7 @@ class ReplayCatalogTests(unittest.TestCase):
         self.assertEqual({row['relative_path'] for row in data['items']}, set(self.relative_paths))
         root_item = next(row for row in data['items'] if row['file'] == 'RootReplay.rep')
         self.assertEqual(root_item['directories'], [])
+        self.assertEqual(root_item['job'], '')
         self.assertEqual(root_item['path'], str(self.replay / 'RootReplay.rep'))
 
     def test_directory_hierarchy_and_case_insensitive_path_search(self):
