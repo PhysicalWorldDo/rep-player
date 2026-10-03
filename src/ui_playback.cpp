@@ -23,10 +23,11 @@ PlayerStatus PlaybackController::status(){std::lock_guard lock(mutex_);return st
 void PlaybackController::run(){try{
     Gpu gpu(root_/L"assets"/L"shaders",canvas_);gpu.createAllPrograms();
     std::unique_ptr<Assets> assets;std::unique_ptr<Executor> executor;std::unique_ptr<Replay> replay;
-    Playback playback;std::filesystem::path activeClient;
+    Playback playback;std::filesystem::path activeClient,activeReplay;
     std::future<ReplayInspection> inspection;uint64_t inspectedGeneration=0;
     Clock::time_point endedAt,playingAt;bool frozenChecked=false;uint32_t finalCrc=0;int oldWidth=0,oldHeight=0;
     std::vector<double> frameTimes;
+    auto releaseReplay=[&]{gpu.flush();playback=Playback{};replay.reset();executor.reset();gpu.resetTextures();if(assets)assets->clearDecodedImages();activeReplay.clear();};
     auto updateImages=[&]{if(!executor)return;status_.currentImages=executor->currentImages();status_.allImages=executor->allImages();status_.hiddenImages=executor->hiddenImages();};
     auto present=[&]{RECT r;GetClientRect(canvas_,&r);gpu.present(executor->output(),std::max(1L,r.right),std::max(1L,r.bottom));oldWidth=r.right;oldHeight=r.bottom;};
     while(!quitting_){
@@ -36,22 +37,24 @@ void PlaybackController::run(){try{
             {std::lock_guard lock(mutex_);path=requested_;client=client_;requestedAt=requestedAt_;stop=stopRequested_;hidden=hidden_;toggleRequested_=false;filterRequested_=false;}
             consumed_=generation;playback.stop();
             try{if(client!=activeClient){
-                replay.reset();executor.reset();assets.reset();assets=std::make_unique<Assets>(client/L"ImagePacks2");
-                gpu.resetTextures();
-                executor=std::make_unique<Executor>(gpu,*assets,root_/L"runtime"/L"cache",client);activeClient=client;
+                releaseReplay();assets.reset();assets=std::make_unique<Assets>(client/L"ImagePacks2");
+                activeClient=client;
             }}catch(const std::exception& e){std::lock_guard lock(mutex_);status_.phase=Phase::Error;status_.message=wide(e.what());continue;}
             if(stop){std::lock_guard lock(mutex_);status_.phase=path.empty()?Phase::Empty:Phase::Stopped;status_.client=activeClient;}
             else try{
                 if(inspection.valid())inspection.wait();
+                if(path!=activeReplay){releaseReplay();executor=std::make_unique<Executor>(gpu,*assets,root_/L"runtime"/L"cache",client);}
+                else if(!executor)executor=std::make_unique<Executor>(gpu,*assets,root_/L"runtime"/L"cache",client);
                 auto options=clientReplayOptions(client,protocol_);
                 auto opened=std::make_unique<Replay>(path,options);executor->attach(*opened);executor->setHiddenImages(hidden);executor->setTransparent(true);replay=std::move(opened);
+                activeReplay=path;
                 playback.attach(*replay,*executor);executor->prepare([&]{return quitting_||generation_!=generation;});
                 if(quitting_||generation_!=generation)continue;
                 inspectedGeneration=generation;inspection=std::async(std::launch::async,[this,path,generation,options]{Replay scan(path,options);return inspectReplayImages(scan,[this,generation]{return quitting_||generation_!=generation;});});
                 playback.start();playingAt=Clock::now();auto before=Clock::now();playback.tick();present();auto after=Clock::now();
                 frameTimes={std::chrono::duration<double,std::milli>(after-before).count()};
                 {std::lock_guard lock(mutex_);status_.phase=Phase::Playing;status_.path=path.wstring();status_.client=activeClient;status_.readySeconds=std::chrono::duration<double>(after-requestedAt).count();status_.processReadySeconds=std::chrono::duration<double>(after-processStart_).count();status_.frames=1;status_.frameCount=0;status_.skipped=0;status_.ordinal=playback.ordinal();status_.timestamp=playback.timestamp();status_.elapsed=playback.elapsedMilliseconds();status_.width=replay->header.width();status_.height=replay->header.height();status_.maxFrameMilliseconds=frameTimes.back();status_.message.clear();status_.frozen=false;status_.duration=0;updateImages();}frozenChecked=false;
-            }catch(const std::exception& e){playback.stop();playback=Playback{};replay.reset();std::lock_guard lock(mutex_);status_.phase=Phase::Error;status_.message=wide(e.what());}
+            }catch(const std::exception& e){releaseReplay();std::lock_guard lock(mutex_);status_.phase=Phase::Error;status_.message=wide(e.what());}
         }
         bool toggle,filter,capture;std::unordered_set<std::string> hidden;std::vector<int> steps;
         {std::lock_guard lock(mutex_);toggle=std::exchange(toggleRequested_,false);filter=std::exchange(filterRequested_,false);capture=std::exchange(captureRequested_,false);steps=std::exchange(stepsRequested_,{});hidden=hidden_;}
@@ -70,7 +73,7 @@ void PlaybackController::run(){try{
                 if(newEnd){endedAt=Clock::now();if(test_){auto pixels=gpu.readback(executor->output());finalCrc=crc(pixels);std::ofstream out(root_/L"validation"/L"ui_last_frame.rgba",std::ios::binary);out.write(reinterpret_cast<const char*>(pixels.data()),pixels.size());std::sort(frameTimes.begin(),frameTimes.end());auto percentile=[&](double p){return frameTimes[std::min(frameTimes.size()-1,size_t(p*(frameTimes.size()-1)))];};std::lock_guard lock(mutex_);status_.p50Frame=percentile(.50);status_.p95Frame=percentile(.95);status_.p99Frame=percentile(.99);}}
                 if(test_&&!frozenChecked&&Clock::now()-endedAt>std::chrono::milliseconds(800)){bool same=crc(gpu.readback(executor->output()))==finalCrc;std::lock_guard lock(mutex_);status_.frozen=same;status_.finalCrc=finalCrc;frozenChecked=true;}
             }
-        }catch(const std::exception& e){playback.stop();playback=Playback{};replay.reset();std::lock_guard lock(mutex_);status_.phase=Phase::Error;status_.message=wide(e.what());}
+        }catch(const std::exception& e){releaseReplay();std::lock_guard lock(mutex_);status_.phase=Phase::Error;status_.message=wide(e.what());}
         std::unique_lock lock(mutex_);condition_.wait_for(lock,std::chrono::milliseconds(playback.playing()?1:20),[&]{return quitting_||generation_!=consumed_||toggleRequested_||filterRequested_||captureRequested_||!stepsRequested_.empty();});
     }
     if(inspection.valid())inspection.wait();gpu.flush();

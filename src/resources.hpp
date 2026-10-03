@@ -44,6 +44,7 @@ public:
     uint64_t fallbacks=0,decodedFrames=0;
     explicit Assets(std::filesystem::path root);
     const std::filesystem::path& root()const{return root_;}
+    void clearDecodedImages(){images_.clear();}
     using FrameObserver=std::function<void(const std::string&,int)>;
     FrameObserver frameObserver()const{return frameObserver_;}
     void setFrameObserver(FrameObserver observer){frameObserver_=std::move(observer);}
