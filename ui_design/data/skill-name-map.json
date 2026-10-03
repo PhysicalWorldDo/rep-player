@@ -9,12 +9,12 @@
     "pages": 71,
     "sourceSkillRows": 4038,
     "sourceKeys": 2387,
-    "repFiles": 3064,
-    "exact": 2878,
+    "repFiles": 3151,
+    "exact": 2965,
     "ambiguous": 0,
     "unmatched": 186,
-    "vpFiles": 1135,
-    "vpNames": 1126,
+    "vpFiles": 1167,
+    "vpNames": 1158,
     "missingVpNames": 9
   },
   "entries": [
@@ -120745,6 +120745,3520 @@
       "sourceSkillIndices": [
         114
       ]
+    },
+    {
+      "id": "ImperialKnight/AnchorKick.rep",
+      "file": "AnchorKick.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\AnchorKick.rep",
+      "relativePath": "ImperialKnight/AnchorKick.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "AnchorKick",
+      "variant": "base",
+      "zh": "枪锚踢击",
+      "vpName": "",
+      "displayZh": "枪锚踢击",
+      "displayEn": "AnchorKick",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "AnchorKick.rep",
+        "AnchorKick",
+        "枪锚踢击",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        9
+      ]
+    },
+    {
+      "id": "ImperialKnight/Avast.rep",
+      "file": "Avast.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\Avast.rep",
+      "relativePath": "ImperialKnight/Avast.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "Avast",
+      "variant": "base",
+      "zh": "停航戒令",
+      "vpName": "",
+      "displayZh": "停航戒令",
+      "displayEn": "Avast",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "Avast.rep",
+        "Avast",
+        "停航戒令",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        11
+      ]
+    },
+    {
+      "id": "ImperialKnight/BackStep.rep",
+      "file": "BackStep.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\BackStep.rep",
+      "relativePath": "ImperialKnight/BackStep.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "BackStep",
+      "variant": "base",
+      "zh": "后跳",
+      "vpName": "",
+      "displayZh": "后跳",
+      "displayEn": "BackStep",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "BackStep.rep",
+        "BackStep",
+        "后跳",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        169
+      ]
+    },
+    {
+      "id": "ImperialKnight/CannonKick.rep",
+      "file": "CannonKick.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\CannonKick.rep",
+      "relativePath": "ImperialKnight/CannonKick.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "CannonKick",
+      "variant": "base",
+      "zh": "舰炮飞踢",
+      "vpName": "",
+      "displayZh": "舰炮飞踢",
+      "displayEn": "CannonKick",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "CannonKick.rep",
+        "CannonKick",
+        "舰炮飞踢",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        6
+      ]
+    },
+    {
+      "id": "ImperialKnight/DeepWaterCall.rep",
+      "file": "DeepWaterCall.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\DeepWaterCall.rep",
+      "relativePath": "ImperialKnight/DeepWaterCall.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "DeepWaterCall",
+      "variant": "base",
+      "zh": "深海召唤",
+      "vpName": "",
+      "displayZh": "深海召唤",
+      "displayEn": "DeepWaterCall",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "DeepWaterCall.rep",
+        "DeepWaterCall",
+        "深海召唤",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        31
+      ]
+    },
+    {
+      "id": "ImperialKnight/DreadfallBarrage.rep",
+      "file": "DreadfallBarrage.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\DreadfallBarrage.rep",
+      "relativePath": "ImperialKnight/DreadfallBarrage.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "DreadfallBarrage",
+      "variant": "base",
+      "zh": "战栗轰击",
+      "vpName": "",
+      "displayZh": "战栗轰击",
+      "displayEn": "DreadfallBarrage",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "DreadfallBarrage.rep",
+        "DreadfallBarrage",
+        "战栗轰击",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        25
+      ]
+    },
+    {
+      "id": "ImperialKnight/DreadfallBarrage_VP1.rep",
+      "file": "DreadfallBarrage_VP1.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\DreadfallBarrage_VP1.rep",
+      "relativePath": "ImperialKnight/DreadfallBarrage_VP1.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "DreadfallBarrage",
+      "variant": "VP1",
+      "zh": "战栗轰击",
+      "vpName": "聚能轰击",
+      "displayZh": "战栗轰击 · VP1 · 聚能轰击",
+      "displayEn": "DreadfallBarrage_VP1",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "DreadfallBarrage_VP1.rep",
+        "DreadfallBarrage_VP1",
+        "DreadfallBarrage",
+        "战栗轰击",
+        "VP1",
+        "聚能轰击",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        25
+      ]
+    },
+    {
+      "id": "ImperialKnight/DreadfallBarrage_VP2.rep",
+      "file": "DreadfallBarrage_VP2.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\DreadfallBarrage_VP2.rep",
+      "relativePath": "ImperialKnight/DreadfallBarrage_VP2.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "DreadfallBarrage",
+      "variant": "VP2",
+      "zh": "战栗轰击",
+      "vpName": "战栗天陨",
+      "displayZh": "战栗轰击 · VP2 · 战栗天陨",
+      "displayEn": "DreadfallBarrage_VP2",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "DreadfallBarrage_VP2.rep",
+        "DreadfallBarrage_VP2",
+        "DreadfallBarrage",
+        "战栗轰击",
+        "VP2",
+        "战栗天陨",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        25
+      ]
+    },
+    {
+      "id": "ImperialKnight/GaleSlash.rep",
+      "file": "GaleSlash.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\GaleSlash.rep",
+      "relativePath": "ImperialKnight/GaleSlash.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "GaleSlash",
+      "variant": "base",
+      "zh": "狂风斩",
+      "vpName": "",
+      "displayZh": "狂风斩",
+      "displayEn": "GaleSlash",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "GaleSlash.rep",
+        "GaleSlash",
+        "狂风斩",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        16
+      ]
+    },
+    {
+      "id": "ImperialKnight/GaleSlash_VP1.rep",
+      "file": "GaleSlash_VP1.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\GaleSlash_VP1.rep",
+      "relativePath": "ImperialKnight/GaleSlash_VP1.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "GaleSlash",
+      "variant": "VP1",
+      "zh": "狂风斩",
+      "vpName": "十字风斩",
+      "displayZh": "狂风斩 · VP1 · 十字风斩",
+      "displayEn": "GaleSlash_VP1",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "GaleSlash_VP1.rep",
+        "GaleSlash_VP1",
+        "GaleSlash",
+        "狂风斩",
+        "VP1",
+        "十字风斩",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        16
+      ]
+    },
+    {
+      "id": "ImperialKnight/GaleSlash_VP2.rep",
+      "file": "GaleSlash_VP2.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\GaleSlash_VP2.rep",
+      "relativePath": "ImperialKnight/GaleSlash_VP2.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "GaleSlash",
+      "variant": "VP2",
+      "zh": "狂风斩",
+      "vpName": "追风之刃",
+      "displayZh": "狂风斩 · VP2 · 追风之刃",
+      "displayEn": "GaleSlash_VP2",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "GaleSlash_VP2.rep",
+        "GaleSlash_VP2",
+        "GaleSlash",
+        "狂风斩",
+        "VP2",
+        "追风之刃",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        16
+      ]
+    },
+    {
+      "id": "ImperialKnight/HookShot.rep",
+      "file": "HookShot.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\HookShot.rep",
+      "relativePath": "ImperialKnight/HookShot.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "HookShot",
+      "variant": "base",
+      "zh": "钩爪突袭",
+      "vpName": "",
+      "displayZh": "钩爪突袭",
+      "displayEn": "HookShot",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "HookShot.rep",
+        "HookShot",
+        "钩爪突袭",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        10
+      ]
+    },
+    {
+      "id": "ImperialKnight/HullBreach.rep",
+      "file": "HullBreach.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\HullBreach.rep",
+      "relativePath": "ImperialKnight/HullBreach.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "HullBreach",
+      "variant": "base",
+      "zh": "船体碎击",
+      "vpName": "",
+      "displayZh": "船体碎击",
+      "displayEn": "HullBreach",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "HullBreach.rep",
+        "HullBreach",
+        "船体碎击",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        12
+      ]
+    },
+    {
+      "id": "ImperialKnight/JumpPowerUp.rep",
+      "file": "JumpPowerUp.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\JumpPowerUp.rep",
+      "relativePath": "ImperialKnight/JumpPowerUp.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "JumpPowerUp",
+      "variant": "base",
+      "zh": "跃翔",
+      "vpName": "",
+      "displayZh": "跃翔",
+      "displayEn": "JumpPowerUp",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "JumpPowerUp.rep",
+        "JumpPowerUp",
+        "跃翔",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        175
+      ]
+    },
+    {
+      "id": "ImperialKnight/Maelstrom.rep",
+      "file": "Maelstrom.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\Maelstrom.rep",
+      "relativePath": "ImperialKnight/Maelstrom.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "Maelstrom",
+      "variant": "base",
+      "zh": "气卷万涛",
+      "vpName": "",
+      "displayZh": "气卷万涛",
+      "displayEn": "Maelstrom",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "Maelstrom.rep",
+        "Maelstrom",
+        "气卷万涛",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        23
+      ]
+    },
+    {
+      "id": "ImperialKnight/Maelstrom_VP1.rep",
+      "file": "Maelstrom_VP1.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\Maelstrom_VP1.rep",
+      "relativePath": "ImperialKnight/Maelstrom_VP1.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "Maelstrom",
+      "variant": "VP1",
+      "zh": "气卷万涛",
+      "vpName": "风涡领域",
+      "displayZh": "气卷万涛 · VP1 · 风涡领域",
+      "displayEn": "Maelstrom_VP1",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "Maelstrom_VP1.rep",
+        "Maelstrom_VP1",
+        "Maelstrom",
+        "气卷万涛",
+        "VP1",
+        "风涡领域",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        23
+      ]
+    },
+    {
+      "id": "ImperialKnight/Maelstrom_VP2.rep",
+      "file": "Maelstrom_VP2.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\Maelstrom_VP2.rep",
+      "relativePath": "ImperialKnight/Maelstrom_VP2.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "Maelstrom",
+      "variant": "VP2",
+      "zh": "气卷万涛",
+      "vpName": "海洋风暴",
+      "displayZh": "气卷万涛 · VP2 · 海洋风暴",
+      "displayEn": "Maelstrom_VP2",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "Maelstrom_VP2.rep",
+        "Maelstrom_VP2",
+        "Maelstrom",
+        "气卷万涛",
+        "VP2",
+        "海洋风暴",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        23
+      ]
+    },
+    {
+      "id": "ImperialKnight/OpenwarFanfare.rep",
+      "file": "OpenwarFanfare.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\OpenwarFanfare.rep",
+      "relativePath": "ImperialKnight/OpenwarFanfare.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "OpenwarFanfare",
+      "variant": "base",
+      "zh": "鸣镝破阵",
+      "vpName": "",
+      "displayZh": "鸣镝破阵",
+      "displayEn": "OpenwarFanfare",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "OpenwarFanfare.rep",
+        "OpenwarFanfare",
+        "鸣镝破阵",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        21
+      ]
+    },
+    {
+      "id": "ImperialKnight/PierceImpact.rep",
+      "file": "PierceImpact.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\PierceImpact.rep",
+      "relativePath": "ImperialKnight/PierceImpact.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "PierceImpact",
+      "variant": "base",
+      "zh": "怒海冲击",
+      "vpName": "",
+      "displayZh": "怒海冲击",
+      "displayEn": "PierceImpact",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "PierceImpact.rep",
+        "PierceImpact",
+        "怒海冲击",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        22
+      ]
+    },
+    {
+      "id": "ImperialKnight/PierceImpact_VP1.rep",
+      "file": "PierceImpact_VP1.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\PierceImpact_VP1.rep",
+      "relativePath": "ImperialKnight/PierceImpact_VP1.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "PierceImpact",
+      "variant": "VP1",
+      "zh": "怒海冲击",
+      "vpName": "发散",
+      "displayZh": "怒海冲击 · VP1 · 发散",
+      "displayEn": "PierceImpact_VP1",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "PierceImpact_VP1.rep",
+        "PierceImpact_VP1",
+        "PierceImpact",
+        "怒海冲击",
+        "VP1",
+        "发散",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        22
+      ]
+    },
+    {
+      "id": "ImperialKnight/PierceImpact_VP2.rep",
+      "file": "PierceImpact_VP2.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\PierceImpact_VP2.rep",
+      "relativePath": "ImperialKnight/PierceImpact_VP2.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "PierceImpact",
+      "variant": "VP2",
+      "zh": "怒海冲击",
+      "vpName": "怒海涡流",
+      "displayZh": "怒海冲击 · VP2 · 怒海涡流",
+      "displayEn": "PierceImpact_VP2",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "PierceImpact_VP2.rep",
+        "PierceImpact_VP2",
+        "PierceImpact",
+        "怒海冲击",
+        "VP2",
+        "怒海涡流",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        22
+      ]
+    },
+    {
+      "id": "ImperialKnight/PointThrust.rep",
+      "file": "PointThrust.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\PointThrust.rep",
+      "relativePath": "ImperialKnight/PointThrust.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "PointThrust",
+      "variant": "base",
+      "zh": "穿心刺",
+      "vpName": "",
+      "displayZh": "穿心刺",
+      "displayEn": "PointThrust",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "PointThrust.rep",
+        "PointThrust",
+        "穿心刺",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        2
+      ]
+    },
+    {
+      "id": "ImperialKnight/QuickBisection.rep",
+      "file": "QuickBisection.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\QuickBisection.rep",
+      "relativePath": "ImperialKnight/QuickBisection.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "QuickBisection",
+      "variant": "base",
+      "zh": "破浪斩",
+      "vpName": "",
+      "displayZh": "破浪斩",
+      "displayEn": "QuickBisection",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "QuickBisection.rep",
+        "QuickBisection",
+        "破浪斩",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        3
+      ]
+    },
+    {
+      "id": "ImperialKnight/QuickStanding.rep",
+      "file": "QuickStanding.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\QuickStanding.rep",
+      "relativePath": "ImperialKnight/QuickStanding.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "QuickStanding",
+      "variant": "base",
+      "zh": "受身蹲伏",
+      "vpName": "",
+      "displayZh": "受身蹲伏",
+      "displayEn": "QuickStanding",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "QuickStanding.rep",
+        "QuickStanding",
+        "受身蹲伏",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        190
+      ]
+    },
+    {
+      "id": "ImperialKnight/RaiseUpperCut.rep",
+      "file": "RaiseUpperCut.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\RaiseUpperCut.rep",
+      "relativePath": "ImperialKnight/RaiseUpperCut.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "RaiseUpperCut",
+      "variant": "base",
+      "zh": "上撩斩",
+      "vpName": "",
+      "displayZh": "上撩斩",
+      "displayEn": "RaiseUpperCut",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "RaiseUpperCut.rep",
+        "RaiseUpperCut",
+        "上撩斩",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        1
+      ]
+    },
+    {
+      "id": "ImperialKnight/RiptideUprising.rep",
+      "file": "RiptideUprising.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\RiptideUprising.rep",
+      "relativePath": "ImperialKnight/RiptideUprising.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "RiptideUprising",
+      "variant": "base",
+      "zh": "逆浪断空",
+      "vpName": "",
+      "displayZh": "逆浪断空",
+      "displayEn": "RiptideUprising",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "RiptideUprising.rep",
+        "RiptideUprising",
+        "逆浪断空",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        18
+      ]
+    },
+    {
+      "id": "ImperialKnight/RiptideUprising_VP1.rep",
+      "file": "RiptideUprising_VP1.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\RiptideUprising_VP1.rep",
+      "relativePath": "ImperialKnight/RiptideUprising_VP1.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "RiptideUprising",
+      "variant": "VP1",
+      "zh": "逆浪断空",
+      "vpName": "逆浪瞬影",
+      "displayZh": "逆浪断空 · VP1 · 逆浪瞬影",
+      "displayEn": "RiptideUprising_VP1",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "RiptideUprising_VP1.rep",
+        "RiptideUprising_VP1",
+        "RiptideUprising",
+        "逆浪断空",
+        "VP1",
+        "逆浪瞬影",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        18
+      ]
+    },
+    {
+      "id": "ImperialKnight/RiptideUprising_VP2.rep",
+      "file": "RiptideUprising_VP2.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\RiptideUprising_VP2.rep",
+      "relativePath": "ImperialKnight/RiptideUprising_VP2.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "RiptideUprising",
+      "variant": "VP2",
+      "zh": "逆浪断空",
+      "vpName": "聚浪蔽空",
+      "displayZh": "逆浪断空 · VP2 · 聚浪蔽空",
+      "displayEn": "RiptideUprising_VP2",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "RiptideUprising_VP2.rep",
+        "RiptideUprising_VP2",
+        "RiptideUprising",
+        "逆浪断空",
+        "VP2",
+        "聚浪蔽空",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        18
+      ]
+    },
+    {
+      "id": "ImperialKnight/RoughBoarding.rep",
+      "file": "RoughBoarding.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\RoughBoarding.rep",
+      "relativePath": "ImperialKnight/RoughBoarding.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "RoughBoarding",
+      "variant": "base",
+      "zh": "无畏登舰",
+      "vpName": "",
+      "displayZh": "无畏登舰",
+      "displayEn": "RoughBoarding",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "RoughBoarding.rep",
+        "RoughBoarding",
+        "无畏登舰",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        7
+      ]
+    },
+    {
+      "id": "ImperialKnight/SeaBane.rep",
+      "file": "SeaBane.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\SeaBane.rep",
+      "relativePath": "ImperialKnight/SeaBane.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "SeaBane",
+      "variant": "base",
+      "zh": "四海游龙",
+      "vpName": "",
+      "displayZh": "四海游龙",
+      "displayEn": "SeaBane",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "SeaBane.rep",
+        "SeaBane",
+        "四海游龙",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        27
+      ]
+    },
+    {
+      "id": "ImperialKnight/SeaDragonTooth.rep",
+      "file": "SeaDragonTooth.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\SeaDragonTooth.rep",
+      "relativePath": "ImperialKnight/SeaDragonTooth.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "SeaDragonTooth",
+      "variant": "base",
+      "zh": "蛟龙惊涛",
+      "vpName": "",
+      "displayZh": "蛟龙惊涛",
+      "displayEn": "SeaDragonTooth",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "SeaDragonTooth.rep",
+        "SeaDragonTooth",
+        "蛟龙惊涛",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        26
+      ]
+    },
+    {
+      "id": "ImperialKnight/SeaDragonTooth_VP1.rep",
+      "file": "SeaDragonTooth_VP1.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\SeaDragonTooth_VP1.rep",
+      "relativePath": "ImperialKnight/SeaDragonTooth_VP1.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "SeaDragonTooth",
+      "variant": "VP1",
+      "zh": "蛟龙惊涛",
+      "vpName": "蛟龙翻舞",
+      "displayZh": "蛟龙惊涛 · VP1 · 蛟龙翻舞",
+      "displayEn": "SeaDragonTooth_VP1",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "SeaDragonTooth_VP1.rep",
+        "SeaDragonTooth_VP1",
+        "SeaDragonTooth",
+        "蛟龙惊涛",
+        "VP1",
+        "蛟龙翻舞",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        26
+      ]
+    },
+    {
+      "id": "ImperialKnight/SeaDragonTooth_VP2.rep",
+      "file": "SeaDragonTooth_VP2.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\SeaDragonTooth_VP2.rep",
+      "relativePath": "ImperialKnight/SeaDragonTooth_VP2.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "SeaDragonTooth",
+      "variant": "VP2",
+      "zh": "蛟龙惊涛",
+      "vpName": "蛟龙追猎",
+      "displayZh": "蛟龙惊涛 · VP2 · 蛟龙追猎",
+      "displayEn": "SeaDragonTooth_VP2",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "SeaDragonTooth_VP2.rep",
+        "SeaDragonTooth_VP2",
+        "SeaDragonTooth",
+        "蛟龙惊涛",
+        "VP2",
+        "蛟龙追猎",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        26
+      ]
+    },
+    {
+      "id": "ImperialKnight/SeaGodFallDown.rep",
+      "file": "SeaGodFallDown.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\SeaGodFallDown.rep",
+      "relativePath": "ImperialKnight/SeaGodFallDown.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "SeaGodFallDown",
+      "variant": "base",
+      "zh": "海神降临",
+      "vpName": "",
+      "displayZh": "海神降临",
+      "displayEn": "SeaGodFallDown",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "SeaGodFallDown.rep",
+        "SeaGodFallDown",
+        "海神降临",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        30
+      ]
+    },
+    {
+      "id": "ImperialKnight/SweepingStrike.rep",
+      "file": "SweepingStrike.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\SweepingStrike.rep",
+      "relativePath": "ImperialKnight/SweepingStrike.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "SweepingStrike",
+      "variant": "base",
+      "zh": "旋风扫荡",
+      "vpName": "",
+      "displayZh": "旋风扫荡",
+      "displayEn": "SweepingStrike",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "SweepingStrike.rep",
+        "SweepingStrike",
+        "旋风扫荡",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        13
+      ]
+    },
+    {
+      "id": "ImperialKnight/TideBound.rep",
+      "file": "TideBound.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\TideBound.rep",
+      "relativePath": "ImperialKnight/TideBound.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "TideBound",
+      "variant": "base",
+      "zh": "潮汐之缚",
+      "vpName": "",
+      "displayZh": "潮汐之缚",
+      "displayEn": "TideBound",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "TideBound.rep",
+        "TideBound",
+        "潮汐之缚",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        17
+      ]
+    },
+    {
+      "id": "ImperialKnight/TideBound_VP1.rep",
+      "file": "TideBound_VP1.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\TideBound_VP1.rep",
+      "relativePath": "ImperialKnight/TideBound_VP1.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "TideBound",
+      "variant": "VP1",
+      "zh": "潮汐之缚",
+      "vpName": "潮汐迅袭",
+      "displayZh": "潮汐之缚 · VP1 · 潮汐迅袭",
+      "displayEn": "TideBound_VP1",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "TideBound_VP1.rep",
+        "TideBound_VP1",
+        "TideBound",
+        "潮汐之缚",
+        "VP1",
+        "潮汐迅袭",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        17
+      ]
+    },
+    {
+      "id": "ImperialKnight/TideBound_VP2.rep",
+      "file": "TideBound_VP2.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\TideBound_VP2.rep",
+      "relativePath": "ImperialKnight/TideBound_VP2.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "TideBound",
+      "variant": "VP2",
+      "zh": "潮汐之缚",
+      "vpName": "重涛叠浪",
+      "displayZh": "潮汐之缚 · VP2 · 重涛叠浪",
+      "displayEn": "TideBound_VP2",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "TideBound_VP2.rep",
+        "TideBound_VP2",
+        "TideBound",
+        "潮汐之缚",
+        "VP2",
+        "重涛叠浪",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        17
+      ]
+    },
+    {
+      "id": "ImperialKnight/Tidepiercer.rep",
+      "file": "Tidepiercer.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\Tidepiercer.rep",
+      "relativePath": "ImperialKnight/Tidepiercer.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "Tidepiercer",
+      "variant": "base",
+      "zh": "激流勇进",
+      "vpName": "",
+      "displayZh": "激流勇进",
+      "displayEn": "Tidepiercer",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "Tidepiercer.rep",
+        "Tidepiercer",
+        "激流勇进",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        15
+      ]
+    },
+    {
+      "id": "ImperialKnight/UnBoundTempest.rep",
+      "file": "UnBoundTempest.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\UnBoundTempest.rep",
+      "relativePath": "ImperialKnight/UnBoundTempest.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "UnBoundTempest",
+      "variant": "base",
+      "zh": "狂澜风暴舞",
+      "vpName": "",
+      "displayZh": "狂澜风暴舞",
+      "displayEn": "UnBoundTempest",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "UnBoundTempest.rep",
+        "UnBoundTempest",
+        "狂澜风暴舞",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        29
+      ]
+    },
+    {
+      "id": "ImperialKnight/WaveBreaker.rep",
+      "file": "WaveBreaker.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\WaveBreaker.rep",
+      "relativePath": "ImperialKnight/WaveBreaker.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "WaveBreaker",
+      "variant": "base",
+      "zh": "乘风破浪",
+      "vpName": "",
+      "displayZh": "乘风破浪",
+      "displayEn": "WaveBreaker",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "WaveBreaker.rep",
+        "WaveBreaker",
+        "乘风破浪",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        19
+      ]
+    },
+    {
+      "id": "ImperialKnight/WaveBreaker_VP1.rep",
+      "file": "WaveBreaker_VP1.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\WaveBreaker_VP1.rep",
+      "relativePath": "ImperialKnight/WaveBreaker_VP1.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "WaveBreaker",
+      "variant": "VP1",
+      "zh": "乘风破浪",
+      "vpName": "浪涌不息",
+      "displayZh": "乘风破浪 · VP1 · 浪涌不息",
+      "displayEn": "WaveBreaker_VP1",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "WaveBreaker_VP1.rep",
+        "WaveBreaker_VP1",
+        "WaveBreaker",
+        "乘风破浪",
+        "VP1",
+        "浪涌不息",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        19
+      ]
+    },
+    {
+      "id": "ImperialKnight/WaveBreaker_VP2.rep",
+      "file": "WaveBreaker_VP2.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\WaveBreaker_VP2.rep",
+      "relativePath": "ImperialKnight/WaveBreaker_VP2.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "WaveBreaker",
+      "variant": "VP2",
+      "zh": "乘风破浪",
+      "vpName": "浪压万钧",
+      "displayZh": "乘风破浪 · VP2 · 浪压万钧",
+      "displayEn": "WaveBreaker_VP2",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "WaveBreaker_VP2.rep",
+        "WaveBreaker_VP2",
+        "WaveBreaker",
+        "乘风破浪",
+        "VP2",
+        "浪压万钧",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        19
+      ]
+    },
+    {
+      "id": "ImperialKnight/WideCleave.rep",
+      "file": "WideCleave.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ImperialKnight\\WideCleave.rep",
+      "relativePath": "ImperialKnight/WideCleave.rep",
+      "job": "ImperialKnight",
+      "baseJob": "imperial knight",
+      "jobZh": "帝国骑士",
+      "professions": [
+        "破浪者"
+      ],
+      "professionKeys": [
+        "breaker"
+      ],
+      "english": "WideCleave",
+      "variant": "base",
+      "zh": "狂野横扫",
+      "vpName": "",
+      "displayZh": "狂野横扫",
+      "displayEn": "WideCleave",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "WideCleave.rep",
+        "WideCleave",
+        "狂野横扫",
+        "ImperialKnight",
+        "帝国骑士",
+        "破浪者"
+      ],
+      "sources": [
+        "帝国骑士/破浪者/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        5
+      ]
+    },
+    {
+      "id": "ATPriest/AccelDrive.rep",
+      "file": "AccelDrive.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\AccelDrive.rep",
+      "relativePath": "ATPriest/AccelDrive.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "AccelDrive",
+      "variant": "base",
+      "zh": "圣光三重破",
+      "vpName": "",
+      "displayZh": "圣光三重破",
+      "displayEn": "AccelDrive",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "AccelDrive.rep",
+        "AccelDrive",
+        "圣光三重破",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        315
+      ]
+    },
+    {
+      "id": "ATPriest/ArdereVehemens.rep",
+      "file": "ArdereVehemens.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\ArdereVehemens.rep",
+      "relativePath": "ATPriest/ArdereVehemens.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "ArdereVehemens",
+      "variant": "base",
+      "zh": "炽拳 : 以暴制暴",
+      "vpName": "",
+      "displayZh": "炽拳 : 以暴制暴",
+      "displayEn": "ArdereVehemens",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "ArdereVehemens.rep",
+        "ArdereVehemens",
+        "炽拳 : 以暴制暴",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        313
+      ]
+    },
+    {
+      "id": "ATPriest/ATDivineCrush.rep",
+      "file": "ATDivineCrush.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\ATDivineCrush.rep",
+      "relativePath": "ATPriest/ATDivineCrush.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "ATDivineCrush",
+      "variant": "base",
+      "zh": "圣拳锤击",
+      "vpName": "",
+      "displayZh": "圣拳锤击",
+      "displayEn": "ATDivineCrush",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "ATDivineCrush.rep",
+        "ATDivineCrush",
+        "圣拳锤击",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        297
+      ]
+    },
+    {
+      "id": "ATPriest/ATGorgeousCombination.rep",
+      "file": "ATGorgeousCombination.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\ATGorgeousCombination.rep",
+      "relativePath": "ATPriest/ATGorgeousCombination.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "ATGorgeousCombination",
+      "variant": "base",
+      "zh": "圣拳连击",
+      "vpName": "",
+      "displayZh": "圣拳连击",
+      "displayEn": "ATGorgeousCombination",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "ATGorgeousCombination.rep",
+        "ATGorgeousCombination",
+        "圣拳连击",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        292
+      ]
+    },
+    {
+      "id": "ATPriest/ATHeavenlyCombination.rep",
+      "file": "ATHeavenlyCombination.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\ATHeavenlyCombination.rep",
+      "relativePath": "ATPriest/ATHeavenlyCombination.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "ATHeavenlyCombination",
+      "variant": "base",
+      "zh": "神圣组合拳",
+      "vpName": "",
+      "displayZh": "神圣组合拳",
+      "displayEn": "ATHeavenlyCombination",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "ATHeavenlyCombination.rep",
+        "ATHeavenlyCombination",
+        "神圣组合拳",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        304
+      ]
+    },
+    {
+      "id": "ATPriest/ATHeavenlyCombination_VP1.rep",
+      "file": "ATHeavenlyCombination_VP1.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\ATHeavenlyCombination_VP1.rep",
+      "relativePath": "ATPriest/ATHeavenlyCombination_VP1.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "ATHeavenlyCombination",
+      "variant": "VP1",
+      "zh": "神圣组合拳",
+      "vpName": "锁敌组合拳",
+      "displayZh": "神圣组合拳 · VP1 · 锁敌组合拳",
+      "displayEn": "ATHeavenlyCombination_VP1",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "ATHeavenlyCombination_VP1.rep",
+        "ATHeavenlyCombination_VP1",
+        "ATHeavenlyCombination",
+        "神圣组合拳",
+        "VP1",
+        "锁敌组合拳",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        304
+      ]
+    },
+    {
+      "id": "ATPriest/ATHeavenlyCombination_VP2.rep",
+      "file": "ATHeavenlyCombination_VP2.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\ATHeavenlyCombination_VP2.rep",
+      "relativePath": "ATPriest/ATHeavenlyCombination_VP2.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "ATHeavenlyCombination",
+      "variant": "VP2",
+      "zh": "神圣组合拳",
+      "vpName": "灵动组合拳",
+      "displayZh": "神圣组合拳 · VP2 · 灵动组合拳",
+      "displayEn": "ATHeavenlyCombination_VP2",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "ATHeavenlyCombination_VP2.rep",
+        "ATHeavenlyCombination_VP2",
+        "ATHeavenlyCombination",
+        "神圣组合拳",
+        "VP2",
+        "灵动组合拳",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        304
+      ]
+    },
+    {
+      "id": "ATPriest/ATHurricaneRoll.rep",
+      "file": "ATHurricaneRoll.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\ATHurricaneRoll.rep",
+      "relativePath": "ATPriest/ATHurricaneRoll.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "ATHurricaneRoll",
+      "variant": "base",
+      "zh": "极速飓风拳",
+      "vpName": "",
+      "displayZh": "极速飓风拳",
+      "displayEn": "ATHurricaneRoll",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "ATHurricaneRoll.rep",
+        "ATHurricaneRoll",
+        "极速飓风拳",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        302
+      ]
+    },
+    {
+      "id": "ATPriest/ATHurricaneRoll_VP1.rep",
+      "file": "ATHurricaneRoll_VP1.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\ATHurricaneRoll_VP1.rep",
+      "relativePath": "ATPriest/ATHurricaneRoll_VP1.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "ATHurricaneRoll",
+      "variant": "VP1",
+      "zh": "极速飓风拳",
+      "vpName": "双重飓风",
+      "displayZh": "极速飓风拳 · VP1 · 双重飓风",
+      "displayEn": "ATHurricaneRoll_VP1",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "ATHurricaneRoll_VP1.rep",
+        "ATHurricaneRoll_VP1",
+        "ATHurricaneRoll",
+        "极速飓风拳",
+        "VP1",
+        "双重飓风",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        302
+      ]
+    },
+    {
+      "id": "ATPriest/ATHurricaneRoll_VP2.rep",
+      "file": "ATHurricaneRoll_VP2.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\ATHurricaneRoll_VP2.rep",
+      "relativePath": "ATPriest/ATHurricaneRoll_VP2.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "ATHurricaneRoll",
+      "variant": "VP2",
+      "zh": "极速飓风拳",
+      "vpName": "飓风连环拳",
+      "displayZh": "极速飓风拳 · VP2 · 飓风连环拳",
+      "displayEn": "ATHurricaneRoll_VP2",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "ATHurricaneRoll_VP2.rep",
+        "ATHurricaneRoll_VP2",
+        "ATHurricaneRoll",
+        "极速飓风拳",
+        "VP2",
+        "飓风连环拳",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        302
+      ]
+    },
+    {
+      "id": "ATPriest/ATSecondUpper.rep",
+      "file": "ATSecondUpper.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\ATSecondUpper.rep",
+      "relativePath": "ATPriest/ATSecondUpper.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "ATSecondUpper",
+      "variant": "base",
+      "zh": "勾拳追击",
+      "vpName": "",
+      "displayZh": "勾拳追击",
+      "displayEn": "ATSecondUpper",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "ATSecondUpper.rep",
+        "ATSecondUpper",
+        "勾拳追击",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        289
+      ]
+    },
+    {
+      "id": "ATPriest/BlowShot.rep",
+      "file": "BlowShot.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\BlowShot.rep",
+      "relativePath": "ATPriest/BlowShot.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "BlowShot",
+      "variant": "base",
+      "zh": "旋风冲拳",
+      "vpName": "",
+      "displayZh": "旋风冲拳",
+      "displayEn": "BlowShot",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "BlowShot.rep",
+        "BlowShot",
+        "旋风冲拳",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        301
+      ]
+    },
+    {
+      "id": "ATPriest/BodyBlow.rep",
+      "file": "BodyBlow.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\BodyBlow.rep",
+      "relativePath": "ATPriest/BodyBlow.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "BodyBlow",
+      "variant": "base",
+      "zh": "腹部重击",
+      "vpName": "",
+      "displayZh": "腹部重击",
+      "displayEn": "BodyBlow",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "BodyBlow.rep",
+        "BodyBlow",
+        "腹部重击",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        294
+      ]
+    },
+    {
+      "id": "ATPriest/BodySpiritBecomeOne.rep",
+      "file": "BodySpiritBecomeOne.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\BodySpiritBecomeOne.rep",
+      "relativePath": "ATPriest/BodySpiritBecomeOne.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "BodySpiritBecomeOne",
+      "variant": "base",
+      "zh": "神体合一",
+      "vpName": "",
+      "displayZh": "神体合一",
+      "displayEn": "BodySpiritBecomeOne",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "BodySpiritBecomeOne.rep",
+        "BodySpiritBecomeOne",
+        "神体合一",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        299
+      ]
+    },
+    {
+      "id": "ATPriest/BrutalCombination.rep",
+      "file": "BrutalCombination.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\BrutalCombination.rep",
+      "relativePath": "ATPriest/BrutalCombination.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "BrutalCombination",
+      "variant": "base",
+      "zh": "怒气贯地击",
+      "vpName": "",
+      "displayZh": "怒气贯地击",
+      "displayEn": "BrutalCombination",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "BrutalCombination.rep",
+        "BrutalCombination",
+        "怒气贯地击",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        311
+      ]
+    },
+    {
+      "id": "ATPriest/BrutalCombination_VP1.rep",
+      "file": "BrutalCombination_VP1.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\BrutalCombination_VP1.rep",
+      "relativePath": "ATPriest/BrutalCombination_VP1.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "BrutalCombination",
+      "variant": "VP1",
+      "zh": "怒气贯地击",
+      "vpName": "破空贯地击",
+      "displayZh": "怒气贯地击 · VP1 · 破空贯地击",
+      "displayEn": "BrutalCombination_VP1",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "BrutalCombination_VP1.rep",
+        "BrutalCombination_VP1",
+        "BrutalCombination",
+        "怒气贯地击",
+        "VP1",
+        "破空贯地击",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        311
+      ]
+    },
+    {
+      "id": "ATPriest/BrutalCombination_VP2.rep",
+      "file": "BrutalCombination_VP2.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\BrutalCombination_VP2.rep",
+      "relativePath": "ATPriest/BrutalCombination_VP2.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "BrutalCombination",
+      "variant": "VP2",
+      "zh": "怒气贯地击",
+      "vpName": "怒气追击",
+      "displayZh": "怒气贯地击 · VP2 · 怒气追击",
+      "displayEn": "BrutalCombination_VP2",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "BrutalCombination_VP2.rep",
+        "BrutalCombination_VP2",
+        "BrutalCombination",
+        "怒气贯地击",
+        "VP2",
+        "怒气追击",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        311
+      ]
+    },
+    {
+      "id": "ATPriest/DuckingStep.rep",
+      "file": "DuckingStep.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\DuckingStep.rep",
+      "relativePath": "ATPriest/DuckingStep.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "DuckingStep",
+      "variant": "base",
+      "zh": "闪避步",
+      "vpName": "",
+      "displayZh": "闪避步",
+      "displayEn": "DuckingStep",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "DuckingStep.rep",
+        "DuckingStep",
+        "闪避步",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        293
+      ]
+    },
+    {
+      "id": "ATPriest/FakeTwist.rep",
+      "file": "FakeTwist.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\FakeTwist.rep",
+      "relativePath": "ATPriest/FakeTwist.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "FakeTwist",
+      "variant": "base",
+      "zh": "幻影直拳",
+      "vpName": "",
+      "displayZh": "幻影直拳",
+      "displayEn": "FakeTwist",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "FakeTwist.rep",
+        "FakeTwist",
+        "幻影直拳",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        298
+      ]
+    },
+    {
+      "id": "ATPriest/FatalImpact.rep",
+      "file": "FatalImpact.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\FatalImpact.rep",
+      "relativePath": "ATPriest/FatalImpact.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "FatalImpact",
+      "variant": "base",
+      "zh": "致命冲拳",
+      "vpName": "",
+      "displayZh": "致命冲拳",
+      "displayEn": "FatalImpact",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "FatalImpact.rep",
+        "FatalImpact",
+        "致命冲拳",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        312
+      ]
+    },
+    {
+      "id": "ATPriest/FatalImpact_VP1.rep",
+      "file": "FatalImpact_VP1.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\FatalImpact_VP1.rep",
+      "relativePath": "ATPriest/FatalImpact_VP1.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "FatalImpact",
+      "variant": "VP1",
+      "zh": "致命冲拳",
+      "vpName": "聚敌冲拳",
+      "displayZh": "致命冲拳 · VP1 · 聚敌冲拳",
+      "displayEn": "FatalImpact_VP1",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "FatalImpact_VP1.rep",
+        "FatalImpact_VP1",
+        "FatalImpact",
+        "致命冲拳",
+        "VP1",
+        "聚敌冲拳",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        312
+      ]
+    },
+    {
+      "id": "ATPriest/FatalImpact_VP2.rep",
+      "file": "FatalImpact_VP2.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\FatalImpact_VP2.rep",
+      "relativePath": "ATPriest/FatalImpact_VP2.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "FatalImpact",
+      "variant": "VP2",
+      "zh": "致命冲拳",
+      "vpName": "致命升龙拳",
+      "displayZh": "致命冲拳 · VP2 · 致命升龙拳",
+      "displayEn": "FatalImpact_VP2",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "FatalImpact_VP2.rep",
+        "FatalImpact_VP2",
+        "FatalImpact",
+        "致命冲拳",
+        "VP2",
+        "致命升龙拳",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        312
+      ]
+    },
+    {
+      "id": "ATPriest/GiganticCannon.rep",
+      "file": "GiganticCannon.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\GiganticCannon.rep",
+      "relativePath": "ATPriest/GiganticCannon.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "GiganticCannon",
+      "variant": "base",
+      "zh": "巨力炮拳",
+      "vpName": "",
+      "displayZh": "巨力炮拳",
+      "displayEn": "GiganticCannon",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "GiganticCannon.rep",
+        "GiganticCannon",
+        "巨力炮拳",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        305
+      ]
+    },
+    {
+      "id": "ATPriest/GiganticCannon_VP1.rep",
+      "file": "GiganticCannon_VP1.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\GiganticCannon_VP1.rep",
+      "relativePath": "ATPriest/GiganticCannon_VP1.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "GiganticCannon",
+      "variant": "VP1",
+      "zh": "巨力炮拳",
+      "vpName": "破军炮拳",
+      "displayZh": "巨力炮拳 · VP1 · 破军炮拳",
+      "displayEn": "GiganticCannon_VP1",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "GiganticCannon_VP1.rep",
+        "GiganticCannon_VP1",
+        "GiganticCannon",
+        "巨力炮拳",
+        "VP1",
+        "破军炮拳",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        305
+      ]
+    },
+    {
+      "id": "ATPriest/GiganticCannon_VP2.rep",
+      "file": "GiganticCannon_VP2.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\GiganticCannon_VP2.rep",
+      "relativePath": "ATPriest/GiganticCannon_VP2.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "GiganticCannon",
+      "variant": "VP2",
+      "zh": "巨力炮拳",
+      "vpName": "蓄劲巨炮",
+      "displayZh": "巨力炮拳 · VP2 · 蓄劲巨炮",
+      "displayEn": "GiganticCannon_VP2",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "GiganticCannon_VP2.rep",
+        "GiganticCannon_VP2",
+        "GiganticCannon",
+        "巨力炮拳",
+        "VP2",
+        "蓄劲巨炮",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        305
+      ]
+    },
+    {
+      "id": "ATPriest/GrabBlow.rep",
+      "file": "GrabBlow.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\GrabBlow.rep",
+      "relativePath": "ATPriest/GrabBlow.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "GrabBlow",
+      "variant": "base",
+      "zh": "抓取重击",
+      "vpName": "",
+      "displayZh": "抓取重击",
+      "displayEn": "GrabBlow",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "GrabBlow.rep",
+        "GrabBlow",
+        "抓取重击",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        291
+      ]
+    },
+    {
+      "id": "ATPriest/HollowBack.rep",
+      "file": "HollowBack.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\HollowBack.rep",
+      "relativePath": "ATPriest/HollowBack.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "HollowBack",
+      "variant": "base",
+      "zh": "瞬闪袭拳",
+      "vpName": "",
+      "displayZh": "瞬闪袭拳",
+      "displayEn": "HollowBack",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "HollowBack.rep",
+        "HollowBack",
+        "瞬闪袭拳",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        303
+      ]
+    },
+    {
+      "id": "ATPriest/HollowBack_VP1.rep",
+      "file": "HollowBack_VP1.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\HollowBack_VP1.rep",
+      "relativePath": "ATPriest/HollowBack_VP1.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "HollowBack",
+      "variant": "VP1",
+      "zh": "瞬闪袭拳",
+      "vpName": "一往无前",
+      "displayZh": "瞬闪袭拳 · VP1 · 一往无前",
+      "displayEn": "HollowBack_VP1",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "HollowBack_VP1.rep",
+        "HollowBack_VP1",
+        "HollowBack",
+        "瞬闪袭拳",
+        "VP1",
+        "一往无前",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        303
+      ]
+    },
+    {
+      "id": "ATPriest/HollowBack_VP2.rep",
+      "file": "HollowBack_VP2.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\HollowBack_VP2.rep",
+      "relativePath": "ATPriest/HollowBack_VP2.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "HollowBack",
+      "variant": "VP2",
+      "zh": "瞬闪袭拳",
+      "vpName": "瞬闪背袭",
+      "displayZh": "瞬闪袭拳 · VP2 · 瞬闪背袭",
+      "displayEn": "HollowBack_VP2",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "HollowBack_VP2.rep",
+        "HollowBack_VP2",
+        "HollowBack",
+        "瞬闪袭拳",
+        "VP2",
+        "瞬闪背袭",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        303
+      ]
+    },
+    {
+      "id": "ATPriest/ImperiumRage.rep",
+      "file": "ImperiumRage.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\ImperiumRage.rep",
+      "relativePath": "ATPriest/ImperiumRage.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "ImperiumRage",
+      "variant": "base",
+      "zh": "泯灭之怒",
+      "vpName": "",
+      "displayZh": "泯灭之怒",
+      "displayEn": "ImperiumRage",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "ImperiumRage.rep",
+        "ImperiumRage",
+        "泯灭之怒",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        307
+      ]
+    },
+    {
+      "id": "ATPriest/MassPistol.rep",
+      "file": "MassPistol.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\MassPistol.rep",
+      "relativePath": "ATPriest/MassPistol.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "MassPistol",
+      "variant": "base",
+      "zh": "蓄劲轰拳",
+      "vpName": "",
+      "displayZh": "蓄劲轰拳",
+      "displayEn": "MassPistol",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "MassPistol.rep",
+        "MassPistol",
+        "蓄劲轰拳",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        300
+      ]
+    },
+    {
+      "id": "ATPriest/OneTwo.rep",
+      "file": "OneTwo.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\OneTwo.rep",
+      "relativePath": "ATPriest/OneTwo.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "OneTwo",
+      "variant": "base",
+      "zh": "双刺拳",
+      "vpName": "",
+      "displayZh": "双刺拳",
+      "displayEn": "OneTwo",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "OneTwo.rep",
+        "OneTwo",
+        "双刺拳",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        286
+      ]
+    },
+    {
+      "id": "ATPriest/PugnusVoluntatis.rep",
+      "file": "PugnusVoluntatis.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\PugnusVoluntatis.rep",
+      "relativePath": "ATPriest/PugnusVoluntatis.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "PugnusVoluntatis",
+      "variant": "base",
+      "zh": "意志之拳 : 与神同行",
+      "vpName": "",
+      "displayZh": "意志之拳 : 与神同行",
+      "displayEn": "PugnusVoluntatis",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "PugnusVoluntatis.rep",
+        "PugnusVoluntatis",
+        "意志之拳 : 与神同行",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        316
+      ]
+    },
+    {
+      "id": "ATPriest/ScrewStraight.rep",
+      "file": "ScrewStraight.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\ScrewStraight.rep",
+      "relativePath": "ATPriest/ScrewStraight.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "ScrewStraight",
+      "variant": "base",
+      "zh": "螺旋直拳",
+      "vpName": "",
+      "displayZh": "螺旋直拳",
+      "displayEn": "ScrewStraight",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "ScrewStraight.rep",
+        "ScrewStraight",
+        "螺旋直拳",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        290
+      ]
+    },
+    {
+      "id": "ATPriest/SideKnuckle.rep",
+      "file": "SideKnuckle.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\SideKnuckle.rep",
+      "relativePath": "ATPriest/SideKnuckle.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "SideKnuckle",
+      "variant": "base",
+      "zh": "侧击拳",
+      "vpName": "",
+      "displayZh": "侧击拳",
+      "displayEn": "SideKnuckle",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "SideKnuckle.rep",
+        "SideKnuckle",
+        "侧击拳",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        295
+      ]
+    },
+    {
+      "id": "ATPriest/StormFist.rep",
+      "file": "StormFist.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\StormFist.rep",
+      "relativePath": "ATPriest/StormFist.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "StormFist",
+      "variant": "base",
+      "zh": "风暴猛击",
+      "vpName": "",
+      "displayZh": "风暴猛击",
+      "displayEn": "StormFist",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "StormFist.rep",
+        "StormFist",
+        "风暴猛击",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        308
+      ]
+    },
+    {
+      "id": "ATPriest/StormFist_VP1.rep",
+      "file": "StormFist_VP1.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\StormFist_VP1.rep",
+      "relativePath": "ATPriest/StormFist_VP1.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "StormFist",
+      "variant": "VP1",
+      "zh": "风暴猛击",
+      "vpName": "狂怒风暴",
+      "displayZh": "风暴猛击 · VP1 · 狂怒风暴",
+      "displayEn": "StormFist_VP1",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "StormFist_VP1.rep",
+        "StormFist_VP1",
+        "StormFist",
+        "风暴猛击",
+        "VP1",
+        "狂怒风暴",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        308
+      ]
+    },
+    {
+      "id": "ATPriest/StormFist_VP2.rep",
+      "file": "StormFist_VP2.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\StormFist_VP2.rep",
+      "relativePath": "ATPriest/StormFist_VP2.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "StormFist",
+      "variant": "VP2",
+      "zh": "风暴猛击",
+      "vpName": "连绵风暴",
+      "displayZh": "风暴猛击 · VP2 · 连绵风暴",
+      "displayEn": "StormFist_VP2",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "StormFist_VP2.rep",
+        "StormFist_VP2",
+        "StormFist",
+        "风暴猛击",
+        "VP2",
+        "连绵风暴",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        308
+      ]
+    },
+    {
+      "id": "ATPriest/Uppercut.rep",
+      "file": "Uppercut.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\Uppercut.rep",
+      "relativePath": "ATPriest/Uppercut.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "Uppercut",
+      "variant": "base",
+      "zh": "上勾拳",
+      "vpName": "",
+      "displayZh": "上勾拳",
+      "displayEn": "Uppercut",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "Uppercut.rep",
+        "Uppercut",
+        "上勾拳",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        287
+      ]
+    },
+    {
+      "id": "ATPriest/ViolentCrush.rep",
+      "file": "ViolentCrush.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\ViolentCrush.rep",
+      "relativePath": "ATPriest/ViolentCrush.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "ViolentCrush",
+      "variant": "base",
+      "zh": "拳震八方",
+      "vpName": "",
+      "displayZh": "拳震八方",
+      "displayEn": "ViolentCrush",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "ViolentCrush.rep",
+        "ViolentCrush",
+        "拳震八方",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        309
+      ]
+    },
+    {
+      "id": "ATPriest/ViolentCrush_VP1.rep",
+      "file": "ViolentCrush_VP1.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\ViolentCrush_VP1.rep",
+      "relativePath": "ATPriest/ViolentCrush_VP1.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "ViolentCrush",
+      "variant": "VP1",
+      "zh": "拳震八方",
+      "vpName": "大地震颤",
+      "displayZh": "拳震八方 · VP1 · 大地震颤",
+      "displayEn": "ViolentCrush_VP1",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "ViolentCrush_VP1.rep",
+        "ViolentCrush_VP1",
+        "ViolentCrush",
+        "拳震八方",
+        "VP1",
+        "大地震颤",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        309
+      ]
+    },
+    {
+      "id": "ATPriest/ViolentCrush_VP2.rep",
+      "file": "ViolentCrush_VP2.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\ViolentCrush_VP2.rep",
+      "relativePath": "ATPriest/ViolentCrush_VP2.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "ViolentCrush",
+      "variant": "VP2",
+      "zh": "拳震八方",
+      "vpName": "震地余威",
+      "displayZh": "拳震八方 · VP2 · 震地余威",
+      "displayEn": "ViolentCrush_VP2",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "ViolentCrush_VP2.rep",
+        "ViolentCrush_VP2",
+        "ViolentCrush",
+        "拳震八方",
+        "VP2",
+        "震地余威",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        309
+      ]
+    },
+    {
+      "id": "ATPriest/Weaving.rep",
+      "file": "Weaving.rep",
+      "path": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay\\ATPriest\\Weaving.rep",
+      "relativePath": "ATPriest/Weaving.rep",
+      "job": "ATPriest",
+      "baseJob": "at priest",
+      "jobZh": "光职者(女)",
+      "professions": [
+        "蓝拳使者(女)"
+      ],
+      "professionKeys": [
+        "atinfighter"
+      ],
+      "english": "Weaving",
+      "variant": "base",
+      "zh": "摆步",
+      "vpName": "",
+      "displayZh": "摆步",
+      "displayEn": "Weaving",
+      "matchStatus": "exact",
+      "chineseCandidates": [],
+      "vpNameCandidates": [],
+      "aliases": [
+        "Weaving.rep",
+        "Weaving",
+        "摆步",
+        "ATPriest",
+        "光职者(女)",
+        "蓝拳使者(女)"
+      ],
+      "sources": [
+        "光职者(女)/蓝拳使者(女)/skill-data.js"
+      ],
+      "sourceSkillIndices": [
+        288
+      ]
+    }
+  ],
+  "supplements": [
+    {
+      "sourceRoot": "E:\\DNFAutoPlay\\DNFPVF\\summary\\全职业技能页复现",
+      "repRoot": "E:\\WeGameApps\\地下城与勇士：创新世纪\\Replay\\SkillReplay",
+      "pages": [
+        {
+          "job": "ImperialKnight",
+          "source": "帝国骑士/破浪者/skill-data.js",
+          "matchedRepFiles": 44,
+          "addedRepFiles": 44,
+          "addedPaths": [
+            "ImperialKnight/AnchorKick.rep",
+            "ImperialKnight/Avast.rep",
+            "ImperialKnight/BackStep.rep",
+            "ImperialKnight/CannonKick.rep",
+            "ImperialKnight/DeepWaterCall.rep",
+            "ImperialKnight/DreadfallBarrage.rep",
+            "ImperialKnight/DreadfallBarrage_VP1.rep",
+            "ImperialKnight/DreadfallBarrage_VP2.rep",
+            "ImperialKnight/GaleSlash.rep",
+            "ImperialKnight/GaleSlash_VP1.rep",
+            "ImperialKnight/GaleSlash_VP2.rep",
+            "ImperialKnight/HookShot.rep",
+            "ImperialKnight/HullBreach.rep",
+            "ImperialKnight/JumpPowerUp.rep",
+            "ImperialKnight/Maelstrom.rep",
+            "ImperialKnight/Maelstrom_VP1.rep",
+            "ImperialKnight/Maelstrom_VP2.rep",
+            "ImperialKnight/OpenwarFanfare.rep",
+            "ImperialKnight/PierceImpact.rep",
+            "ImperialKnight/PierceImpact_VP1.rep",
+            "ImperialKnight/PierceImpact_VP2.rep",
+            "ImperialKnight/PointThrust.rep",
+            "ImperialKnight/QuickBisection.rep",
+            "ImperialKnight/QuickStanding.rep",
+            "ImperialKnight/RaiseUpperCut.rep",
+            "ImperialKnight/RiptideUprising.rep",
+            "ImperialKnight/RiptideUprising_VP1.rep",
+            "ImperialKnight/RiptideUprising_VP2.rep",
+            "ImperialKnight/RoughBoarding.rep",
+            "ImperialKnight/SeaBane.rep",
+            "ImperialKnight/SeaDragonTooth.rep",
+            "ImperialKnight/SeaDragonTooth_VP1.rep",
+            "ImperialKnight/SeaDragonTooth_VP2.rep",
+            "ImperialKnight/SeaGodFallDown.rep",
+            "ImperialKnight/SweepingStrike.rep",
+            "ImperialKnight/TideBound.rep",
+            "ImperialKnight/TideBound_VP1.rep",
+            "ImperialKnight/TideBound_VP2.rep",
+            "ImperialKnight/Tidepiercer.rep",
+            "ImperialKnight/UnBoundTempest.rep",
+            "ImperialKnight/WaveBreaker.rep",
+            "ImperialKnight/WaveBreaker_VP1.rep",
+            "ImperialKnight/WaveBreaker_VP2.rep",
+            "ImperialKnight/WideCleave.rep"
+          ]
+        },
+        {
+          "job": "ATPriest",
+          "source": "光职者(女)/蓝拳使者(女)/skill-data.js",
+          "matchedRepFiles": 48,
+          "addedRepFiles": 43,
+          "addedPaths": [
+            "ATPriest/AccelDrive.rep",
+            "ATPriest/ArdereVehemens.rep",
+            "ATPriest/ATDivineCrush.rep",
+            "ATPriest/ATGorgeousCombination.rep",
+            "ATPriest/ATHeavenlyCombination.rep",
+            "ATPriest/ATHeavenlyCombination_VP1.rep",
+            "ATPriest/ATHeavenlyCombination_VP2.rep",
+            "ATPriest/ATHurricaneRoll.rep",
+            "ATPriest/ATHurricaneRoll_VP1.rep",
+            "ATPriest/ATHurricaneRoll_VP2.rep",
+            "ATPriest/ATSecondUpper.rep",
+            "ATPriest/BlowShot.rep",
+            "ATPriest/BodyBlow.rep",
+            "ATPriest/BodySpiritBecomeOne.rep",
+            "ATPriest/BrutalCombination.rep",
+            "ATPriest/BrutalCombination_VP1.rep",
+            "ATPriest/BrutalCombination_VP2.rep",
+            "ATPriest/DuckingStep.rep",
+            "ATPriest/FakeTwist.rep",
+            "ATPriest/FatalImpact.rep",
+            "ATPriest/FatalImpact_VP1.rep",
+            "ATPriest/FatalImpact_VP2.rep",
+            "ATPriest/GiganticCannon.rep",
+            "ATPriest/GiganticCannon_VP1.rep",
+            "ATPriest/GiganticCannon_VP2.rep",
+            "ATPriest/GrabBlow.rep",
+            "ATPriest/HollowBack.rep",
+            "ATPriest/HollowBack_VP1.rep",
+            "ATPriest/HollowBack_VP2.rep",
+            "ATPriest/ImperiumRage.rep",
+            "ATPriest/MassPistol.rep",
+            "ATPriest/OneTwo.rep",
+            "ATPriest/PugnusVoluntatis.rep",
+            "ATPriest/ScrewStraight.rep",
+            "ATPriest/SideKnuckle.rep",
+            "ATPriest/StormFist.rep",
+            "ATPriest/StormFist_VP1.rep",
+            "ATPriest/StormFist_VP2.rep",
+            "ATPriest/Uppercut.rep",
+            "ATPriest/ViolentCrush.rep",
+            "ATPriest/ViolentCrush_VP1.rep",
+            "ATPriest/ViolentCrush_VP2.rep",
+            "ATPriest/Weaving.rep"
+          ]
+        }
+      ],
+      "addedRepFiles": 87
     }
   ]
 }
