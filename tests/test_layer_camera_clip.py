@@ -15,8 +15,8 @@ from test_default_layer_camera import draw43
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def camera(layer, x=0, y=0, zoom=1):
-    return op(50, struct.pack('<2fI3f', x, y, layer, 16, 16, zoom))
+def camera(layer, x=0, y=0, zoom=1, width=16, height=16):
+    return op(50, struct.pack('<2fI3f', x, y, layer, width, height, zoom))
 
 
 def clip(rectangle):
@@ -98,6 +98,28 @@ class LayerCameraClipTests(unittest.TestCase):
                 draw, aux = legacy(2, 1)
                 pixel = self.render([(camera(0, y=-4) + clip((-16, -16, 16, 2)) + draw, aux)], profile)
                 self.assert_rectangles(pixel, [(2, 1, 6, 2)])
+
+    def test_zero_origin_keeps_finite_screen_bounds_when_viewport_differs(self):
+        # Native 148C2D9D1..DA06 only replaces sentinel edges at zero integer
+        # origin. It neither applies zoom nor bounds left/top to camera size;
+        # scissor backend 148C65F70 submits these pixel coordinates directly.
+        for profile in ('dfo', 'dnf-july'):
+            for zoom in (1, 2):
+                with self.subTest(profile=profile, zoom=zoom):
+                    draw, aux = draw43(4, 1, 2)
+                    raw = camera(2, width=8, zoom=zoom) + clip((10, 0, 12, 16)) + draw
+                    pixel = self.render([(raw, aux)], profile)
+                    self.assert_rectangles(pixel, [(10, 1, 12, 5)] if zoom == 1 else [(10, 0, 12, 2)])
+
+    def test_partial_sentinels_and_full_reset_keep_unbounded_edges(self):
+        for profile in ('dfo', 'dnf-july'):
+            with self.subTest(profile=profile):
+                first, a = draw43(2, -1, 2)
+                second, b = draw43(8, -1, 2)
+                raw = camera(2, y=-4) + clip((-1000000, -1000000, 1000000, 2)) + first
+                raw += clip((-1000000, -1000000, 1000000, 1000000)) + second
+                pixel = self.render([(raw, a + b)], profile)
+                self.assert_rectangles(pixel, [(2, 3, 6, 6), (8, 3, 12, 7)])
 
 
 if __name__ == '__main__':
