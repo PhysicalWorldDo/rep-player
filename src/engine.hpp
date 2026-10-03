@@ -39,6 +39,9 @@ private:
     int localTarget_=0,globalTarget_=0;
     std::map<std::pair<int,uint32_t>,Camera> cameras_;
     std::array<std::optional<Target>,12> actors_;
+    std::array<std::optional<Target>,12> contexts_;
+    std::array<bool,12> contextBound_{};
+    int selectedContext_=219;
     std::array<Camera,12> actorCameras_{};
     std::map<int,std::array<float,2>> samplerOffsets_;
     unsigned lastBlend_=0;
@@ -55,6 +58,7 @@ private:
     size_t recordImage(std::string path,int frame,uint32_t layer,std::string role,bool dependency,bool drawn=false);
     void markDrawn(size_t call);
     bool hidden(const std::string& path)const;
+    Target& renderTarget(int context);
     void draw(Sprite sprite,State& state);
     void capture(const Instruction& instruction,std::span<const uint8_t> payload,bool global,State& state);
 public:
@@ -80,7 +84,7 @@ public:
 class Playback {
     Replay* replay_=nullptr;Executor* executor_=nullptr;Scene scene_;
     bool hasScene_=false,ended_=false,stopped_=true,paused_=false;
-    bool sequentialState_=true;
+    bool sequentialState_=true,contextDependent_=false;
     std::chrono::steady_clock::time_point start_;
     int64_t elapsed_=0;
     bool rebuildToOrdinal(uint64_t ordinal);

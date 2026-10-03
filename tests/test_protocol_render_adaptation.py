@@ -37,8 +37,9 @@ def effect(kind, values=()):
     return op(19, body + struct.pack('<' + 'f' * len(values), *values))
 
 
-def context_mask(mode=0, enabled=True):
+def context_mask(mode=1, enabled=True):
     # Native54 serializer: offset2, scale2, facing, mode, bind-context flag.
+    # Original DXBC mode1 masks alpha; mode0/2 preserve source without a mask.
     return effect(54, (0, 0, 0, 0, 0, mode, float(enabled)))
 
 
@@ -129,10 +130,24 @@ class ProtocolRenderAdaptationTests(unittest.TestCase):
     def test_cn_type54_binds_context_texture_only_when_flag_is_set(self):
         mask, first = legacy()
         draw, second = legacy(-2, -2, scale=(2, 2))
-        pixel = self.render(op(38) + mask + op(39) + context_mask() + draw,
+        pixel = self.render(op(38) + mask + op(39) + context_mask() + draw + op(40),
                             aux=first + second, profile='dnf-july')
         self.assert_rectangle(pixel, (2, 2, 6, 6))
         self.assertEqual(self.report['shader_counts'][54], 1)
+
+    def test_cn_type54_flag_zero_does_not_bind_cached_context_texture(self):
+        mask, first = legacy()
+        draw, second = legacy(-2, -2, scale=(2, 2))
+        pixel = self.render(op(38) + mask + op(39) + context_mask(enabled=False) + draw + op(40),
+                            aux=first + second, profile='dnf-july')
+        self.assert_rectangle(pixel, (0, 0, 0, 0))
+
+    def test_cn_context_mask_uses_render_texture_dimensions_at_canvas_edge(self):
+        mask, first = legacy(28, 0)
+        draw, second = legacy(28, 0)
+        pixel = self.render(op(38) + mask + op(39) + context_mask() + draw + op(40),
+                            aux=first + second, profile='dnf-july')
+        self.assert_rectangle(pixel, (30, 2, 32, 6))
 
     def test_cn_context40_releases_actual_effect_stack(self):
         mask, first = legacy()
@@ -178,6 +193,37 @@ class ProtocolRenderAdaptationTests(unittest.TestCase):
         self.assert_rectangle(pixel, (2, 2, 6, 6))
         for field in ('context_allocations', 'context_bindings', 'context_releases'):
             self.assertEqual(self.report[field], 0)
+
+    def cached_context_navigation(self, actions):
+        left, first = legacy()
+        draw, second = legacy(-10, -2, scale=(6, 2))
+        right, third = legacy(12, 0)
+        commands = {0: op(38) + left + op(39),
+                    1: context_mask() + draw + op(40) + op(38) + right + op(39)}
+        header = b'\x0b\0' + struct.pack('<8h', *([32, 32] * 4))
+        header += b'\x0c' + struct.pack('<H', 6) + bytes(126)
+        path = self.folder / (self._testMethodName + '.rep')
+        path.write_bytes(pack_replay(1.8, commands,
+                                    [(0, (0,), first), (100, (1,), second + third)],
+                                    ['sprite/grid/frame.img'], header))
+        result = subprocess.run([str(ROOT / 'build' / 'rep_gpu.exe'), '--frame-step',
+                                 str(path), str(self.assets), actions, '--profile', 'dnf-july'],
+                                capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = json.loads(result.stdout)
+        path.with_suffix('.json').write_text(json.dumps(report, indent=2), encoding='utf-8')
+        for snapshot in report['snapshots']:
+            self.assertEqual(snapshot['crc'], snapshot['reference_crc'], snapshot)
+        return report['snapshots']
+
+    def test_cn_cached_context_refresh_rebuilds_entry_texture_state(self):
+        snapshots = self.cached_context_navigation('next,next,hide,hide,prev,next')
+        self.assertEqual([v['ordinal'] for v in snapshots], [0, 1, 1, 1, 0, 1])
+        self.assertTrue(all(v['paused'] for v in snapshots))
+
+    def test_cn_cached_context_select_executes_skipped_scene_dependencies(self):
+        snapshots = self.cached_context_navigation('select=100,hide')
+        self.assertEqual([v['ordinal'] for v in snapshots], [1, 1])
 
 
 if __name__ == '__main__':
