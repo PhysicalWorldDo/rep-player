@@ -33,10 +33,29 @@ std::shared_ptr<Movies::Payload> Movies::payload(std::string logical){
     logical=canonical(logical);if(auto it=payloads_.find(logical);it!=payloads_.end())if(auto active=it->second.lock())return active;
     auto original=client_/wide(logical);if(!std::filesystem::is_regular_file(original))return {};
     auto result=std::make_shared<Payload>();result->path=original;
-    auto data=readFile(original);if(data.size()<32||std::memcmp(data.data(),"Neople Video Fil",16)){payloads_[logical]=result;return result;}
-    uint32_t version=at<uint32_t>(data,16),count=at<uint32_t>(data,20),size=at<uint32_t>(data,24),padded=at<uint32_t>(data,28);
-    if(version!=1||count!=1||padded<size||padded%1024||data.size()<32ull+padded)throw Error("invalid Neople movie header");
-    for(size_t i=1024;i<padded;i++)data[32+i]^=data[32+i-1024];
+    auto data=readFile(original);size_t offset=0,size=0;
+    if(data.size()>=19&&!std::memcmp(data.data(),"Neople Video Stream",19)){
+        // Stream stores a 1024-byte seed after the 19-byte magic. Rotate its
+        // 8192 bits right by block index + 1, then XOR each payload block.
+        offset=19+1024;
+        if(data.size()<offset)throw Error("invalid Neople Video Stream header");
+        for(size_t pos=offset;pos<data.size();pos+=1024){
+            size_t shift=((pos-offset)/1024+1)&0x1fff,byteShift=shift>>3,bitShift=shift&7;
+            uint8_t mask=uint8_t((1u<<bitShift)-1);
+            for(size_t i=0;i<std::min<size_t>(1024,data.size()-pos);i++){
+                uint8_t cur=data[19+((i-byteShift)&0x3ff)],prev=data[19+((i-byteShift-1)&0x3ff)];
+                uint8_t key=uint8_t((cur>>bitShift)|((prev&mask)<<(8-bitShift)));
+                data[pos+i]^=key;
+            }
+        }
+        if(data.size()-offset<8||std::memcmp(data.data()+offset,"KB2n",4))throw Error("invalid decrypted Neople Video Stream payload");
+        size=uint64_t(at<uint32_t>(data,offset+4))+8;
+        if(size<=8||size>512ull*1024*1024||size>data.size()-offset)throw Error("invalid Neople Video Stream payload size");
+    }else if(data.size()>=32&&!std::memcmp(data.data(),"Neople Video Fil",16)){
+        uint32_t version=at<uint32_t>(data,16),count=at<uint32_t>(data,20),padded=at<uint32_t>(data,28);size=at<uint32_t>(data,24);offset=32;
+        if(version!=1||count!=1||padded<size||padded%1024||data.size()<32ull+padded)throw Error("invalid Neople movie header");
+        for(size_t i=1024;i<padded;i++)data[32+i]^=data[32+i-1024];
+    }else{payloads_[logical]=result;return result;}
     // Each decoder group owns a new file. Existing caches and client inputs are
     // never reused or removed; preview and export may decode the same movie.
     static std::atomic<uint64_t> sequence{0};HANDLE file;
@@ -46,7 +65,7 @@ std::shared_ptr<Movies::Payload> Movies::payload(std::string logical){
     }while(file==INVALID_HANDLE_VALUE&&GetLastError()==ERROR_FILE_EXISTS);
     if(file==INVALID_HANDLE_VALUE)throw Error("cannot create owned movie payload");result->owned=true;
     size_t position=0;bool okay=true;
-    while(position<size){DWORD written=0;DWORD bytes=DWORD(std::min<size_t>(size-position,1024*1024));if(!WriteFile(file,data.data()+32+position,bytes,&written,nullptr)||!written){okay=false;break;}position+=written;}
+    while(position<size){DWORD written=0;DWORD bytes=DWORD(std::min<size_t>(size-position,1024*1024));if(!WriteFile(file,data.data()+offset+position,bytes,&written,nullptr)||!written){okay=false;break;}position+=written;}
     CloseHandle(file);if(!okay)throw Error("cannot save owned movie payload");
     payloads_[logical]=result;return result;
 }
