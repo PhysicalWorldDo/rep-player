@@ -22,6 +22,13 @@ U.SendMessageW.restype = C.c_ssize_t
 U.PostMessageW.argtypes = [W.HWND, W.UINT, W.WPARAM, W.LPARAM]
 U.GetDlgItem.argtypes = [W.HWND, C.c_int]
 U.GetDlgItem.restype = W.HWND
+U.GetWindowTextW.argtypes = [W.HWND, W.LPWSTR, C.c_int]
+U.GetClassNameW.argtypes = [W.HWND, W.LPWSTR, C.c_int]
+U.GetDlgCtrlID.argtypes = [W.HWND]
+U.IsWindow.argtypes = [W.HWND]
+U.GetWindowThreadProcessId.argtypes = [W.HWND, C.POINTER(W.DWORD)]
+U.EnumWindows.argtypes = [CALLBACK, W.LPARAM]
+U.EnumChildWindows.argtypes = [W.HWND, CALLBACK, W.LPARAM]
 K.OpenProcess.argtypes = [W.DWORD, W.BOOL, W.DWORD]
 K.OpenProcess.restype = W.HANDLE
 K.VirtualAllocEx.argtypes = [W.HANDLE, C.c_void_p, C.c_size_t, W.DWORD, W.DWORD]
@@ -77,13 +84,16 @@ class TreeItem(C.Structure):
                 ('children', C.c_int), ('data', C.c_ssize_t)]
 
 
-def tree_paths(pid, tree):
+def tree_paths(pid, tree, selection_only=False):
     # TVM_GETITEM requires the text buffer to belong to the control's process.
     process = K.OpenProcess(0x38, False, pid)
     memory = K.VirtualAllocEx(process, None, 4096, 0x3000, 4)
     assert process and memory
     paths = []
+    selected = U.SendMessageW(tree, 0x110A, 9, 0)
+    selected_path = ()
     def visit(item, parents):
+        nonlocal selected_path
         while item:
             request = TreeItem(mask=1, item=item, text=memory + 128, capacity=1024)
             assert K.WriteProcessMemory(process, memory, C.byref(request), C.sizeof(request), None)
@@ -92,11 +102,13 @@ def tree_paths(pid, tree):
             assert K.ReadProcessMemory(process, memory + 128, text, C.sizeof(text), None)
             path = parents + (text.value,)
             paths.append(path)
+            if item == selected:
+                selected_path = path
             visit(U.SendMessageW(tree, 0x110A, 4, item), path)
             item = U.SendMessageW(tree, 0x110A, 1, item)
     try:
         visit(U.SendMessageW(tree, 0x110A, 0, 0), ())
-        return paths
+        return selected_path if selection_only else paths
     finally:
         K.VirtualFreeEx(process, memory, 0, 0x8000)
         K.CloseHandle(process)
@@ -127,6 +139,7 @@ class ReplayBrowserUiTests(unittest.TestCase):
                                          '--client', str(self.client)], cwd=ROOT)
         self.window = wait_for(lambda: next((w for w in windows(self.process.pid)
                                              if class_name(w) == 'NativeRepPlayer'), None))
+        wait_for(lambda: label(U.GetDlgItem(self.window, 1)))
 
     def tearDown(self):
         U.PostMessageW(self.window, 0x10, 0, 0)
@@ -144,21 +157,25 @@ class ReplayBrowserUiTests(unittest.TestCase):
         self.assertIn(('Dungeon', 'Swordman', 'BloodyRave.rep'), paths)
         self.assertIn(('RootReplay.rep',), paths)
         self.assertIn(('剧情', '第一幕', 'Opening.rep'), paths)
-        self.assertIn(('SkillReplay', '鬼剑士', '嗜魂封魔斩'), paths)
+        self.assertIn(('SkillReplay', '鬼剑士(男)', '嗜魂封魔斩'), paths)
 
-    def test_open_rep_dialog_plays_external_file_and_cancel_preserves_it(self):
+    def choose_rep(self, path):
         button = U.GetDlgItem(self.window, 21)
         self.assertTrue(button, 'Open REP button is missing')
         U.PostMessageW(self.window, 0x111, 21, 0)
         dialog = wait_for(lambda: next((w for w in windows(self.process.pid)
                                        if class_name(w) == '#32770'), None))
-        edits = [w for w in windows(self.process.pid, dialog) if class_name(w) == 'Edit']
-        filename = next((w for w in edits if U.GetDlgCtrlID(w) == 1001), None)
-        self.assertTrue(filename, 'REP dialog filename edit is missing')
-        value = C.create_unicode_buffer(str(self.external))
-        U.SendMessageW(filename, 0xC, 0, C.cast(value, C.c_void_p).value)
+        filename = wait_for(lambda: next((w for w in windows(self.process.pid, dialog)
+                                         if class_name(w) == 'Edit' and U.GetDlgCtrlID(w) == 1148), None))
+        # The shell publishes child HWNDs before its initial folder setup ends.
+        time.sleep(.3)
+        value = C.create_unicode_buffer(str(path))
+        self.assertEqual(U.SendMessageW(filename, 0xC, 0, C.cast(value, C.c_void_p).value), 1)
         U.PostMessageW(dialog, 0x111, 1, 0)
         wait_for(lambda: not U.IsWindow(dialog))
+
+    def test_open_rep_dialog_plays_external_file_and_cancel_preserves_it(self):
+        self.choose_rep(self.external)
         wait_for(lambda: any(self.external.name in label(w)
                              for w in windows(self.process.pid, self.window)))
         wait_for(lambda: '播放结束' in label(U.GetDlgItem(self.window, 6)))
@@ -169,6 +186,17 @@ class ReplayBrowserUiTests(unittest.TestCase):
         wait_for(lambda: not U.IsWindow(dialog))
         self.assertTrue(any(self.external.name in label(w)
                             for w in windows(self.process.pid, self.window)))
+
+    def test_open_rep_inside_replay_reveals_its_deep_selection(self):
+        value = C.create_unicode_buffer('BloodSword')
+        U.SendMessageW(U.GetDlgItem(self.window, 8), 0xC, 0, C.cast(value, C.c_void_p).value)
+        self.choose_rep(self.client / 'Replay' / 'Dungeon' / 'Nested' / '中文.REP')
+        tree = next(w for w in windows(self.process.pid, self.window)
+                    if class_name(w) == 'SysTreeView32')
+        self.assertEqual(tree_paths(self.process.pid, tree, selection_only=True),
+                         ('Dungeon', 'Nested', '中文.REP'))
+        wait_for(lambda: '播放结束' in label(U.GetDlgItem(self.window, 6)))
+        self.assertIn(('RootReplay.rep',), tree_paths(self.process.pid, tree))
 
 
 if __name__ == '__main__':
