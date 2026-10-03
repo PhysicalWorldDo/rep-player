@@ -43,12 +43,16 @@ FFmpeg n8.1.2-29-g703dcc25b9-20260721 (separate process)
   Binary extracted as data from that distribution; no other application
   executable from it is included. FFmpeg is byte-identical to its published
   SHA-256. Its original upstream historical autobuild has expired.
-  The following unmodified corresponding source archives, including external
-  dependency inputs and their individual licenses, are provided alongside our
-  executable ZIP at https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.0.0:
-    Open-Video-Craft-1.0.3-Windows-FFmpeg-Build-Sources.tar.gz
-    Open-Video-Craft-1.0.3-Windows-FFmpeg-Dependency-Sources.tar
-    SHA256SUMS.txt (upstream archive checksums)
+  Corresponding source, including external dependency inputs and licenses:
+  Build scripts and FFmpeg source (also attached to our v1.0.0 Release):
+  https://github.com/Reubencfernandes/Open-Video-Craft/releases/download/v1.0.3/Open-Video-Craft-1.0.3-Windows-FFmpeg-Build-Sources.tar.gz
+  Complete dependency source cache (available from the original source server):
+  https://github.com/Reubencfernandes/Open-Video-Craft/releases/download/v1.0.3/Open-Video-Craft-1.0.3-Windows-FFmpeg-Dependency-Sources.tar
+  Source archive checksums (also attached to our Release):
+  https://github.com/Reubencfernandes/Open-Video-Craft/releases/download/v1.0.3/SHA256SUMS.txt
+  These direct source links are also displayed beside the runtime ZIP in our
+  Release description. Ordinary users download only the runtime ZIP. The
+  dependency source cache is not duplicated as an attachment to our Release.
   See licenses/FFMPEG_SOURCE.md for rebuild instructions. Ordinary playback
   requires only the executable ZIP; source archives are separate downloads.
 

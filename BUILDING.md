@@ -40,7 +40,7 @@ New-Item -ItemType Directory -Path .\build -Force | Out-Null
 Copy-Item -LiteralPath .\dependency-cache\runtime\rep-player-v1.0.0-windows-x64\build\ffmpeg.exe -Destination .\build\ffmpeg.exe -Force
 ```
 
-版本为 `n8.1.2-29-g703dcc25b9-20260721`，支持 libx264、ProRes 4444 和 PNG。完整对应源码和依赖源码缓存也作为独立 Release 附件提供；查看 [FFMPEG_SOURCE.md](licenses/FFMPEG_SOURCE.md) 可重建该第三方工具。它通过独立进程调用，未链接入播放器。
+版本为 `n8.1.2-29-g703dcc25b9-20260721`，支持 libx264、ProRes 4444 和 PNG。较小的构建源码包作为 Release 附件提供，完整依赖源码缓存链接到上游固定版本；查看 [FFMPEG_SOURCE.md](licenses/FFMPEG_SOURCE.md) 可重建该第三方工具。它通过独立进程调用，未链接入播放器。
 
 ## 编译
 
