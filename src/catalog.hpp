@@ -6,6 +6,8 @@ namespace rep::ui {
 struct SkillItem {
     std::filesystem::path path;
     std::string relativePath,job,jobZh,english,zh,vpName,displayZh,displayEn;
+    // Actual directory components relative to the scan root, excluding the file.
+    std::vector<std::string> directories;
     std::vector<std::string> aliases;
 };
 class Catalog {

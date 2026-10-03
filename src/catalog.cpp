@@ -65,12 +65,19 @@ void Catalog::loadNames(std::string_view text){
 void Catalog::scan(const std::filesystem::path& replayRoot){
     items_.clear();matched_=0;std::error_code error;
     if(!std::filesystem::is_directory(replayRoot,error))return;
+    const bool skillRoot=key(utf8(replayRoot.filename().wstring()))=="skillreplay";
     for(std::filesystem::recursive_directory_iterator it(replayRoot,std::filesystem::directory_options::skip_permission_denied,error),end;it!=end;it.increment(error)){
         if(error){error.clear();continue;}if(!it->is_regular_file(error)||key(utf8(it->path().extension().wstring()))!=".rep")continue;
-        auto relative=utf8(it->path().lexically_relative(replayRoot).generic_wstring());SkillItem item;auto found=names_.find(key(relative));
+        auto relativePath=it->path().lexically_relative(replayRoot);
+        auto relative=utf8(relativePath.generic_wstring());SkillItem item;
+        std::vector<std::string> directories;for(const auto& part:relativePath.parent_path())directories.push_back(utf8(part.wstring()));
+        std::string skillKey;
+        if(skillRoot)skillKey=relative;
+        else if(!directories.empty()&&key(directories.front())=="skillreplay")skillKey=relative.substr(directories.front().size()+1);
+        auto found=names_.find(key(skillKey));
         if(found!=names_.end()){item=found->second;if(!item.zh.empty())++matched_;}
-        else {item.relativePath=relative;auto parent=it->path().lexically_relative(replayRoot);item.job=utf8(parent.begin()->wstring());item.english=utf8(it->path().stem().wstring());item.displayEn=item.english;item.displayZh=utf8(it->path().filename().wstring());item.aliases={item.displayZh,item.english,item.job};}
-        item.path=it->path();items_.push_back(std::move(item));
+        else {if(!directories.empty())item.job=directories[!skillRoot&&key(directories.front())=="skillreplay"&&directories.size()>1?1:0];item.english=utf8(it->path().stem().wstring());item.displayEn=item.english;item.displayZh=utf8(it->path().filename().wstring());item.aliases={item.displayZh,item.english,item.job};}
+        item.relativePath=std::move(relative);item.directories=std::move(directories);item.path=it->path();items_.push_back(std::move(item));
     }
     std::sort(items_.begin(),items_.end(),[](const auto& a,const auto& b){return key(a.relativePath)<key(b.relativePath);});
 }
