@@ -85,6 +85,16 @@ class DefaultLayerCameraTests(unittest.TestCase):
                 pixel = self.render([(camera(20, 4, 4) + draw, aux), (draw, aux)], profile)
                 self.assert_rectangle(pixel, (2, 2, 6, 6))
 
+    def test_unconfigured_layer_still_draws_inside_identity_clip_space(self):
+        # The default camera is a real identity projection, not a disabled
+        # layer. Clip [0,1]^2 maps to the viewport's upper right quarter.
+        for profile in ('dfo', 'dnf-july'):
+            for layer in (20, 35):
+                with self.subTest(profile=profile, layer=layer):
+                    draw, aux = draw43(0, 0, layer=layer, scale=(.25, .25))
+                    pixel = self.render([(draw, aux)], profile)
+                    self.assert_rectangle(pixel, (8, 0, 16, 8))
+
     def test_legacy_draw_keeps_pixel_coordinates_without_a_layer_camera(self):
         for profile in ('dfo', 'dnf-july'):
             with self.subTest(profile=profile):

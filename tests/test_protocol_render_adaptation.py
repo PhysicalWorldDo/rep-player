@@ -14,6 +14,10 @@ from test_scene_branches import pack_replay, npk, img_header, rec, legacy, op
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def pixel_camera():
+    return op(50, struct.pack('<2fI3f', 0, 0, 0, 32, 32, 1))
+
+
 def grid57(version, extent=(14, 14), source_scale=(1, 1), position=(1, 2),
            xs=(2, 4), ys=(2, 4)):
     # resource DWORD followed by the 32/40-byte versioned parameter body.
@@ -85,24 +89,24 @@ class ProtocolRenderAdaptationTests(unittest.TestCase):
     def test_v18_grid57_uses_direct_target_extent(self):
         # Native >=1.8 forwards14 directly, stretching [2,4] from2 to4;
         # visible source [2,6] becomes [2,8], then position is added.
-        pixel = self.render(grid57(1.8))
+        pixel = self.render(pixel_camera() + grid57(1.8))
         self.assert_rectangle(pixel, (3, 4, 9, 10))
 
     def test_v18_grid57_source_scale_changes_origin_and_extent(self):
-        pixel = self.render(grid57(1.8, source_scale=(2, 1)))
+        pixel = self.render(pixel_camera() + grid57(1.8, source_scale=(2, 1)))
         self.assert_rectangle(pixel, (5, 4, 17, 10))
 
     def test_v18_grid57_signed_source_scale_keeps_native_origin(self):
-        pixel = self.render(grid57(1.8, source_scale=(-1, 1), position=(10, 2)))
+        pixel = self.render(pixel_camera() + grid57(1.8, source_scale=(-1, 1), position=(10, 2)))
         self.assert_rectangle(pixel, (2, 4, 8, 10))
 
     def test_v18_grid57_zero_source_scale_draws_nothing(self):
-        pixel = self.render(grid57(1.8, source_scale=(0, 1)))
+        pixel = self.render(pixel_camera() + grid57(1.8, source_scale=(0, 1)))
         self.assert_rectangle(pixel, (0, 0, 0, 0))
 
     def test_legacy_grid57_converts_stored_float_to_extent(self):
         # full12-cropped4+cropped4*1.5 gives14, the same target as above.
-        pixel = self.render(grid57(1.7, extent=(1.5, 1.5)), version=1.7)
+        pixel = self.render(pixel_camera() + grid57(1.7, extent=(1.5, 1.5)), version=1.7)
         self.assert_rectangle(pixel, (3, 4, 9, 10))
 
     def test_v18_ordinary_grid_keeps_legacy_scale_conversion(self):

@@ -64,14 +64,14 @@ class ClientProtocolTests(unittest.TestCase):
 
     def test_v18_grid57_export_preserves_extent_scale_alpha_and_last_scene(self):
         sys.path.insert(0, str(Path(__file__).resolve().parent))
-        from test_protocol_render_adaptation import grid57
+        from test_protocol_render_adaptation import grid57, pixel_camera
         image = img_header(2, 36, 1) + rec(16, 5, 4, 4, 64, x=2, y=2, full_w=12, full_h=12)
         image += bytes([0, 0, 255, 255]) * 16
         (self.client / 'ImagePacks2' / 'sprite_grid.NPK').write_bytes(npk(image, 'sprite/grid/frame.img'))
         header = b'\x0b\0' + struct.pack('<8h', *([32, 32] * 4))
         header += b'\x0c' + struct.pack('<H', 6) + bytes(126)
         replay = self.folder / 'grid57_18.rep'
-        replay.write_bytes(pack_replay(1.8, {0: grid57(1.8), 1: grid57(1.8, source_scale=(2, 1))},
+        replay.write_bytes(pack_replay(1.8, {0: pixel_camera() + grid57(1.8), 1: pixel_camera() + grid57(1.8, source_scale=(2, 1))},
                                       [(0, (0,), b''), (100, (1,), b'')],
                                       ['sprite/grid/frame.img'], header=header))
         result = subprocess.run([

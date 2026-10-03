@@ -31,10 +31,11 @@ class RecordedFrameStepTests(unittest.TestCase):
         # The second recorded frame updates a persistent per-layer camera.
         # Realtime selection can skip it; backward stepping must reconstruct it.
         camera = struct.pack('<I2fI3f', 50, 2, 0, 0, 16, 16, 1)
+        initial_camera = struct.pack('<I2fI3f', 50, 0, 0, 0, 16, 16, 1)
         header = b'\x0b\0' + struct.pack('<8h', *([16] * 8)) + b'\x0c' + struct.pack('<H', 7) + bytes(126)
         cls.replay = cls.folder / 'duplicates_and_camera.rep'
-        cls.replay.write_bytes(pack_replay(1.7, {0: draw, 1: camera + draw},
-            [(10, (0,), struct.pack('<2h', 2, 2)), (10, (1,), struct.pack('<2h', 4, 2)),
+        cls.replay.write_bytes(pack_replay(1.7, {0: draw, 1: camera + draw, 2: initial_camera + draw},
+            [(10, (2,), struct.pack('<2h', 2, 2)), (10, (1,), struct.pack('<2h', 4, 2)),
              (30, (0,), struct.pack('<2h', 6, 2)), (40, (0,), struct.pack('<2h', 8, 2))],
             ['sprite/test/frame.img'], header=header))
         cls.empty = cls.folder / 'empty.rep'

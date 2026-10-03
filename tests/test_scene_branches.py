@@ -14,6 +14,9 @@ from test_npk_reader import npk,img_header,rec
 from rep_protocol import _default_draw_params
 ROOT=Path(__file__).resolve().parents[1]
 def op(number,data=b''):return struct.pack('<I',number)+data
+def pixel_camera(layer=0):
+    # Geometry tests use pixel coordinates, so initialize a native 2D camera.
+    return op(50,struct.pack('<2fI3f',0,0,layer,16,16,1))
 def legacy(x=0,y=0,color=0xffffffff,scale=(1,1),special=0,frame=0,pivot=(0,0),source=None,rotation=0,direction=0,opcode=3):
     p=bytearray(_default_draw_params(b''));struct.pack_into('<I',p,8,color);struct.pack_into('<2f',p,20,*scale);struct.pack_into('<2f',p,28,0,0);p[12]=special
     struct.pack_into('<h',p,4,frame);struct.pack_into('<2f',p,28,*pivot)
@@ -90,7 +93,8 @@ class NativeSceneBranchTests(unittest.TestCase):
     def rotation_draw(self,opcode,mode,x,y,scale,rotation,direction=0,extra=(0,1,1)):
         if opcode in (3,4):
             return legacy(x,y,scale=scale,pivot=(3,4),rotation=rotation,direction=direction,opcode=opcode)
-        return extended(x,y,mode=mode,mirror=direction,scale=scale,pivot=(3,4),rotation=rotation,opcode=opcode,extra=extra)
+        draw,aux=extended(x,y,mode=mode,mirror=direction,scale=scale,pivot=(3,4),rotation=rotation,opcode=opcode,extra=extra)
+        return pixel_camera()+draw,aux
     def test_native_rotation_direction_and_scale_order_use_img_offsets(self):
         # Native virtual8: 1487E0640 -> 1487E0660 negates the angle before
         # D3DXMatrixRotationZ. 1487B5870 translates IMG offsets around the
@@ -137,6 +141,7 @@ class NativeSceneBranchTests(unittest.TestCase):
                     draw,aux=extended(0,0,scale=scale) if modern else legacy(0,0,scale=scale)
                     if scale==(1,1):
                         draw,aux=extended(2,2) if modern else legacy(2,2)
+                    if modern:draw=pixel_camera()+draw
                     plain=self.render([(draw,aux)],resource='sprite/offset/frame.img')
                     self.assert_red_rectangle(plain,rect)
                     expected=self.pixels
@@ -150,6 +155,7 @@ class NativeSceneBranchTests(unittest.TestCase):
             for direction in (0,1):
                 with self.subTest(modern=modern,direction=direction):
                     draw,aux=extended(2,2,mirror=direction,pivot=(2,0)) if modern else legacy(2,2,direction=direction,pivot=(2,0))
+                    if modern:draw=pixel_camera()+draw
                     for prefix,suffix in ((b'',b''),(effect,op(20))):
                         pixel=self.render([(prefix+draw+suffix,aux)],resource='sprite/atlas_columns/frame.img')
                         for y in range(16):
@@ -166,6 +172,7 @@ class NativeSceneBranchTests(unittest.TestCase):
             for sy in (1,-1):
                 with self.subTest(modern=modern,scale_y=sy):
                     draw,aux=extended(2,2,scale=(1,sy),pivot=(0,2)) if modern else legacy(2,2,scale=(1,sy),pivot=(0,2))
+                    if modern:draw=pixel_camera()+draw
                     for prefix,suffix in ((b'',b''),(effect,op(20))):
                         pixel=self.render([(prefix+draw+suffix,aux)],resource='sprite/rotated/frame.img')
                         for y in range(16):
@@ -199,7 +206,7 @@ class NativeSceneBranchTests(unittest.TestCase):
         capture=op(58,struct.pack('<Ii7f4B',0,0,1,1,2,2,0,0,0,0,0,0,0))
         draw,aux=legacy(scale=(3,3))
         off=bytearray(40);struct.pack_into('<2f',off,16,3,3);struct.pack_into('<I',off,28,0xffffffff)
-        pixel=self.render([(capture+op(45,struct.pack('<2I',40,0)+off)+op(59),aux)])
+        pixel=self.render([(pixel_camera()+capture+op(45,struct.pack('<2I',40,0)+off)+op(59),aux)])
         self.assertEqual(pixel(3,3),(255,0,0));self.assertEqual(pixel(0,0),(0,0,0))
     def test_actor207_uses_own_transparent_targets(self):
         draw,aux=legacy(2,2)
@@ -236,7 +243,7 @@ class NativeSceneBranchTests(unittest.TestCase):
     def test_sampler_applies_scale_and_retains_offset(self):
         draw,aux=extended(1,1,layer=10)
         sampler=op(61,struct.pack('<BBHI6f',1,1,0,0,2,1,3,0,0,0))
-        pixel=self.render([(op(63,b'\1')+sampler+draw+op(62),aux)])
+        pixel=self.render([(pixel_camera(10)+op(63,b'\1')+sampler+draw+op(62),aux)])
         self.assertEqual(pixel(5,1),(255,0,0));self.assertEqual(pixel(1,1),(0,0,0))
     def test_native_resource_grid_stretches_selected_intervals(self):
         draw,aux=legacy(scale=(2,2))
@@ -292,15 +299,15 @@ class NativeSceneBranchTests(unittest.TestCase):
         draw,aux=extended(1,1,layer=10,scale=(2,2))
         grid=op(32,struct.pack('<hhB2hB2hIi',0,0,2,1,3,2,1,3,0,0))
         sampler=op(61,struct.pack('<BBHI6f',1,1,0,0,1,1,4,0,0,0))
-        pixel=self.render([(grid+op(63,b'\1')+sampler+draw+op(62),aux)])
+        pixel=self.render([(pixel_camera(10)+grid+op(63,b'\1')+sampler+draw+op(62),aux)])
         self.assertEqual(pixel(5,1),(255,0,0));self.assertEqual(pixel(1,1),(0,0,0))
     def test_text_glow_second_pass_clears_entire_effect_stack(self):
         words=(11,400,0,0,2,1,0,0xffff0000,0xff000000,0xff0000ff,0x100)
         text=op(48,struct.pack('<I11IIB',0,*words,0,0));aux=struct.pack('<2h',2,1)
-        self.render([(text,aux)],resource='H');plain=self.pixels
+        self.render([(pixel_camera()+text,aux)],resource='H');plain=self.pixels
         self.assertTrue(any(plain[0::4]))
         previous=op(19,b'\1'+struct.pack('<IIBII',26,1,0,0,0)+struct.pack('<f',0))
         glow=op(19,b'\1'+struct.pack('<IIBII',30,8,0,0,0)+bytes(32))
-        self.render([(previous+glow+text+op(20)+op(20),aux)],resource='H')
+        self.render([(pixel_camera()+previous+glow+text+op(20)+op(20),aux)],resource='H')
         self.assertEqual(self.pixels,plain)
 if __name__=='__main__':unittest.main()
