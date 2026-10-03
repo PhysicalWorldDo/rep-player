@@ -1,0 +1,9 @@
+﻿FreeType 2.12.1: unmodified upstream sources, statically compiled by tools/setup-dependencies.ps1.
+Source: https://github.com/freetype/freetype/tree/VER-2-12-1
+Archive: https://codeload.github.com/freetype/freetype/tar.gz/refs/tags/VER-2-12-1
+License selected for redistribution: FreeType License, FTL.TXT; see LICENSE.TXT.
+This software is based in part on the work of the FreeType Team.
+Build: LLVM MinGW 20260616, x86_64 UCRT, -O2; upstream docs/INSTALL.ANY module procedure.
+All upstream registered font modules are preserved. FT_CONFIG_OPTION_SYSTEM_ZLIB is enabled.
+Compressed PCF uses the player's static zlib 1.2.11; PNG/BZip2/Brotli/HarfBuzz/logging are disabled.
+Additional BDF/PCF copyright notices are included in BDF_NOTICE.txt and PCF_NOTICE.txt.

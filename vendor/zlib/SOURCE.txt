@@ -1,0 +1,5 @@
+﻿zlib 1.2.11: unmodified upstream sources, statically compiled by tools/setup-dependencies.ps1.
+Source: https://github.com/madler/zlib/tree/v1.2.11
+Archive: https://codeload.github.com/madler/zlib/tar.gz/refs/tags/v1.2.11
+Original copyright and license notice: README.txt and zlib.h.
+Build: LLVM MinGW 20260616, x86_64 UCRT, -O2; upstream win32/Makefile.gcc source list.

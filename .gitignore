@@ -1,0 +1,32 @@
+# Local state and client-derived exports / validation artifacts
+/runtime/
+/cache/
+/exports/
+/validation/
+/build/
+/dist/
+/toolchain/
+/dependency-cache/
+/vendor/freetype/freetype.lib
+/vendor/freetype/source/
+/vendor/freetype/libfreetype.a
+/vendor/zlib/source/
+/vendor/zlib/libz.a
+__pycache__/
+*.py[cod]
+*.o
+*.log
+
+# Original shader containers and diagnostic disassembly are local evidence.
+/assets/shaders/*.bin
+/assets/shaders/*.asm
+
+# UI mockups and screenshots contain client-derived imagery.
+/ui_design/*
+!/ui_design/data/
+/ui_design/data/*
+!/ui_design/data/skill-name-map.json
+
+# Local machine / agent instructions and historical paths
+/AGENTS.md
+/HANDOFF.md

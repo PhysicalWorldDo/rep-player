@@ -1,0 +1,82 @@
+Native REP Player v1.0.0 - third-party components
+
+FreeType 2.12.1 (statically linked)
+  This software is based in part on the work of the FreeType Team.
+  Portions of this software are copyright (c) 2022 The FreeType Project
+  (https://www.freetype.org). All rights reserved.
+  License selected: FreeType License, licenses/FREETYPE_FTL.txt.
+  Additional license and BDF/PCF copyright/permission notices:
+  licenses/FREETYPE_LICENSE.txt, FREETYPE_BDF_NOTICE.txt,
+  FREETYPE_PCF_NOTICE.txt. Upstream default font modules are retained.
+  Build: LLVM MinGW 20260616, FT_CONFIG_OPTION_SYSTEM_ZLIB enabled;
+  PNG, BZip2, Brotli, HarfBuzz and logging integrations are disabled.
+  Source: https://github.com/freetype/freetype/tree/VER-2-12-1
+  Archive: https://codeload.github.com/freetype/freetype/tar.gz/refs/tags/VER-2-12-1
+  Reproduce: tools/setup-dependencies.ps1; vendor/freetype/SOURCE.txt.
+  No Anaconda FreeType/libpng/zlib DLL is redistributed in v1.0.0.
+
+zlib 1.2.11 (statically linked)
+  Used for REP streams and FreeType compressed PCF/gzip support.
+  Copyright and license: licenses/ZLIB_1.2.11.txt and vendor/zlib/zlib.h.
+  Source: https://github.com/madler/zlib/tree/v1.2.11
+  Archive: https://codeload.github.com/madler/zlib/tar.gz/refs/tags/v1.2.11
+  Reproduce: tools/setup-dependencies.ps1; vendor/zlib/SOURCE.txt.
+
+FFmpeg n8.1.2-29-g703dcc25b9-20260721 (separate process)
+  Unmodified static Windows x64 GPL/version3 build with libx264.
+  Used for AVI decoding and MOV/MP4/PNG export, not linked into the player.
+  Copyright (c) 2000-2026 the FFmpeg developers.
+  GPL version 3 text: licenses/FFMPEG_GPLv3.txt.
+  Complete reported build flags: licenses/FFMPEG_BUILD.txt.
+  Exact binary SHA-256:
+  070be6f5202e71a5e0bec88312230eebf2708f9b9ee3694596babf20902dddd2
+  Upstream BtbN build scripts commit:
+  8c736b2d6fe5da2a10a8896d01e53bfb0ca4f665
+  FFmpeg source commit: 703dcc25b91eacd2ab8b8b2fe888dc8d7ab4ad6d
+  Variant: win64-gpl with the 8.1 add-in.
+  FFmpeg source: https://github.com/FFmpeg/FFmpeg/tree/703dcc25b91eacd2ab8b8b2fe888dc8d7ab4ad6d
+  Build scripts: https://github.com/BtbN/FFmpeg-Builds/tree/8c736b2d6fe5da2a10a8896d01e53bfb0ca4f665
+  Preserved exact binary and full corresponding source inputs obtained from:
+  https://github.com/Reubencfernandes/Open-Video-Craft/releases/tag/v1.0.3
+  Build/source provenance:
+  https://github.com/Reubencfernandes/Open-Video-Craft/blob/main/FFMPEG_WINDOWS_BUILD_NOTES.md
+  Binary extracted as data from that distribution; no other application
+  executable from it is included. FFmpeg is byte-identical to its published
+  SHA-256. Its original upstream historical autobuild has expired.
+  The following unmodified corresponding source archives, including external
+  dependency inputs and their individual licenses, are provided alongside our
+  executable ZIP at https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.0.0:
+    Open-Video-Craft-1.0.3-Windows-FFmpeg-Build-Sources.tar.gz
+    Open-Video-Craft-1.0.3-Windows-FFmpeg-Dependency-Sources.tar
+    SHA256SUMS.txt (upstream archive checksums)
+  See licenses/FFMPEG_SOURCE.md for rebuild instructions. Ordinary playback
+  requires only the executable ZIP; source archives are separate downloads.
+
+LLVM MinGW / C++ runtime
+  Portable compiler: llvm-mingw-20260616-ucrt-x86_64, Clang 22.1.8.
+  Compiler is not redistributed in the runtime ZIP or Git repository.
+  Its libc++/compiler runtime support is linked statically; Windows UCRT and
+  platform libraries are operating system components on Windows 10/11.
+  Runtime and toolchain notices: licenses/LLVM_MINGW/.
+  Source/release: https://github.com/mstorsjo/llvm-mingw/releases/tag/20260616
+
+Application icon
+  Original image generated with the Codex built-in imagegen tool, 2026-10-03.
+  No client artwork was used as input. Prompt and ICO conversion instructions:
+  assets/icon/README.md.
+
+Client inputs and shader resources
+  REP/NPK/IMG/font/video files, game executables and the installed bink2w64.dll
+  are not distributed. Users select their own complete client folder. All such
+  input files are read-only. The player does not start or modify the game.
+  The required DXBC programs in assets/shaders were extracted from the original
+  client's shader code for this playback implementation. Their rights remain
+  with the respective rightsholders; manifest.json records their client origin.
+  Source and player notices do not relicense those shader binaries. Original
+  FXO containers, disassembly dumps, rendered client images/videos, caches and
+  user settings are not included in the source repository or runtime ZIP.
+
+Historical local files
+  licenses/LIBPNG_LICENSE.txt and ZLIB_1.2.13_source_header.txt describe the old
+  local Anaconda DLL build. Those DLLs remain in the developer's build directory
+  as historical files and are not copied into this release.

@@ -1,0 +1,3260 @@
+[
+  {
+    "program_id": 1,
+    "raw_id": 1,
+    "technique": "Sprite_Default_Alpha",
+    "registration": "0x1487f7a22",
+    "blob": 5560195824,
+    "size_address": 5560201704,
+    "selected_blob": "0x14b69daf0",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "3033bdd81aa86d66f13060f2.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 2,
+    "raw_id": 2,
+    "technique": "Font_Default",
+    "registration": "0x1487f7aa3",
+    "blob": 5560201712,
+    "size_address": 5560207664,
+    "selected_blob": "0x14b69f1f0",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "dd80953009edd188ef3a0da2.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 3,
+    "raw_id": 3,
+    "technique": "Sprite_Default_Line",
+    "registration": "0x1487f7b24",
+    "blob": 5560207680,
+    "size_address": 5560207672,
+    "selected_blob": "0x14b6a0940",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "0358e674cd2b0c513ebca9cd.ps.dxbc",
+    "samplers": {}
+  },
+  {
+    "program_id": 144,
+    "raw_id": 3,
+    "technique": "Sprite_Default_Polygon",
+    "registration": "0x1487f7b49",
+    "blob": 5560207680,
+    "size_address": 5560207672,
+    "selected_blob": "0x14b6a0940",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "0358e674cd2b0c513ebca9cd.ps.dxbc",
+    "samplers": {}
+  },
+  {
+    "program_id": 4,
+    "raw_id": 4,
+    "technique": "Sprite_Default",
+    "registration": "0x1487f7bca",
+    "blob": 5560215296,
+    "size_address": 5560221128,
+    "selected_blob": "0x14b6a2700",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "0c4a834f4edf306d2b9cf186.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 9,
+    "raw_id": 9,
+    "technique": "screenEffect_dissolve",
+    "registration": "0x1487f7e73",
+    "blob": 5560250752,
+    "size_address": 5560256632,
+    "selected_blob": "0x14b6ab180",
+    "vs": "5002aaecc4234ec856af6332.vs.dxbc",
+    "ps": "6e83e8036ef51cd133a7d1b5.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 11,
+    "raw_id": 11,
+    "technique": "dropRain_effect",
+    "registration": "0x1487f7f8b",
+    "blob": 5560269264,
+    "size_address": 5560269256,
+    "selected_blob": "0x14b6af9d0",
+    "vs": "5002aaecc4234ec856af6332.vs.dxbc",
+    "ps": "6cfc2884e556405d5088c9f0.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 12,
+    "raw_id": 12,
+    "technique": "screenEffect_gaussianBlur",
+    "registration": "0x1487f8016",
+    "blob": 5560286160,
+    "size_address": 5560292664,
+    "selected_blob": "0x14b6b3bd0",
+    "vs": "5002aaecc4234ec856af6332.vs.dxbc",
+    "ps": "8cab39b188c7f58de2ab10c1.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 13,
+    "raw_id": 13,
+    "technique": "glitch_effect",
+    "registration": "0x1487f80a1",
+    "blob": 5560292672,
+    "size_address": 5560312656,
+    "selected_blob": "0x14b6b5540",
+    "vs": "5002aaecc4234ec856af6332.vs.dxbc",
+    "ps": "1212030848a1d530a406fe54.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 14,
+    "raw_id": 13,
+    "technique": "glitch_vertical_effect",
+    "registration": "0x1487f8233",
+    "blob": 5560292672,
+    "size_address": 5560312656,
+    "selected_blob": "0x14b6b5540",
+    "vs": "5002aaecc4234ec856af6332.vs.dxbc",
+    "ps": "e4e0015b090316a85377d6b7.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 15,
+    "raw_id": 14,
+    "technique": "glitch_partial_effect",
+    "registration": "0x1487f8429",
+    "blob": 5560312672,
+    "size_address": 5560312664,
+    "selected_blob": "0x14b6ba360",
+    "vs": "5002aaecc4234ec856af6332.vs.dxbc",
+    "ps": "a0ad08445d20829ef5de3ffe.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 16,
+    "raw_id": 15,
+    "technique": "screenEffect_gray",
+    "registration": "0x1487f861f",
+    "blob": 5560320896,
+    "size_address": 5560326672,
+    "selected_blob": "0x14b6bc380",
+    "vs": "5002aaecc4234ec856af6332.vs.dxbc",
+    "ps": "75ae66306dd979e9b3448689.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 17,
+    "raw_id": 16,
+    "technique": "postProcessEffect_hsbc",
+    "registration": "0x1487f86a9",
+    "blob": 5560326688,
+    "size_address": 5560326680,
+    "selected_blob": "0x14b6bda20",
+    "vs": "5002aaecc4234ec856af6332.vs.dxbc",
+    "ps": "f2524b2ce8656af3ba770e9a.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 147,
+    "raw_id": 17,
+    "technique": "screenEffect_hsl",
+    "registration": "0x1487f8733",
+    "blob": 5560333664,
+    "size_address": 5560333656,
+    "selected_blob": "0x14b6bf560",
+    "vs": "5002aaecc4234ec856af6332.vs.dxbc",
+    "ps": "c26bb421b3cea9e39852e27b.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 18,
+    "raw_id": 18,
+    "technique": "screenEffect_invert_gray",
+    "registration": "0x1487f87be",
+    "blob": 5560340384,
+    "size_address": 5560346272,
+    "selected_blob": "0x14b6c0fa0",
+    "vs": "5002aaecc4234ec856af6332.vs.dxbc",
+    "ps": "9a356994bfcd18619ad20cbd.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 19,
+    "raw_id": 19,
+    "technique": "screenEffect_LightsInDark",
+    "registration": "0x1487f8849",
+    "blob": 5560346288,
+    "size_address": 5560346280,
+    "selected_blob": "0x14b6c26b0",
+    "vs": "5002aaecc4234ec856af6332.vs.dxbc",
+    "ps": "01bcaae8749d657c87eefa13.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "point",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 20,
+    "raw_id": 20,
+    "technique": "screenEffect_multiply_color",
+    "registration": "0x1487f899c",
+    "blob": 5560369328,
+    "size_address": 5560369320,
+    "selected_blob": "0x14b6c80b0",
+    "vs": "5002aaecc4234ec856af6332.vs.dxbc",
+    "ps": "c0252061488ad197e3490d39.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 21,
+    "raw_id": 21,
+    "technique": "screenEffect_radialblur",
+    "registration": "0x1487f8a27",
+    "blob": 5560375168,
+    "size_address": 5560391176,
+    "selected_blob": "0x14b6c9780",
+    "vs": "5002aaecc4234ec856af6332.vs.dxbc",
+    "ps": "ec9ea9e5f57837606ca990f1.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 22,
+    "raw_id": 22,
+    "technique": "screenEffect_retro",
+    "registration": "0x1487f8b2a",
+    "blob": 5560391184,
+    "size_address": 5560397200,
+    "selected_blob": "0x14b6cd610",
+    "vs": "5002aaecc4234ec856af6332.vs.dxbc",
+    "ps": "effbf3de99d42cf50948f9ff.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 23,
+    "raw_id": 23,
+    "technique": "screenEffect_spiralRipple",
+    "registration": "0x1487f8bb5",
+    "blob": 5560397216,
+    "size_address": 5560397208,
+    "selected_blob": "0x14b6ceda0",
+    "vs": "5002aaecc4234ec856af6332.vs.dxbc",
+    "ps": "a27e07a92544412c4b605111.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 24,
+    "raw_id": 24,
+    "technique": "screenEffect_saturation",
+    "registration": "0x1487f8c3c",
+    "blob": 5560404896,
+    "size_address": 5560410768,
+    "selected_blob": "0x14b6d0ba0",
+    "vs": "5002aaecc4234ec856af6332.vs.dxbc",
+    "ps": "2c3c6832be96cb232b0e9f3a.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 25,
+    "raw_id": 25,
+    "technique": "screenEffect_scene_transition",
+    "registration": "0x1487f8cc7",
+    "blob": 5560410784,
+    "size_address": 5560410776,
+    "selected_blob": "0x14b6d22a0",
+    "vs": "5002aaecc4234ec856af6332.vs.dxbc",
+    "ps": "40df4b2fafe04fd57953c842.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "point",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 26,
+    "raw_id": 25,
+    "technique": "screenEffect_scene_ripple_transition",
+    "registration": "0x1487f8ced",
+    "blob": 5560410784,
+    "size_address": 5560410776,
+    "selected_blob": "0x14b6d22a0",
+    "vs": "5002aaecc4234ec856af6332.vs.dxbc",
+    "ps": "3103c512df7f997b7bf68d76.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "point",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 27,
+    "raw_id": 25,
+    "technique": "screenEffect_scene_zoom_blur_transition",
+    "registration": "0x1487f8d13",
+    "blob": 5560410784,
+    "size_address": 5560410776,
+    "selected_blob": "0x14b6d22a0",
+    "vs": "5002aaecc4234ec856af6332.vs.dxbc",
+    "ps": "185cd1cdecec1c20809400d5.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 28,
+    "raw_id": 25,
+    "technique": "screenEffect_scene_distortion_transition",
+    "registration": "0x1487f8d39",
+    "blob": 5560410784,
+    "size_address": 5560410776,
+    "selected_blob": "0x14b6d22a0",
+    "vs": "5002aaecc4234ec856af6332.vs.dxbc",
+    "ps": "e4132b2717e363a0bb0df833.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "point",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 29,
+    "raw_id": 25,
+    "technique": "scene_transition_continuous_ripple_transition",
+    "registration": "0x1487f8d5f",
+    "blob": 5560410784,
+    "size_address": 5560410776,
+    "selected_blob": "0x14b6d22a0",
+    "vs": "5002aaecc4234ec856af6332.vs.dxbc",
+    "ps": "aa2b7ca751fa89fbee7eae77.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "point",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 30,
+    "raw_id": 25,
+    "technique": "screenEffect_scene_fade_inout",
+    "registration": "0x1487f8d85",
+    "blob": 5560410784,
+    "size_address": 5560410776,
+    "selected_blob": "0x14b6d22a0",
+    "vs": "5002aaecc4234ec856af6332.vs.dxbc",
+    "ps": "40df4b2fafe04fd57953c842.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "point",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 31,
+    "raw_id": 25,
+    "technique": "screenEffect_scene_pixel_blur_transition",
+    "registration": "0x1487f8dab",
+    "blob": 5560410784,
+    "size_address": 5560410776,
+    "selected_blob": "0x14b6d22a0",
+    "vs": "5002aaecc4234ec856af6332.vs.dxbc",
+    "ps": "6f4622c59535e443305523d0.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "point",
+        "clamp"
+      ],
+      "s1": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 32,
+    "raw_id": 25,
+    "technique": "screenEffect_scene_progression_transition",
+    "registration": "0x1487f8dd1",
+    "blob": 5560410784,
+    "size_address": 5560410776,
+    "selected_blob": "0x14b6d22a0",
+    "vs": "5002aaecc4234ec856af6332.vs.dxbc",
+    "ps": "a8311776627b323e3077b4a6.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "point",
+        "clamp"
+      ],
+      "s1": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 33,
+    "raw_id": 25,
+    "technique": "screenEffect_scene_ink_blot_transition",
+    "registration": "0x1487f8df7",
+    "blob": 5560410784,
+    "size_address": 5560410776,
+    "selected_blob": "0x14b6d22a0",
+    "vs": "5002aaecc4234ec856af6332.vs.dxbc",
+    "ps": "0f6e2eaf54bab8921b51b203.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "point",
+        "clamp"
+      ],
+      "s1": [
+        "linear",
+        "clamp"
+      ],
+      "s2": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 34,
+    "raw_id": 25,
+    "technique": "screenEffect_scene_distortion_reverse_transition",
+    "registration": "0x1487f8e1d",
+    "blob": 5560410784,
+    "size_address": 5560410776,
+    "selected_blob": "0x14b6d22a0",
+    "vs": "5002aaecc4234ec856af6332.vs.dxbc",
+    "ps": "3c1437817152ad07253b8716.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "point",
+        "clamp"
+      ],
+      "s1": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 35,
+    "raw_id": 25,
+    "technique": "screenEffect_scene_rgb_cut_pure_gradiant_transition",
+    "registration": "0x1487f8e43",
+    "blob": 5560410784,
+    "size_address": 5560410776,
+    "selected_blob": "0x14b6d22a0",
+    "vs": "5002aaecc4234ec856af6332.vs.dxbc",
+    "ps": "40df4b2fafe04fd57953c842.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "point",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 36,
+    "raw_id": 25,
+    "technique": "screenEffect_scene_cross_dissolve_transition",
+    "registration": "0x1487f8e69",
+    "blob": 5560410784,
+    "size_address": 5560410776,
+    "selected_blob": "0x14b6d22a0",
+    "vs": "5002aaecc4234ec856af6332.vs.dxbc",
+    "ps": "a84634c86a41b1831e297909.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "point",
+        "clamp"
+      ],
+      "s1": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 145,
+    "raw_id": 25,
+    "technique": "screenEffect_scene_cube_rotation_transition",
+    "registration": "0x1487f8e8f",
+    "blob": 5560410784,
+    "size_address": 5560410776,
+    "selected_blob": "0x14b6d22a0",
+    "vs": "5002aaecc4234ec856af6332.vs.dxbc",
+    "ps": "6434eba3d739937da67bf7fc.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "point",
+        "clamp"
+      ],
+      "s1": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 146,
+    "raw_id": 25,
+    "technique": "screenEffect_dissolvedTargetPoint_effect",
+    "registration": "0x1487f8eb5",
+    "blob": 5560410784,
+    "size_address": 5560410776,
+    "selected_blob": "0x14b6d22a0",
+    "vs": "5002aaecc4234ec856af6332.vs.dxbc",
+    "ps": "40df4b2fafe04fd57953c842.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "point",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 37,
+    "raw_id": 26,
+    "technique": "screenEffect_sepia",
+    "registration": "0x1487f8f3f",
+    "blob": 5560535088,
+    "size_address": 5560541104,
+    "selected_blob": "0x14b6f0830",
+    "vs": "5002aaecc4234ec856af6332.vs.dxbc",
+    "ps": "e62399769a43522539cd0b04.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 38,
+    "raw_id": 27,
+    "technique": "screenEffect_stone",
+    "registration": "0x1487f8fc9",
+    "blob": 5560541120,
+    "size_address": 5560541112,
+    "selected_blob": "0x14b6f1fc0",
+    "vs": "5002aaecc4234ec856af6332.vs.dxbc",
+    "ps": "a44e959b4b1d770c0be05262.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 39,
+    "raw_id": 28,
+    "technique": "postProcessEffect_tencentWatermark",
+    "registration": "0x1487f9053",
+    "blob": 5560548240,
+    "size_address": 5560548232,
+    "selected_blob": "0x14b6f3b90",
+    "vs": "5002aaecc4234ec856af6332.vs.dxbc",
+    "ps": "914a187a68180c9db4a86e46.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "linear",
+        "clamp"
+      ],
+      "s2": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 40,
+    "raw_id": 29,
+    "technique": "screenEffect_wave",
+    "registration": "0x1487f90dd",
+    "blob": 5560554656,
+    "size_address": 5560560840,
+    "selected_blob": "0x14b6f54a0",
+    "vs": "5002aaecc4234ec856af6332.vs.dxbc",
+    "ps": "a805e874e8aa41c69f97a749.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 41,
+    "raw_id": 30,
+    "technique": "xBR_LV2_Fast",
+    "registration": "0x1487f9167",
+    "blob": 5560560848,
+    "size_address": 5560572192,
+    "selected_blob": "0x14b6f6cd0",
+    "vs": "f97dd3ef6a3275f5417db43a.vs.dxbc",
+    "ps": "14e1dfb67cf39959793ca6b7.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 42,
+    "raw_id": 31,
+    "technique": "spriteEffect_BasicWarning",
+    "registration": "0x1487f91f1",
+    "blob": 5560572208,
+    "size_address": 5560572200,
+    "selected_blob": "0x14b6f9930",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "a28e2351165d5402242a136f.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 43,
+    "raw_id": 32,
+    "technique": "spriteEffect_bicubic",
+    "registration": "0x1487f927b",
+    "blob": 5560578448,
+    "size_address": 5560598464,
+    "selected_blob": "0x14b6fb190",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "b7e080df93fc66bfd76c68ce.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 44,
+    "raw_id": 33,
+    "technique": "Sprite_BlendingMask",
+    "registration": "0x1487f9305",
+    "blob": 5560598480,
+    "size_address": 5560598472,
+    "selected_blob": "0x14b6fffd0",
+    "vs": "5002aaecc4234ec856af6332.vs.dxbc",
+    "ps": "4c7ae3c699ce63df329cae4c.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 45,
+    "raw_id": 33,
+    "technique": "Sprite_BlendingLinearMask",
+    "registration": "0x1487f932b",
+    "blob": 5560598480,
+    "size_address": 5560598472,
+    "selected_blob": "0x14b6fffd0",
+    "vs": "5002aaecc4234ec856af6332.vs.dxbc",
+    "ps": "a123a2152906b44a6ddb0c11.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 46,
+    "raw_id": 33,
+    "technique": "Sprite_BlendingMaskLinear",
+    "registration": "0x1487f9351",
+    "blob": 5560598480,
+    "size_address": 5560598472,
+    "selected_blob": "0x14b6fffd0",
+    "vs": "5002aaecc4234ec856af6332.vs.dxbc",
+    "ps": "2c511d8307a79bdfc30a0f74.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 47,
+    "raw_id": 34,
+    "technique": "spriteEffect_blur",
+    "registration": "0x1487f93db",
+    "blob": 5560613440,
+    "size_address": 5560620384,
+    "selected_blob": "0x14b703a40",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "f9eacbbc83cd8442864d681c.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 148,
+    "raw_id": 35,
+    "technique": "spriteEffect_ChainLine",
+    "registration": "0x1487f9465",
+    "blob": 5560620400,
+    "size_address": 5560620392,
+    "selected_blob": "0x14b705570",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "edb619a861cbab4945dfa31f.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 48,
+    "raw_id": 36,
+    "technique": "spriteEffect_ClipSprite",
+    "registration": "0x1487f958f",
+    "blob": 5560628288,
+    "size_address": 5560634912,
+    "selected_blob": "0x14b707440",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "ffdbbdee85c67fb7a8757ae7.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 49,
+    "raw_id": 37,
+    "technique": "sprite_ColorAdd",
+    "registration": "0x1487f9619",
+    "blob": 5560634928,
+    "size_address": 5560634920,
+    "selected_blob": "0x14b708e30",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "0754c5a9ed528929636ec5bc.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 50,
+    "raw_id": 38,
+    "technique": "Sprite_Derangement",
+    "registration": "0x1487f970c",
+    "blob": 5560640848,
+    "size_address": 5560657312,
+    "selected_blob": "0x14b70e5b0",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "8955c0f052f181f86de41bd3.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "linear",
+        "clamp"
+      ],
+      "s2": [
+        "point",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 51,
+    "raw_id": 38,
+    "technique": "Sprite_Derangement_LinearDodge",
+    "registration": "0x1487f97f9",
+    "blob": 5560640848,
+    "size_address": 5560657312,
+    "selected_blob": "0x14b70e5b0",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "8955c0f052f181f86de41bd3.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "linear",
+        "clamp"
+      ],
+      "s2": [
+        "point",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 52,
+    "raw_id": 40,
+    "technique": "sprite_disappearingDissolve",
+    "registration": "0x1487f994b",
+    "blob": 5560675408,
+    "size_address": 5560675400,
+    "selected_blob": "0x14b712c50",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "a5d89e142c88196aa6c355f6.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 53,
+    "raw_id": 41,
+    "technique": "Sprite_Dissolve",
+    "registration": "0x1487f9a75",
+    "blob": 5560685040,
+    "size_address": 5560692784,
+    "selected_blob": "0x14b7151f0",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "0c86c1e33dd4d43dd0b0bd0e.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 54,
+    "raw_id": 42,
+    "technique": "Sprite_DissolveMultiTexture",
+    "registration": "0x1487f9b77",
+    "blob": 5560692800,
+    "size_address": 5560692792,
+    "selected_blob": "0x14b717040",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "0ab1e95ce467b581f201cb14.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 55,
+    "raw_id": 43,
+    "technique": "Sprite_DissolveTargetPoint",
+    "registration": "0x1487f9c29",
+    "blob": 5560700112,
+    "size_address": 5560700104,
+    "selected_blob": "0x14b718cd0",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "568203ab3dc0cff72ec310a7.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 56,
+    "raw_id": 44,
+    "technique": "spriteEffect_distort",
+    "registration": "0x1487f9cb3",
+    "blob": 5560706864,
+    "size_address": 5560706856,
+    "selected_blob": "0x14b71a730",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "fbe7624b290e47b146d33580.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "point",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 57,
+    "raw_id": 45,
+    "technique": "spriteEffect_adjustSaturation",
+    "registration": "0x1487f9d3d",
+    "blob": 5560713520,
+    "size_address": 5560713512,
+    "selected_blob": "0x14b71c130",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "164e57a9825d9e780d5bdb8c.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 58,
+    "raw_id": 46,
+    "technique": "spriteEffect_ExceptColor",
+    "registration": "0x1487f9dc7",
+    "blob": 5560719520,
+    "size_address": 5560719512,
+    "selected_blob": "0x14b71d8a0",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "5664ba7e0c5b7b17b95909c4.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 59,
+    "raw_id": 47,
+    "technique": "sprite_FilterBlur",
+    "registration": "0x1487f9e51",
+    "blob": 5560725760,
+    "size_address": 5560791008,
+    "selected_blob": "0x14b71f100",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "b6f4639f68bd010fcdbe32de.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 60,
+    "raw_id": 47,
+    "technique": "sprite_FilterBlur_LinearDodge",
+    "registration": "0x1487f9eef",
+    "blob": 5560725760,
+    "size_address": 5560791008,
+    "selected_blob": "0x14b71f100",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "b6f4639f68bd010fcdbe32de.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 61,
+    "raw_id": 48,
+    "technique": "sprite_FreeFormGauge",
+    "registration": "0x1487f9ff5",
+    "blob": 5560791024,
+    "size_address": 5560791016,
+    "selected_blob": "0x14b72eff0",
+    "vs": "ee4afeda5115c058944bf68d.vs.dxbc",
+    "ps": "f0baec3fe398bd1d27180ad2.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 62,
+    "raw_id": 48,
+    "technique": "sprite_FreeFormGaugeDissolve",
+    "registration": "0x1487fa090",
+    "blob": 5560791024,
+    "size_address": 5560791016,
+    "selected_blob": "0x14b72eff0",
+    "vs": "ee4afeda5115c058944bf68d.vs.dxbc",
+    "ps": "3bd2472c82d9f423f62deef3.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "linear",
+        "clamp"
+      ],
+      "s2": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 63,
+    "raw_id": 49,
+    "technique": "Sprite_GhostColor",
+    "registration": "0x1487fa192",
+    "blob": 5560804096,
+    "size_address": 5560804088,
+    "selected_blob": "0x14b732300",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "4036879ad5f1df56b9e4aa5f.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 64,
+    "raw_id": 50,
+    "technique": "spriteEffect_glitch",
+    "registration": "0x1487fa42f",
+    "blob": 5560814608,
+    "size_address": 5560814600,
+    "selected_blob": "0x14b734c10",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "672ba71f74c96a513ce877a9.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 65,
+    "raw_id": 51,
+    "technique": "spriteEffect_glitchAddEffect",
+    "registration": "0x1487fa64c",
+    "blob": 5560826240,
+    "size_address": 5560826232,
+    "selected_blob": "0x14b737980",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "b548ddf0fcedc4621d19eeef.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 66,
+    "raw_id": 52,
+    "technique": "Sprite_Glow",
+    "registration": "0x1487fa892",
+    "blob": 5560838304,
+    "size_address": 5560838296,
+    "selected_blob": "0x14b73a8a0",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "b9ee958af63bb0efc4eb73d7.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 67,
+    "raw_id": 53,
+    "technique": "spriteEffect_gray",
+    "registration": "0x1487fa944",
+    "blob": 5560868336,
+    "size_address": 5560868328,
+    "selected_blob": "0x14b741df0",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "3d0c15401b8f0362609e09ec.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 68,
+    "raw_id": 54,
+    "technique": "spriteEffect_GrayColorize",
+    "registration": "0x1487fa9ce",
+    "blob": 5560874256,
+    "size_address": 5560874248,
+    "selected_blob": "0x14b743510",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "e3214080b9558c0a8386db4e.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 69,
+    "raw_id": 55,
+    "technique": "spriteEffect_haze",
+    "registration": "0x1487faa58",
+    "blob": 5560880240,
+    "size_address": 5560888416,
+    "selected_blob": "0x14b744c70",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "004174b58a166a5e9a54fbd5.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 70,
+    "raw_id": 56,
+    "technique": "spriteEffect_HS",
+    "registration": "0x1487fabd2",
+    "blob": 5560888432,
+    "size_address": 5560888424,
+    "selected_blob": "0x14b746c70",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "3581a94037b7bef6dc1de269.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 71,
+    "raw_id": 57,
+    "technique": "spriteEffect_hsbc",
+    "registration": "0x1487fac5c",
+    "blob": 5560894816,
+    "size_address": 5560894808,
+    "selected_blob": "0x14b748560",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "7df358be1c651401b8ca8bf0.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 72,
+    "raw_id": 58,
+    "technique": "spriteEffect_hsbc_filter",
+    "registration": "0x1487face6",
+    "blob": 5560903200,
+    "size_address": 5560911016,
+    "selected_blob": "0x14b74a620",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "dbebb6cab6c5db943046261b.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 73,
+    "raw_id": 59,
+    "technique": "spriteEffect_HSLColorize",
+    "registration": "0x1487fae38",
+    "blob": 5560911024,
+    "size_address": 5560917752,
+    "selected_blob": "0x14b74c4b0",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "f5c6440ac092c501415990b9.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 74,
+    "raw_id": 60,
+    "technique": "spriteEffect_HSL_Colourize_Haze",
+    "registration": "0x1487faf2c",
+    "blob": 5560917760,
+    "size_address": 5560926144,
+    "selected_blob": "0x14b74ffd0",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "240df3a0a97fd376894f0dbb.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "point",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 75,
+    "raw_id": 62,
+    "technique": "spriteEffect_InGlow",
+    "registration": "0x1487fb02c",
+    "blob": 5560935968,
+    "size_address": 5560969080,
+    "selected_blob": "0x14b752620",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "4b395313416f6d4ad5eb91a9.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 76,
+    "raw_id": 63,
+    "technique": "spriteEffect_invert_gray",
+    "registration": "0x1487fb0b6",
+    "blob": 5560969088,
+    "size_address": 5560975024,
+    "selected_blob": "0x14b75a780",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "e0b50782dbc483d648312f32.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 77,
+    "raw_id": 64,
+    "technique": "sprite_LinearDodge_Alter",
+    "registration": "0x1487fb140",
+    "blob": 5560975040,
+    "size_address": 5560975032,
+    "selected_blob": "0x14b75bec0",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "2376a5d3fda630775245906e.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 78,
+    "raw_id": 65,
+    "technique": "spriteEffect_MaskArc",
+    "registration": "0x1487fb1ca",
+    "blob": 5560980912,
+    "size_address": 5560988488,
+    "selected_blob": "0x14b75d5b0",
+    "vs": "e5210cc2300e0e9cf3861d2a.vs.dxbc",
+    "ps": "0727a9aa0904a213d6eba103.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "point",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 79,
+    "raw_id": 66,
+    "technique": "spriteEffect_MaskCircleOut",
+    "registration": "0x1487fb340",
+    "blob": 5560988496,
+    "size_address": 5560995104,
+    "selected_blob": "0x14b75f350",
+    "vs": "ada544ff058df1f6355bc490.vs.dxbc",
+    "ps": "dcabbb9f3514b09924bd4a2e.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 80,
+    "raw_id": 67,
+    "technique": "sprite_MaskingShader",
+    "registration": "0x1487fb3f2",
+    "blob": 5560995120,
+    "size_address": 5560995112,
+    "selected_blob": "0x14b760d30",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "b891d6248d307cfd8e38c60a.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 81,
+    "raw_id": 67,
+    "technique": "sprite_MaskingShader_LinearDodge",
+    "registration": "0x1487fb418",
+    "blob": 5560995120,
+    "size_address": 5560995112,
+    "selected_blob": "0x14b760d30",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "b891d6248d307cfd8e38c60a.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 82,
+    "raw_id": 67,
+    "technique": "sprite_ReverseMaskingShader",
+    "registration": "0x1487fb43e",
+    "blob": 5560995120,
+    "size_address": 5560995112,
+    "selected_blob": "0x14b760d30",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "ad30d7f36663dcb79cd1dbfc.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 83,
+    "raw_id": 68,
+    "technique": "sprite_MaskBlur",
+    "registration": "0x1487fb4c8",
+    "blob": 5561013104,
+    "size_address": 5561013096,
+    "selected_blob": "0x14b765370",
+    "vs": "1683e0ea3a1b2e3908920734.vs.dxbc",
+    "ps": "f175420d848fa71884091bdc.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 84,
+    "raw_id": 69,
+    "technique": "spriteEffect_MaskCircle",
+    "registration": "0x1487fb552",
+    "blob": 5561048272,
+    "size_address": 5561048264,
+    "selected_blob": "0x14b76dcd0",
+    "vs": "ada544ff058df1f6355bc490.vs.dxbc",
+    "ps": "e1159b4120a63fc81c529fcf.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "point",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 85,
+    "raw_id": 70,
+    "technique": "spriteEffect_maskCircleMyCharacter",
+    "registration": "0x1487fb5dc",
+    "blob": 5561054896,
+    "size_address": 5561054888,
+    "selected_blob": "0x14b76f6b0",
+    "vs": "ada544ff058df1f6355bc490.vs.dxbc",
+    "ps": "4b0797c93a5b9a96f46c2d8a.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 86,
+    "raw_id": 71,
+    "technique": "spriteEffect_mask_src",
+    "registration": "0x1487fb666",
+    "blob": 5561061296,
+    "size_address": 5561067544,
+    "selected_blob": "0x14b770fb0",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "3cee79a1d21029603729b3f8.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 87,
+    "raw_id": 72,
+    "technique": "Sprite_Metal",
+    "registration": "0x1487fb6f0",
+    "blob": 5561067552,
+    "size_address": 5561081304,
+    "selected_blob": "0x14b772820",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "140f93eaf86849b2d990e8d2.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 88,
+    "raw_id": 72,
+    "technique": "Sprite_Mask_Metal",
+    "registration": "0x1487fb73e",
+    "blob": 5561067552,
+    "size_address": 5561081304,
+    "selected_blob": "0x14b772820",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "ca7e10282efb613d51f5bf2d.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 89,
+    "raw_id": 73,
+    "technique": "spriteEffect_MultiMaskCircle",
+    "registration": "0x1487fb7f0",
+    "blob": 5561081312,
+    "size_address": 5561087792,
+    "selected_blob": "0x14b775de0",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "69f56086419a08cbe82b19bb.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 90,
+    "raw_id": 74,
+    "technique": "spriteEffect_multiply",
+    "registration": "0x1487fb8ca",
+    "blob": 5561087808,
+    "size_address": 5561087800,
+    "selected_blob": "0x14b777740",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "f3cd535acf8a32f074f44173.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 91,
+    "raw_id": 75,
+    "technique": "spriteEffect_multiply_color",
+    "registration": "0x1487fb954",
+    "blob": 5561094768,
+    "size_address": 5561100648,
+    "selected_blob": "0x14b779270",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "d2186436290b8ba489ea5ac6.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 92,
+    "raw_id": 76,
+    "technique": "Sprite_Default_MultiTexture",
+    "registration": "0x1487fb9de",
+    "blob": 5561100656,
+    "size_address": 5561106640,
+    "selected_blob": "0x14b77a970",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "fa34315c91921fe39ff4b70a.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 160,
+    "raw_id": 77,
+    "technique": "Sprite_MultiTextureBlend",
+    "registration": "0x1487fba68",
+    "blob": 5561106656,
+    "size_address": 5561106648,
+    "selected_blob": "0x14b77c0e0",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "acbaeefdf5fd732801a21a3f.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 93,
+    "raw_id": 78,
+    "technique": "spriteEffect_OilPaintFrame",
+    "registration": "0x1487fbaf2",
+    "blob": 5561112800,
+    "size_address": 5561112792,
+    "selected_blob": "0x14b77d8e0",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "dca9d5a23276799836d147e9.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 94,
+    "raw_id": 79,
+    "technique": "sprite_ReflectionMaskingSrc",
+    "registration": "0x1487fbb7c",
+    "blob": 5561124240,
+    "size_address": 5561124232,
+    "selected_blob": "0x14b780590",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "ab8ab2d6e4bfd7415908cb93.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 95,
+    "raw_id": 80,
+    "technique": "sprite_ReflectionMaskingSrcMainRender",
+    "registration": "0x1487fbc06",
+    "blob": 5561130080,
+    "size_address": 5561136360,
+    "selected_blob": "0x14b781c60",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "9010bc0ebf6c051989ba6214.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 96,
+    "raw_id": 81,
+    "technique": "sprite_ReflectionShadow",
+    "registration": "0x1487fbc90",
+    "blob": 5561136368,
+    "size_address": 5561142872,
+    "selected_blob": "0x14b7834f0",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "66e08442b1ade26250c888d1.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 97,
+    "raw_id": 82,
+    "technique": "sprite_ReflectionShadowMainRender",
+    "registration": "0x1487fbd1a",
+    "blob": 5561142880,
+    "size_address": 5561150560,
+    "selected_blob": "0x14b784e60",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "db49367e68125a0a1095827b.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 98,
+    "raw_id": 83,
+    "technique": "spriteEffect_retro",
+    "registration": "0x1487fbda4",
+    "blob": 5561150576,
+    "size_address": 5561150568,
+    "selected_blob": "0x14b786c70",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "11525f692aa91f99853e1ea9.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 99,
+    "raw_id": 84,
+    "technique": "spriteEffect_saturation",
+    "registration": "0x1487fbe2e",
+    "blob": 5561156688,
+    "size_address": 5561162632,
+    "selected_blob": "0x14b788450",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "e1a7d17515b7443c7f844d7c.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 100,
+    "raw_id": 85,
+    "technique": "spriteEffect_sepia",
+    "registration": "0x1487fbeb8",
+    "blob": 5561162640,
+    "size_address": 5561168592,
+    "selected_blob": "0x14b789b90",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "c445b8501c2c52073b0b930e.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 101,
+    "raw_id": 86,
+    "technique": "spriteEffect_shakeGrass",
+    "registration": "0x1487fbf42",
+    "blob": 5561168608,
+    "size_address": 5561168600,
+    "selected_blob": "0x14b78b2e0",
+    "vs": "82fda8cf67975b6cf913f763.vs.dxbc",
+    "ps": "2a157d99001faeee1626b378.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 102,
+    "raw_id": 87,
+    "technique": "Sprite_Shiny",
+    "registration": "0x1487fbfcc",
+    "blob": 5561174752,
+    "size_address": 5561199728,
+    "selected_blob": "0x14b78cae0",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "d901a2683bec33c657ed962d.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 103,
+    "raw_id": 87,
+    "technique": "Sprite_OnlyShiny_with_maskTex",
+    "registration": "0x1487fc069",
+    "blob": 5561174752,
+    "size_address": 5561199728,
+    "selected_blob": "0x14b78cae0",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "1c404d7a621e2f972ce4565a.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 104,
+    "raw_id": 87,
+    "technique": "Sprite_OnlyShiny_Overlay",
+    "registration": "0x1487fc106",
+    "blob": 5561174752,
+    "size_address": 5561199728,
+    "selected_blob": "0x14b78cae0",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "9a2a697bce231b9612c6470d.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 105,
+    "raw_id": 87,
+    "technique": "Sprite_OnlyShiny",
+    "registration": "0x1487fc1a3",
+    "blob": 5561174752,
+    "size_address": 5561199728,
+    "selected_blob": "0x14b78cae0",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "78b3f7e58c74a7cb1d3fa450.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 106,
+    "raw_id": 88,
+    "technique": "sprite_Silhouette_CharacterEnd",
+    "registration": "0x1487fc2a4",
+    "blob": 5561199744,
+    "size_address": 5561199736,
+    "selected_blob": "0x14b792c80",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "46dfd1f79f1db85c8a2fd4af.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 107,
+    "raw_id": 89,
+    "technique": "sprite_Silhouette_End",
+    "registration": "0x1487fc32e",
+    "blob": 5561206896,
+    "size_address": 5561211744,
+    "selected_blob": "0x14b794870",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "24c56fe224f81056e8d09339.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 108,
+    "raw_id": 90,
+    "technique": "sprite_Silhouette_Ready",
+    "registration": "0x1487fc3b8",
+    "blob": 5561211760,
+    "size_address": 5561211752,
+    "selected_blob": "0x14b795b70",
+    "vs": "51a78f6a49a6b3120480398e.vs.dxbc",
+    "ps": "8459273aee4b1b10294a0372.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 149,
+    "raw_id": 91,
+    "technique": "spriteEffect_Silhouette_Ready_BasicWarning_Fragment",
+    "registration": "0x1487fc442",
+    "blob": 5561219040,
+    "size_address": 5561219032,
+    "selected_blob": "0x14b7977e0",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "f0efe9fd45295a3439e407a6.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 109,
+    "raw_id": 92,
+    "technique": "sprite_Silhouette_Ready_LinearDodge",
+    "registration": "0x1487fc4f5",
+    "blob": 5561225824,
+    "size_address": 5561225816,
+    "selected_blob": "0x14b799260",
+    "vs": "6c11b7dcd8170481204d7b61.vs.dxbc",
+    "ps": "66583620ad7355843189052c.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 110,
+    "raw_id": 93,
+    "technique": "sprite_Silhouette_Ready_LinearDodge_re",
+    "registration": "0x1487fc57f",
+    "blob": 5561233184,
+    "size_address": 5561242272,
+    "selected_blob": "0x14b79af20",
+    "vs": "6c11b7dcd8170481204d7b61.vs.dxbc",
+    "ps": "244eb44a121e990f08acb1ec.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 169,
+    "raw_id": 94,
+    "technique": "sprite_Silhouette_Ready_LinearDodge_re_monochrome_mrt",
+    "registration": "0x1487fc609",
+    "blob": 5561242288,
+    "size_address": 5561242280,
+    "selected_blob": "0x14b79d2b0",
+    "vs": "6c11b7dcd8170481204d7b61.vs.dxbc",
+    "ps": "19b8d47b26f792d8077974cb.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 170,
+    "raw_id": 95,
+    "technique": "sprite_Silhouette_Ready_LinearDodge_re_mrt",
+    "registration": "0x1487fc693",
+    "blob": 5561250896,
+    "size_address": 5561259488,
+    "selected_blob": "0x14b79f450",
+    "vs": "51a78f6a49a6b3120480398e.vs.dxbc",
+    "ps": "79614e5a60fd77c5c439e9a8.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 171,
+    "raw_id": 96,
+    "technique": "sprite_Silhouette_Ready_LinearDodge_character_mrt",
+    "registration": "0x1487fc71d",
+    "blob": 5561259504,
+    "size_address": 5561259496,
+    "selected_blob": "0x14b7a15f0",
+    "vs": "6c11b7dcd8170481204d7b61.vs.dxbc",
+    "ps": "30ae1da561d34049b30d328f.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 172,
+    "raw_id": 97,
+    "technique": "sprite_Silhouette_Ready_LinearDodge_monochrome_character_mrt",
+    "registration": "0x1487fc7a7",
+    "blob": 5561268096,
+    "size_address": 5561276680,
+    "selected_blob": "0x14b7a3780",
+    "vs": "6c11b7dcd8170481204d7b61.vs.dxbc",
+    "ps": "2a3ac9d06ec977837cb49088.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 173,
+    "raw_id": 98,
+    "technique": "sprite_Silhouette_Ready_LinearDodge_monochrome_mrt",
+    "registration": "0x1487fc831",
+    "blob": 5561276688,
+    "size_address": 5561285208,
+    "selected_blob": "0x14b7a5910",
+    "vs": "6c11b7dcd8170481204d7b61.vs.dxbc",
+    "ps": "a69a1ade7b291a40de4de5df.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 174,
+    "raw_id": 99,
+    "technique": "sprite_Silhouette_Ready_LinearDodge_mrt",
+    "registration": "0x1487fc8bb",
+    "blob": 5561285216,
+    "size_address": 5561293744,
+    "selected_blob": "0x14b7a7a60",
+    "vs": "6c11b7dcd8170481204d7b61.vs.dxbc",
+    "ps": "4c0484a6bce2d8eee2065f49.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 150,
+    "raw_id": 100,
+    "technique": "spriteEffect_Silhouette_Ready_MaskArcWarning_Fragment",
+    "registration": "0x1487fc945",
+    "blob": 5561293760,
+    "size_address": 5561293752,
+    "selected_blob": "0x14b7a9bc0",
+    "vs": "e5210cc2300e0e9cf3861d2a.vs.dxbc",
+    "ps": "2e570e736c7d8db60dd2b002.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "point",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 151,
+    "raw_id": 101,
+    "technique": "spriteEffect_Silhouette_Ready_MaskCircleOutWarning_Fragment",
+    "registration": "0x1487fcaea",
+    "blob": 5561301536,
+    "size_address": 5561301528,
+    "selected_blob": "0x14b7aba20",
+    "vs": "ada544ff058df1f6355bc490.vs.dxbc",
+    "ps": "2b228ac83eea71c3f93b71b0.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 152,
+    "raw_id": 102,
+    "technique": "spriteEffect_Silhouette_Ready_MaskCircleWarning_Fragment",
+    "registration": "0x1487fcb9d",
+    "blob": 5561308256,
+    "size_address": 5561315416,
+    "selected_blob": "0x14b7ad460",
+    "vs": "ada544ff058df1f6355bc490.vs.dxbc",
+    "ps": "c93d728f8e8d8795d26f89cf.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "point",
+        "border"
+      ]
+    }
+  },
+  {
+    "program_id": 111,
+    "raw_id": 103,
+    "technique": "sprite_Silhouette_Ready_re",
+    "registration": "0x1487fcc50",
+    "blob": 5561315424,
+    "size_address": 5561322800,
+    "selected_blob": "0x14b7af060",
+    "vs": "6c11b7dcd8170481204d7b61.vs.dxbc",
+    "ps": "80cff1f37de9d9f8b366124d.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 163,
+    "raw_id": 104,
+    "technique": "sprite_Silhouette_Ready_re_monochrome",
+    "registration": "0x1487fccda",
+    "blob": 5561322816,
+    "size_address": 5561322808,
+    "selected_blob": "0x14b7b0d40",
+    "vs": "6c11b7dcd8170481204d7b61.vs.dxbc",
+    "ps": "d5b47374d7eb6abe3ec4bb90.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 175,
+    "raw_id": 105,
+    "technique": "sprite_Silhouette_Ready_re_monochrome_mrt",
+    "registration": "0x1487fcd64",
+    "blob": 5561330288,
+    "size_address": 5561330280,
+    "selected_blob": "0x14b7b2a70",
+    "vs": "6c11b7dcd8170481204d7b61.vs.dxbc",
+    "ps": "d5b47374d7eb6abe3ec4bb90.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 176,
+    "raw_id": 106,
+    "technique": "sprite_Silhouette_Ready_re_mrt",
+    "registration": "0x1487fcdee",
+    "blob": 5561337760,
+    "size_address": 5561345200,
+    "selected_blob": "0x14b7b47a0",
+    "vs": "6c11b7dcd8170481204d7b61.vs.dxbc",
+    "ps": "e6297e3938f8cc23500c5a86.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 112,
+    "raw_id": 107,
+    "technique": "sprite_Silhouette_Ready_text_Fragment",
+    "registration": "0x1487fce78",
+    "blob": 5561345216,
+    "size_address": 5561345208,
+    "selected_blob": "0x14b7b64c0",
+    "vs": "e0367e7c0c15fe08f3a7bb36.vs.dxbc",
+    "ps": "8e34de23de0747b386dc2814.ps.dxbc",
+    "samplers": {}
+  },
+  {
+    "program_id": 177,
+    "raw_id": 108,
+    "technique": "sprite_Silhouette_Ready_text_Fragment_mrt",
+    "registration": "0x1487fcf02",
+    "blob": 5561353824,
+    "size_address": 5561353816,
+    "selected_blob": "0x14b7b8660",
+    "vs": "6c11b7dcd8170481204d7b61.vs.dxbc",
+    "ps": "589cf55e4c4a02f2d723d297.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 154,
+    "raw_id": 109,
+    "technique": "spriteEffect_Silhouette_Ready_Warning_Default_Fragment",
+    "registration": "0x1487fcf8c",
+    "blob": 5561361120,
+    "size_address": 5561361112,
+    "selected_blob": "0x14b7ba2e0",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "9aff62b5ad4f71b2a65516b8.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 178,
+    "raw_id": 110,
+    "technique": "sprite_Silhouette_Ready_character_mrt",
+    "registration": "0x1487fd03f",
+    "blob": 5561367536,
+    "size_address": 5561367528,
+    "selected_blob": "0x14b7bbbf0",
+    "vs": "6c11b7dcd8170481204d7b61.vs.dxbc",
+    "ps": "ccef2e5d1a234ecec206256d.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 179,
+    "raw_id": 111,
+    "technique": "sprite_Silhouette_Ready_monochrome_character_mrt",
+    "registration": "0x1487fd0c9",
+    "blob": 5561375952,
+    "size_address": 5561384400,
+    "selected_blob": "0x14b7bdcd0",
+    "vs": "6c11b7dcd8170481204d7b61.vs.dxbc",
+    "ps": "8a02fdba8cd0ab8cb9d4b7b2.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 180,
+    "raw_id": 112,
+    "technique": "sprite_Silhouette_Ready_monochrome_mrt",
+    "registration": "0x1487fd153",
+    "blob": 5561384416,
+    "size_address": 5561384408,
+    "selected_blob": "0x14b7bfde0",
+    "vs": "6c11b7dcd8170481204d7b61.vs.dxbc",
+    "ps": "261416edd5c0b582593e76ae.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 181,
+    "raw_id": 113,
+    "technique": "sprite_Silhouette_Ready_mrt",
+    "registration": "0x1487fd1dd",
+    "blob": 5561392800,
+    "size_address": 5561401152,
+    "selected_blob": "0x14b7c1ea0",
+    "vs": "6c11b7dcd8170481204d7b61.vs.dxbc",
+    "ps": "21a4f5fa48a85e28be799a8e.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 113,
+    "raw_id": 114,
+    "technique": "sprite_Silhouette_TextEnd",
+    "registration": "0x1487fd267",
+    "blob": 5561401168,
+    "size_address": 5561401160,
+    "selected_blob": "0x14b7c3f50",
+    "vs": "982dc3881adc51161920e19f.vs.dxbc",
+    "ps": "5598b5d4b0edec354d020249.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 153,
+    "raw_id": 115,
+    "technique": "sprite_silhouetteWarning_End_Fragment",
+    "registration": "0x1487fd2f1",
+    "blob": 5561408016,
+    "size_address": 5561414128,
+    "selected_blob": "0x14b7c5a10",
+    "vs": "982dc3881adc51161920e19f.vs.dxbc",
+    "ps": "a4b4bdad347d29fb706f196c.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 114,
+    "raw_id": 116,
+    "technique": "sprite_StoneStatue",
+    "registration": "0x1487fd37b",
+    "blob": 5561414144,
+    "size_address": 5561414136,
+    "selected_blob": "0x14b7c7200",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "ff6c7bbda6fd38a7b7963dd1.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 115,
+    "raw_id": 117,
+    "technique": "sprite_WaterReflection",
+    "registration": "0x1487fd405",
+    "blob": 5561420944,
+    "size_address": 5561420936,
+    "selected_blob": "0x14b7c8c90",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "1696de40943118099ccf02fb.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 116,
+    "raw_id": 118,
+    "technique": "StaticBranch_Draw",
+    "registration": "0x1487fd4f8",
+    "blob": 5561427520,
+    "size_address": 5561427512,
+    "selected_blob": "0x14b7e5550",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "f76d5e48a88456b544bce2cd.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 117,
+    "raw_id": 118,
+    "technique": "StaticBranch_Metal",
+    "registration": "0x1487fda4f",
+    "blob": 5561427520,
+    "size_address": 5561427512,
+    "selected_blob": "0x14b7e5550",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "1600b152fd4014b455c6fc37.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "point",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 118,
+    "raw_id": 118,
+    "technique": "StaticBranch_ColorGlow",
+    "registration": "0x1487fdfa7",
+    "blob": 5561427520,
+    "size_address": 5561427512,
+    "selected_blob": "0x14b7e5550",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "11dc54951830db2e6ed40731.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "point",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 119,
+    "raw_id": 118,
+    "technique": "StaticBranch_Glow_Gradation_Outline",
+    "registration": "0x1487fe4fd",
+    "blob": 5561427520,
+    "size_address": 5561427512,
+    "selected_blob": "0x14b7e5550",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "2755d8d57e21fceea8749e4c.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "point",
+        "clamp"
+      ],
+      "s2": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 120,
+    "raw_id": 118,
+    "technique": "StaticBranch_MetalGlow",
+    "registration": "0x1487fea54",
+    "blob": 5561427520,
+    "size_address": 5561427512,
+    "selected_blob": "0x14b7e5550",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "cc4de2ea96401c1740978035.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "point",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 121,
+    "raw_id": 118,
+    "technique": "StaticBranch_Dissolve",
+    "registration": "0x1487fefab",
+    "blob": 5561427520,
+    "size_address": 5561427512,
+    "selected_blob": "0x14b7e5550",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "41feb9c4956158d7603f295b.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "point",
+        "clamp"
+      ],
+      "s2": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 122,
+    "raw_id": 118,
+    "technique": "StaticBranch_MetalDissolve",
+    "registration": "0x1487ff502",
+    "blob": 5561427520,
+    "size_address": 5561427512,
+    "selected_blob": "0x14b7e5550",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "b2a67221a3115f3d5551c37b.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "point",
+        "clamp"
+      ],
+      "s2": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 123,
+    "raw_id": 118,
+    "technique": "StaticBranch_MetalGlowDissolve",
+    "registration": "0x1487ffa59",
+    "blob": 5561427520,
+    "size_address": 5561427512,
+    "selected_blob": "0x14b7e5550",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "fb0d850d9d437e59941f3d8a.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "point",
+        "clamp"
+      ],
+      "s2": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 124,
+    "raw_id": 118,
+    "technique": "StaticBranch_Outline",
+    "registration": "0x1487fffb0",
+    "blob": 5561427520,
+    "size_address": 5561427512,
+    "selected_blob": "0x14b7e5550",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "ff6eb2267697ef5a788b8f01.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "point",
+        "clamp"
+      ],
+      "s2": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 125,
+    "raw_id": 118,
+    "technique": "StaticBranch_MetalOutline",
+    "registration": "0x148800507",
+    "blob": 5561427520,
+    "size_address": 5561427512,
+    "selected_blob": "0x14b7e5550",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "9b942cd5ff9b3d9f0386a9ef.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "point",
+        "clamp"
+      ],
+      "s2": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 126,
+    "raw_id": 118,
+    "technique": "StaticBranch_MetalGlowOutline",
+    "registration": "0x148800a5e",
+    "blob": 5561427520,
+    "size_address": 5561427512,
+    "selected_blob": "0x14b7e5550",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "ccb686ffa360665a6a3569d5.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "point",
+        "clamp"
+      ],
+      "s2": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 127,
+    "raw_id": 118,
+    "technique": "StaticBranch_Shiny",
+    "registration": "0x148800fb5",
+    "blob": 5561427520,
+    "size_address": 5561427512,
+    "selected_blob": "0x14b7e5550",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "51838b1df7fe459b7fc5fcfa.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "point",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 128,
+    "raw_id": 118,
+    "technique": "StaticBranch_ShinyGlow",
+    "registration": "0x14880150c",
+    "blob": 5561427520,
+    "size_address": 5561427512,
+    "selected_blob": "0x14b7e5550",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "0ae6798f117a0007d8780f62.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "point",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 129,
+    "raw_id": 118,
+    "technique": "StaticBranch_ShinyOutline",
+    "registration": "0x148801a63",
+    "blob": 5561427520,
+    "size_address": 5561427512,
+    "selected_blob": "0x14b7e5550",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "c9e141a10a3e5df4f2ca046e.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "point",
+        "clamp"
+      ],
+      "s2": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 130,
+    "raw_id": 118,
+    "technique": "StaticBranch_ShinyGlowOutline",
+    "registration": "0x148801fbb",
+    "blob": 5561427520,
+    "size_address": 5561427512,
+    "selected_blob": "0x14b7e5550",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "f14884ca190ed53268f93d6b.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "point",
+        "clamp"
+      ],
+      "s2": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 131,
+    "raw_id": 118,
+    "technique": "StaticBranch_ShinyDissolve",
+    "registration": "0x148802554",
+    "blob": 5561427520,
+    "size_address": 5561427512,
+    "selected_blob": "0x14b7e5550",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "a720756974715e2fddc1dc1e.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "point",
+        "clamp"
+      ],
+      "s2": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 132,
+    "raw_id": 118,
+    "technique": "StaticBranch_ShinyGlowDissolve",
+    "registration": "0x148802acc",
+    "blob": 5561427520,
+    "size_address": 5561427512,
+    "selected_blob": "0x14b7e5550",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "2fc1088dd26deb76229a2639.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "point",
+        "clamp"
+      ],
+      "s2": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 133,
+    "raw_id": 118,
+    "technique": "StaticBranch_WeaponEffectSkin",
+    "registration": "0x148803044",
+    "blob": 5561427520,
+    "size_address": 5561427512,
+    "selected_blob": "0x14b7e5550",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "6d2eb5f50c2407745d1a51c0.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "point",
+        "clamp"
+      ],
+      "s2": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 134,
+    "raw_id": 118,
+    "technique": "StaticBranch_WeaponEffectSkinOutline",
+    "registration": "0x1488035bc",
+    "blob": 5561427520,
+    "size_address": 5561427512,
+    "selected_blob": "0x14b7e5550",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "7e742b5f7378b8cd663232bf.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "point",
+        "clamp"
+      ],
+      "s2": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 135,
+    "raw_id": 118,
+    "technique": "StaticBranch_MetalWeaponEffectSkin",
+    "registration": "0x148803b34",
+    "blob": 5561427520,
+    "size_address": 5561427512,
+    "selected_blob": "0x14b7e5550",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "a8c1ed8bb7a5b68287160ff8.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "point",
+        "clamp"
+      ],
+      "s2": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 136,
+    "raw_id": 118,
+    "technique": "StaticBranch_MetalWeaponEffectSkinOutline",
+    "registration": "0x1488040ac",
+    "blob": 5561427520,
+    "size_address": 5561427512,
+    "selected_blob": "0x14b7e5550",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "630f26289016392c7697cf56.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "point",
+        "clamp"
+      ],
+      "s2": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 137,
+    "raw_id": 118,
+    "technique": "StaticBranch_MetalGlowWeaponEffectSkin",
+    "registration": "0x148804624",
+    "blob": 5561427520,
+    "size_address": 5561427512,
+    "selected_blob": "0x14b7e5550",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "8acba6202342a07f5c4f4a00.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "point",
+        "clamp"
+      ],
+      "s2": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 138,
+    "raw_id": 118,
+    "technique": "StaticBranch_MetalGlowWeaponEffectSkinOutline",
+    "registration": "0x148804b9c",
+    "blob": 5561427520,
+    "size_address": 5561427512,
+    "selected_blob": "0x14b7e5550",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "3e742797d35111d0ae64a571.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "point",
+        "clamp"
+      ],
+      "s2": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 139,
+    "raw_id": 118,
+    "technique": "StaticBranch_ShinyWeaponEffectSkin",
+    "registration": "0x148805114",
+    "blob": 5561427520,
+    "size_address": 5561427512,
+    "selected_blob": "0x14b7e5550",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "287e91a5f7d3222386b0ee9c.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "point",
+        "clamp"
+      ],
+      "s2": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 140,
+    "raw_id": 118,
+    "technique": "StaticBranch_ShinyWeaponEffectSkinOutline",
+    "registration": "0x14880568c",
+    "blob": 5561427520,
+    "size_address": 5561427512,
+    "selected_blob": "0x14b7e5550",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "f9bde9c5d4a4fda5b2c3fa95.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "point",
+        "clamp"
+      ],
+      "s2": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 141,
+    "raw_id": 118,
+    "technique": "StaticBranch_ShinyGlowWeaponEffectSkin",
+    "registration": "0x148805c04",
+    "blob": 5561427520,
+    "size_address": 5561427512,
+    "selected_blob": "0x14b7e5550",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "d8055ae5c0d02a7c1d01b6e4.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "point",
+        "clamp"
+      ],
+      "s2": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 142,
+    "raw_id": 118,
+    "technique": "StaticBranch_ShinyGlowWeaponEffectSkinOutline",
+    "registration": "0x14880617c",
+    "blob": 5561427520,
+    "size_address": 5561427512,
+    "selected_blob": "0x14b7e5550",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "fc79814c957896b33c13a055.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "point",
+        "clamp"
+      ],
+      "s2": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 155,
+    "raw_id": 118,
+    "technique": "StaticBranch_Outline2",
+    "registration": "0x1488066f4",
+    "blob": 5561427520,
+    "size_address": 5561427512,
+    "selected_blob": "0x14b7e5550",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "f0c96f4d2108a2a85bc4b193.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "point",
+        "clamp"
+      ],
+      "s2": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 156,
+    "raw_id": 118,
+    "technique": "StaticBranch_MetalOutline2",
+    "registration": "0x148806c6c",
+    "blob": 5561427520,
+    "size_address": 5561427512,
+    "selected_blob": "0x14b7e5550",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "b0226a94fd4a9bf8ac543853.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "point",
+        "clamp"
+      ],
+      "s2": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 157,
+    "raw_id": 118,
+    "technique": "StaticBranch_MetalGlowOutline2",
+    "registration": "0x1488071e4",
+    "blob": 5561427520,
+    "size_address": 5561427512,
+    "selected_blob": "0x14b7e5550",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "8f69411ef28e48e080abecc8.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "point",
+        "clamp"
+      ],
+      "s2": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 158,
+    "raw_id": 118,
+    "technique": "StaticBranch_ShinyOutline2",
+    "registration": "0x14880775c",
+    "blob": 5561427520,
+    "size_address": 5561427512,
+    "selected_blob": "0x14b7e5550",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "269f4c5f293d47a8ef448f86.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "point",
+        "clamp"
+      ],
+      "s2": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 159,
+    "raw_id": 118,
+    "technique": "StaticBranch_ShinyGlowOutline2",
+    "registration": "0x148807cd4",
+    "blob": 5561427520,
+    "size_address": 5561427512,
+    "selected_blob": "0x14b7e5550",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "a960db4ce46a9b4d810082b2.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ],
+      "s1": [
+        "point",
+        "clamp"
+      ],
+      "s2": [
+        "linear",
+        "clamp"
+      ]
+    }
+  },
+  {
+    "program_id": 143,
+    "raw_id": 120,
+    "technique": "Text_ColorGlow",
+    "registration": "0x1488082a8",
+    "blob": 5562349760,
+    "size_address": 5562349752,
+    "selected_blob": "0x14b8ab8c0",
+    "vs": "8d1b89311bfc5917b728c08c.vs.dxbc",
+    "ps": "9c7a04f01962f06ddcc0e457.ps.dxbc",
+    "samplers": {
+      "s0": [
+        "linear",
+        "clamp"
+      ]
+    }
+  }
+]
