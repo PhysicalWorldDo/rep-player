@@ -1,4 +1,8 @@
-"""Optional real-input regression; inputs are read-only and never bundled."""
+"""Optional real-input structural regression; inputs are never bundled.
+
+Run build.ps1 first: the probe links the current native protocol object.
+Passing this gate does not establish opcode66 state or rendering semantics.
+"""
 import json
 import os
 from pathlib import Path
