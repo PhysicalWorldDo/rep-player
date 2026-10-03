@@ -155,7 +155,7 @@ static std::array<int,4> cameraClip(std::array<int,4> clip,const Camera& camera,
         int axis=n%2;
         if(clip[n]==unbounded[n])clip[n]=n<2?0:size[axis];
         else {clip[n]-=origin[axis];if(zoom){int center=size[axis]/2;clip[n]=center+int(float(clip[n]-center)*camera.zoom);}}
-        clip[n]=n<2?std::min(clip[n],size[axis]):std::max(clip[n],0);
+        if(origin[0]||origin[1])clip[n]=n<2?std::min(clip[n],size[axis]):std::max(clip[n],0);
     }
     return clip;
 }
