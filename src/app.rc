@@ -4,8 +4,8 @@
 #include "../build/resources/app-resources.rc"
 
 1 VERSIONINFO
- FILEVERSION 1,0,2,0
- PRODUCTVERSION 1,0,2,0
+ FILEVERSION 1,0,3,0
+ PRODUCTVERSION 1,0,3,0
  FILEFLAGSMASK 0x3fL
  FILEFLAGS 0
  FILEOS VOS_NT_WINDOWS32
@@ -17,11 +17,11 @@ BEGIN
         BLOCK "040904b0"
         BEGIN
             VALUE "FileDescription", "Native REP Player\0"
-            VALUE "FileVersion", "1.0.2\0"
+            VALUE "FileVersion", "1.0.3\0"
             VALUE "InternalName", "rep_player\0"
             VALUE "OriginalFilename", "rep_player.exe\0"
             VALUE "ProductName", "REP Player\0"
-            VALUE "ProductVersion", "1.0.2\0"
+            VALUE "ProductVersion", "1.0.3\0"
         END
     END
     BLOCK "VarFileInfo"
