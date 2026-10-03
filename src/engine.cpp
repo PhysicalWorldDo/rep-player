@@ -53,6 +53,7 @@ struct Executor::State {
     unsigned phantom=0,flags=0,colorMode=0,color=0;
     std::vector<unsigned> flagsStack;
     std::array<int,4> clip{};
+    bool worldClip=false;
     bool nextClip=false,samplerEnabled=false;
     struct Sampler{unsigned number=0,flag=0;float sx=1,sy=1,x=0,y=0,ox=0,oy=0;};
     std::optional<Sampler> sampler;
@@ -78,6 +79,7 @@ struct Executor::Sprite {
     std::optional<std::array<float,4>> sourceRect;
     std::optional<State::Grid> grid;
     std::optional<std::array<int,2>> sourceSize;
+    std::optional<std::array<int,4>> screenClip;
     size_t call=SIZE_MAX;
     size_t actualCall=SIZE_MAX;
 };
@@ -143,6 +145,20 @@ static double mapAxis(double position,double full,double target,const std::vecto
     size_t n=intervals.size()/2*2;if(!n)return full?position*target/full:0;double stretch=0;for(size_t k=0;k<n;k+=2)stretch+=std::max(0,intervals[k+1]-intervals[k]);double scale=stretch>0?std::max((target-(full-stretch))/stretch,0.):1,destination=0,previous=0;
     for(size_t k=0;k<n;k+=2){int begin=intervals[k],end=intervals[k+1];if(position<=begin)return destination+position-previous;destination+=begin-previous;if(position<=end)return destination+(position-begin)*scale;destination+=(end-begin)*scale;previous=end;}return destination+position-previous;
 }
+static std::array<int,4> cameraClip(std::array<int,4> clip,const Camera& camera,bool bypassZoom){
+    // GameRenderCamera virtual128 (CN 148C2D900) transforms the drawable's
+    // world rectangle separately from its floating-point sprite matrix.
+    constexpr std::array<int,4> unbounded{-1000000,-1000000,1000000,1000000};
+    int origin[]={int(camera.x),int(camera.y)},size[]={int(camera.width),int(camera.height)};
+    bool zoom=(origin[0]||origin[1])&&!bypassZoom&&std::abs(camera.zoom-1.f)>std::abs(camera.zoom)*0x1p-23f;
+    for(int n=0;n<4;n++){
+        int axis=n%2;
+        if(clip[n]==unbounded[n])clip[n]=n<2?0:size[axis];
+        else {clip[n]-=origin[axis];if(zoom){int center=size[axis]/2;clip[n]=center+int(float(clip[n]-center)*camera.zoom);}}
+        clip[n]=n<2?std::min(clip[n],size[axis]):std::max(clip[n],0);
+    }
+    return clip;
+}
 void Executor::draw(Sprite s,State& state){
     statistics.primitives++;
     if(!s.frame){auto path=s.opcode==18||s.opcode==64?std::string("sprite/character/defaultfaces.img"):replay_->path(s.resource);if(path.empty()){statistics.nullResources++;return;}s.frame=assets_.frame(path,s.frameIndex);}
@@ -179,11 +195,16 @@ void Executor::draw(Sprite s,State& state){
     if(!s.matrix||s.skipGrid){int context=s.context>=81&&s.context<=84?int(s.layer):s.context;bool eligible=state.samplerEnabled&&state.sampler&&state.sampler->number==1&&(context==10||context==11||context==28||context==29||context==30||context==33);
         if(eligible){auto& sampler=*state.sampler;if(sampler.flag==1)samplerOffsets_[context]={sampler.x,sampler.y};auto offset=samplerOffsets_[context];m.a*=sampler.sx;m.b*=sampler.sx;m.c*=sampler.sy;m.d*=sampler.sy;m.x=sampler.sx*(m.x-sampler.ox)+offset[0];m.y=sampler.sy*(m.y-sampler.oy)+offset[1];statistics.samplerDraws++;}else samplerOffsets_.erase(context);
     }
+    auto clip=s.screenClip.value_or(state.clip);
     double cameraZoom=1,cameraScaleX=1,cameraScaleY=1;
     if(s.explicitCamera){
         auto it=cameras_.find({cameraId(s.context),s.layer});
         if(it!=cameras_.end()){
             const auto& c=it->second;if(c.width==0||c.height==0)return;
+            if(state.worldClip&&!s.screenClip){
+                constexpr std::array<int,4> unbounded{-1000000,-1000000,1000000,1000000};
+                clip=state.clip==unbounded?std::array{0,0,output_.image.width,output_.image.height}:cameraClip(state.clip,c,s.bypassZoom);
+            }
             double zoom=s.bypassZoom?1:c.zoom;
             cameraZoom=zoom;cameraScaleX=zoom*output_.image.width/c.width;cameraScaleY=zoom*output_.image.height/c.height;
             m.x=output_.image.width*.5+cameraScaleX*(m.x-c.x-c.width*.5);
@@ -202,7 +223,7 @@ void Executor::draw(Sprite s,State& state){
         if(frame.rotated&&!s.params[36]&&!s.sourceRect)source={0,0,float(frame.height),float(frame.width)};
         int ax=int(px)-frame.x,ay=int(py)-frame.y,mode=s.params[12],sourceWidth=int(source[2]-source[0]),sourceHeight=int(source[3]-source[1]);if(frame.rotated)std::swap(sourceWidth,sourceHeight);
         int w=mode==1||mode==3?std::min(ax,sourceWidth):sourceWidth,h=mode==2||mode==3?std::min(ay,sourceHeight):sourceHeight;if(w==0||h==0)return;
-        for(int my=0;my<((mode==2||mode==3)?2:1);my++)for(int mx=0;mx<((mode==1||mode==3)?2:1);mx++){auto part=s;part.params[12]=part.params[36]=0;part.specialUv=true;part.sourceSize=std::array{originalWidth,originalHeight};part.frame=std::make_shared<Frame>(frame);part.frame->width=w;part.frame->height=h;part.sourceRect=std::array<float,4>{source[0],source[1],source[0]+(frame.rotated?h:w),source[1]+(frame.rotated?w:h)};if(frame.rotated&&(mode==2||mode==3)){part.sourceRect->at(0)=source[2]-h;part.sourceRect->at(2)=source[2];}auto reflected=m;reflected.x+=mx?2*ax*m.a:0;reflected.y+=mx?2*ax*m.c:0;reflected.x+=my?2*ay*m.b:0;reflected.y+=my?2*ay*m.d:0;reflected.a*=mx?-1:1;reflected.c*=mx?-1:1;reflected.b*=my?-1:1;reflected.d*=my?-1:1;part.matrix=reflected;part.explicitCamera=false;draw(std::move(part),state);}return;
+        for(int my=0;my<((mode==2||mode==3)?2:1);my++)for(int mx=0;mx<((mode==1||mode==3)?2:1);mx++){auto part=s;part.params[12]=part.params[36]=0;part.specialUv=true;part.sourceSize=std::array{originalWidth,originalHeight};part.screenClip=clip;part.frame=std::make_shared<Frame>(frame);part.frame->width=w;part.frame->height=h;part.sourceRect=std::array<float,4>{source[0],source[1],source[0]+(frame.rotated?h:w),source[1]+(frame.rotated?w:h)};if(frame.rotated&&(mode==2||mode==3)){part.sourceRect->at(0)=source[2]-h;part.sourceRect->at(2)=source[2];}auto reflected=m;reflected.x+=mx?2*ax*m.a:0;reflected.y+=mx?2*ax*m.c:0;reflected.x+=my?2*ay*m.b:0;reflected.y+=my?2*ay*m.d:0;reflected.a*=mx?-1:1;reflected.c*=mx?-1:1;reflected.b*=my?-1:1;reflected.d*=my?-1:1;part.matrix=reflected;part.explicitCamera=false;draw(std::move(part),state);}return;
     }
     auto sourceTexture=gpu_.texture(frame.texture,s.update);ShaderContext c;c.version=replay_->version;c.minor=replay_->header.minor;c.width=originalWidth;c.height=originalHeight;c.channel=s.channel;c.imagePresent=true;c.directSource=s.font||s.sourceRect.has_value()||s.params[36]||(quad2&&s.instruction->native[16]);c.x=m.x;c.y=m.y;c.scaleX=at<float>(s.params,20);c.scaleY=at<float>(s.params,24);c.direction=s.params[6]==1?0:1;
     auto& destination=renderTarget(s.context);
@@ -253,15 +274,15 @@ void Executor::draw(Sprite s,State& state){
     bool sourceHidden=(s.call!=SIZE_MAX&&currentImages_[s.call].hidden)||(s.actualCall!=SIZE_MAX&&currentImages_[s.actualCall].hidden);
     if(sourceHidden||dependencyHidden||(captureActive&&(s.offscreen?localHidden_:globalHidden_))){if(state.phase==1&&state.channel>=0)state.hiddenStencil[state.channel].insert(state.reference);return;}
     if(state.phase==2&&state.channel>=0&&state.hiddenStencil[state.channel].contains(state.reference))return;
-    if(std::max(0,state.clip[0])>=std::min(output_.image.width,state.clip[2])||std::max(0,state.clip[1])>=std::min(output_.image.height,state.clip[3]))return;
+    if(std::max(0,clip[0])>=std::min(output_.image.width,clip[2])||std::max(0,clip[1])>=std::min(output_.image.height,clip[3]))return;
     if(writeColor)markDrawn(s.actualCall==SIZE_MAX?s.call:s.actualCall);
-    if(captureActive||stencil){float clear[4]{};gpu_.begin(working_,clear);auto unblended=material;unblended.blend=0x8000;gpu_.draw(vertices,unblended,state.clip);
-        if(captureActive&&(flags==1||flags==2)){gpu_.begin(raw_,clear);auto raw=material;raw.program=s.font?2:4;raw.blend=0x8000;auto rawVerts=vertices;for(auto& v:rawVerts){v.color[0]=v.color[1]=v.color[2]=v.color[3]=1;v.texcoord[3][0]=1;}gpu_.draw(rawVerts,raw,state.clip);}
+    if(captureActive||stencil){float clear[4]{};gpu_.begin(working_,clear);auto unblended=material;unblended.blend=0x8000;gpu_.draw(vertices,unblended,clip);
+        if(captureActive&&(flags==1||flags==2)){gpu_.begin(raw_,clear);auto raw=material;raw.program=s.font?2:4;raw.blend=0x8000;auto rawVerts=vertices;for(auto& v:rawVerts){v.color[0]=v.color[1]=v.color[2]=v.color[3]=1;v.texcoord[3][0]=1;}gpu_.draw(rawVerts,raw,clip);}
         gpu_.begin(destination);Material composite;composite.program=-1;composite.blend=flags;composite.textures[0]=gpu_.view(working_);composite.constants[0]=output_.image.width;composite.constants[1]=output_.image.height;
         if(captureActive){composite.textures[1]=gpu_.view(s.offscreen?localMask_:globalMask_);composite.textures[2]=gpu_.view(raw_);composite.constants[32]=flags==1||flags==2?1:(s.offscreen?localTarget_:globalTarget_)==2?2:3;std::copy(vertexColor.begin(),vertexColor.end(),composite.constants.begin()+36);}
         std::array<Vertex,6> full{};int corners[]={0,1,2,2,1,3};for(int n=0;n<6;n++){int corner=corners[n];full[n].position[0]=(corner&1)*output_.image.width;full[n].position[1]=(corner>>1)*output_.image.height;full[n].texcoord[2][0]=1;}
-        gpu_.draw(full,composite,state.clip,stencilMode,state.reference,writeColor);if(stencil)statistics.stencilDraws++;
-    }else {gpu_.begin(destination);gpu_.draw(vertices,material,state.clip);}
+        gpu_.draw(full,composite,clip,stencilMode,state.reference,writeColor);if(stencil)statistics.stencilDraws++;
+    }else {gpu_.begin(destination);gpu_.draw(vertices,material,clip);}
 }
 void Executor::capture(const Instruction& i,std::span<const uint8_t> payload,bool global,State& state){
     auto& active=global?globalCapture_:localCapture_;auto& target=global?globalMask_:localMask_;int& channel=global?globalTarget_:localTarget_;auto& maskHidden=global?globalHidden_:localHidden_;active=false;maskHidden=false;
@@ -295,7 +316,7 @@ void Executor::execute(const Scene& scene){
             switch(i.opcode){
             case 0:{auto type=at<uint32_t>(payload,0)&255;if(type!=7)state.blends.push_back({type,at<uint32_t>(payload,4)});break;}
             case 1:if(!state.blends.empty())state.blends.pop_back();break;
-            case 2:for(int n=0;n<4;n++)state.clip[n]=at<int16_t>(payload,n*2);state.nextClip=false;break;
+            case 2:for(int n=0;n<4;n++)state.clip[n]=at<int16_t>(payload,n*2);state.worldClip=true;state.nextClip=false;break;
             case 3:case 4:case 42:case 43:case 44:case 45:case 46:case 47:draw(sprite(),state);break;
             case 5:case 48:{auto glyphs=textQuads.find(cursor);if(glyphs!=textQuads.end())for(auto& glyph:glyphs->second){Sprite s;s.opcode=3;s.frame=glyph.frame;s.x=glyph.x;s.y=glyph.y;s.font=true;s.channel=glyph.channel;s.layer=i.opcode==48?i.layer:state.layer;s.context=state.context;s.explicitCamera=i.opcode==48;s.gradient=glyph.gradient;s.lower=glyph.lower;
                 put(s.params,28,0.f);put(s.params,32,0.f);put(s.params,8,glyph.color);put(s.params,20,glyph.scale*(glyph.frame->rect[2]<glyph.frame->rect[0]?-1:1));put(s.params,24,glyph.scale*(glyph.frame->rect[3]<glyph.frame->rect[1]?-1:1));s.update=updatedFonts.insert(glyph.frame->texture.get()).second;draw(std::move(s),state);}
@@ -323,7 +344,7 @@ void Executor::execute(const Scene& scene){
             case 57:{auto s=sprite();s.params=drawDefaults();s.opcode=3;s.layer=i.layer;s.explicitCamera=true;s.directGridExtent=replay_->version>=18;s.x=at<float>(i.native,8);s.y=at<float>(i.native,12);put(s.params,20,at<float>(i.native,16));put(s.params,24,at<float>(i.native,20));put(s.params,16,at<float>(i.native,24));put(s.params,8,at<uint32_t>(i.native,28));put(s.params,52,at<float>(i.native,32));put(s.params,56,at<float>(i.native,36));Reader arrays(payload.subspan(4+(replay_->version<18?32:40)));auto nx=arrays.get<uint64_t>(),ny=arrays.get<uint64_t>();State::Grid value;while(nx--)value.xs.push_back(arrays.get<int32_t>());while(ny--)value.ys.push_back(arrays.get<int32_t>());s.grid=value;draw(std::move(s),state);break;}
             case 58:capture(i,payload,false,state);break;
             case 59:localCapture_=false;break;
-            case 60:for(int n=0;n<4;n++)state.clip[n]=at<int32_t>(payload,n*4);break;
+            case 60:for(int n=0;n<4;n++)state.clip[n]=at<int32_t>(payload,n*4);state.worldClip=true;break;
             case 61:{state.samplers.push_back(state.sampler);State::Sampler s;s.number=payload[0];s.flag=payload[1];s.sx=at<float>(payload,8);s.sy=at<float>(payload,12);s.x=at<float>(payload,16);s.y=at<float>(payload,20);s.ox=at<float>(payload,24);s.oy=at<float>(payload,28);state.sampler=s;break;}
             case 62:state.sampler=state.samplers.empty()?std::nullopt:state.samplers.back();if(!state.samplers.empty())state.samplers.pop_back();break;
             case 63:state.samplerEnabled=payload[0]!=0;break;
