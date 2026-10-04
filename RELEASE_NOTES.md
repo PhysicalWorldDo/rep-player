@@ -1,5 +1,25 @@
 # 更新记录
 
+## v1.0.4
+
+发布日期：2026-10-04。下载 [Windows x64 运行包](https://github.com/PhysicalWorldDo/rep-player/releases/download/v1.0.4/rep-player-v1.0.4-windows-x64.zip)。完整解压后直接运行 `rep_player.exe`。
+
+### 新增
+
+- 支持 `Neople Video Stream` 视频封装，改善新版国服录像中的过场视频播放。
+
+### 优化
+
+- 国服录像默认启用有限兼容模式，播放界面显示“兼容播放”提示；预览、逐帧和导出使用相同的处理方式。
+- 视频解包沿用按使用周期回收的临时文件机制，预览和导出可独立使用同一视频。
+
+### 修复
+
+- 修复部分 REP 1.8 录像因包含特定未识别指令而无法打开的问题。
+- 修复 Stream 视频被当作 AVI 读取，导致播放或导出途中失败的问题。
+
+有限兼容模式仅覆盖已确认的特定记录，其他未知指令仍会报错。出现“兼容播放”提示时，画面可能与原客户端不同；请使用与录像版本匹配的完整客户端资源。
+
 ## v1.0.3
 
 发布日期：2026-10-04。下载 [Windows x64 运行包](https://github.com/PhysicalWorldDo/rep-player/releases/download/v1.0.3/rep-player-v1.0.3-windows-x64.zip)。完整解压后直接运行 `rep_player.exe`。

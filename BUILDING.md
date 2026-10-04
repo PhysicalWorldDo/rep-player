@@ -75,10 +75,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1
 编译并准备好 `build\ffmpeg.exe` 后执行：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\package-release.ps1 -Version 1.0.3 -FFmpegDirectory .\build
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\package-release.ps1 -Version 1.0.4 -FFmpegDirectory .\build
 ```
 
-FFmpegDirectory 指向包含当前静态 `ffmpeg.exe` 的目录，脚本只复制该 EXE，不复制历史 DLL。脚本按运行清单生成 `dist\rep-player-v1.0.3-windows-x64.zip`，ZIP 内直接包含：
+FFmpegDirectory 指向包含当前静态 `ffmpeg.exe` 的目录，脚本只复制该 EXE，不复制历史 DLL。脚本按运行清单生成 `dist\rep-player-v1.0.4-windows-x64.zip`，ZIP 内直接包含：
 
 ```text
 rep_player.exe

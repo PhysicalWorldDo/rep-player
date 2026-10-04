@@ -1,4 +1,4 @@
-REP 播放器 1.0.3
+REP 播放器 1.0.4
 
 完整解压 Windows x64 运行包后，双击 rep_player.exe。
 点击“选择客户端”，选择包含 Replay 和 ImagePacks2 的客户端根目录。
@@ -8,4 +8,4 @@ REP 播放器 1.0.3
 DNF 默认启用有限兼容模式；出现“兼容播放”提示时，部分未识别指令已跳过，画面可能与客户端不同。
 
 完整使用说明：https://github.com/PhysicalWorldDo/rep-player/blob/main/README.md
-下载：https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.0.3
+下载：https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.0.4
