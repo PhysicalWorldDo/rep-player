@@ -5,8 +5,8 @@
 #include <utility>
 
 namespace rep::ui {
-PlaybackController::PlaybackController(HWND canvas,std::filesystem::path root,std::filesystem::path client,bool test,Clock::time_point processStart,ClientProtocolSelection protocol)
-    :canvas_(canvas),root_(std::move(root)),client_(std::move(client)),protocol_(std::move(protocol)),test_(test),processStart_(processStart) {
+PlaybackController::PlaybackController(HWND canvas,std::filesystem::path root,std::filesystem::path client,bool test,Clock::time_point processStart,ClientProtocolSelection protocol,CanvasSettings settings)
+    :canvas_(canvas),root_(std::move(root)),client_(std::move(client)),protocol_(std::move(protocol)),canvasSettings_(std::move(settings)),test_(test),processStart_(processStart) {
     thread_=std::thread([this]{run();});
 }
 PlaybackController::~PlaybackController(){quitting_=true;generation_++;condition_.notify_all();if(thread_.joinable())thread_.join();}
@@ -17,6 +17,7 @@ void PlaybackController::togglePause(){std::lock_guard lock(mutex_);if(status_.p
 void PlaybackController::stepFrame(int direction){if(!direction)return;std::lock_guard lock(mutex_);if(status_.path.empty()||status_.phase==Phase::Loading||status_.phase==Phase::Error)return;stepsRequested_.push_back(direction<0?-1:1);condition_.notify_all();}
 void PlaybackController::configureClient(const std::filesystem::path& client){std::lock_guard lock(mutex_);client_=client;requested_.clear();hidden_.clear();stepsRequested_.clear();stopRequested_=true;toggleRequested_=filterRequested_=captureRequested_=false;status_=PlayerStatus{};status_.client=client_;generation_++;condition_.notify_all();}
 void PlaybackController::setHiddenImages(std::unordered_set<std::string> hidden){std::lock_guard lock(mutex_);hidden_=std::move(hidden);status_.hiddenImages=hidden_;if(status_.path.empty())return;filterRequested_=true;condition_.notify_all();}
+void PlaybackController::setCanvasSettings(const CanvasSettings& settings){std::lock_guard lock(mutex_);canvasSettings_=settings;canvasRequested_=true;condition_.notify_all();}
 void PlaybackController::captureFrame(){std::lock_guard lock(mutex_);if(status_.path.empty())return;captureRequested_=true;condition_.notify_all();}
 PlayerStatus PlaybackController::status(){std::lock_guard lock(mutex_);return status_;}
 
@@ -29,12 +30,13 @@ void PlaybackController::run(){try{
     std::vector<double> frameTimes;
     auto releaseReplay=[&]{gpu.flush();playback=Playback{};replay.reset();executor.reset();gpu.resetTextures();if(assets)assets->clearDecodedImages();activeReplay.clear();};
     auto updateImages=[&]{if(!executor)return;status_.currentImages=executor->currentImages();status_.allImages=executor->allImages();status_.hiddenImages=executor->hiddenImages();};
+    auto updateCanvas=[&]{if(!executor)return;const auto& layout=executor->canvasLayout();status_.canvasWidth=layout.width;status_.canvasHeight=layout.height;status_.canvasLeft=layout.left;status_.canvasTop=layout.top;status_.canvasRight=layout.right;status_.canvasBottom=layout.bottom;};
     auto present=[&]{RECT r;GetClientRect(canvas_,&r);gpu.present(executor->output(),std::max(1L,r.right),std::max(1L,r.bottom));oldWidth=r.right;oldHeight=r.bottom;};
     while(!quitting_){
         uint64_t generation=generation_;
         if(generation!=consumed_){
-            std::filesystem::path path,client;Clock::time_point requestedAt;bool stop;std::unordered_set<std::string> hidden;
-            {std::lock_guard lock(mutex_);path=requested_;client=client_;requestedAt=requestedAt_;stop=stopRequested_;hidden=hidden_;toggleRequested_=false;filterRequested_=false;}
+            std::filesystem::path path,client;Clock::time_point requestedAt;bool stop;std::unordered_set<std::string> hidden;CanvasSettings settings;
+            {std::lock_guard lock(mutex_);path=requested_;client=client_;requestedAt=requestedAt_;stop=stopRequested_;hidden=hidden_;settings=canvasSettings_;toggleRequested_=false;filterRequested_=false;}
             consumed_=generation;playback.stop();
             try{if(client!=activeClient){
                 releaseReplay();assets.reset();assets=std::make_unique<Assets>(client/L"ImagePacks2");
@@ -46,21 +48,22 @@ void PlaybackController::run(){try{
                 if(path!=activeReplay){releaseReplay();executor=std::make_unique<Executor>(gpu,*assets,root_/L"runtime"/L"cache",client);}
                 else if(!executor)executor=std::make_unique<Executor>(gpu,*assets,root_/L"runtime"/L"cache",client);
                 auto options=clientReplayOptions(client,protocol_);
-                auto opened=std::make_unique<Replay>(path,options);executor->attach(*opened);executor->setHiddenImages(hidden);executor->setTransparent(true);replay=std::move(opened);
+                auto opened=std::make_unique<Replay>(path,options);executor->setCanvasSettings(settings);executor->attach(*opened);executor->setHiddenImages(hidden);executor->setTransparent(true);replay=std::move(opened);
                 activeReplay=path;
                 playback.attach(*replay,*executor);executor->prepare([&]{return quitting_||generation_!=generation;});
                 if(quitting_||generation_!=generation)continue;
                 inspectedGeneration=generation;inspection=std::async(std::launch::async,[this,path,generation,options]{Replay scan(path,options);return inspectReplayImages(scan,[this,generation]{return quitting_||generation_!=generation;});});
                 playback.start();playingAt=Clock::now();auto before=Clock::now();playback.tick();present();auto after=Clock::now();
                 frameTimes={std::chrono::duration<double,std::milli>(after-before).count()};
-                {std::lock_guard lock(mutex_);status_.phase=Phase::Playing;status_.path=path.wstring();status_.client=activeClient;status_.readySeconds=std::chrono::duration<double>(after-requestedAt).count();status_.processReadySeconds=std::chrono::duration<double>(after-processStart_).count();status_.frames=1;status_.frameCount=0;status_.skipped=0;status_.ordinal=playback.ordinal();status_.timestamp=playback.timestamp();status_.elapsed=playback.elapsedMilliseconds();status_.width=replay->header.width();status_.height=replay->header.height();status_.maxFrameMilliseconds=frameTimes.back();status_.message.clear();status_.frozen=false;status_.compatibilityIgnored=replay->hasCompatibilityIgnored;status_.duration=0;updateImages();}frozenChecked=false;
+                {std::lock_guard lock(mutex_);status_.phase=Phase::Playing;status_.path=path.wstring();status_.client=activeClient;status_.readySeconds=std::chrono::duration<double>(after-requestedAt).count();status_.processReadySeconds=std::chrono::duration<double>(after-processStart_).count();status_.frames=1;status_.frameCount=0;status_.skipped=0;status_.ordinal=playback.ordinal();status_.timestamp=playback.timestamp();status_.elapsed=playback.elapsedMilliseconds();status_.width=replay->header.width();status_.height=replay->header.height();status_.maxFrameMilliseconds=frameTimes.back();status_.message.clear();status_.frozen=false;status_.compatibilityIgnored=replay->hasCompatibilityIgnored;status_.duration=0;updateImages();updateCanvas();}frozenChecked=false;
             }catch(const std::exception& e){releaseReplay();std::lock_guard lock(mutex_);status_.phase=Phase::Error;status_.message=wide(e.what());}
         }
-        bool toggle,filter,capture;std::unordered_set<std::string> hidden;std::vector<int> steps;
-        {std::lock_guard lock(mutex_);toggle=std::exchange(toggleRequested_,false);filter=std::exchange(filterRequested_,false);capture=std::exchange(captureRequested_,false);steps=std::exchange(stepsRequested_,{});hidden=hidden_;}
+        bool toggle,filter,capture,canvasChanged;std::unordered_set<std::string> hidden;std::vector<int> steps;CanvasSettings settings;
+        {std::lock_guard lock(mutex_);toggle=std::exchange(toggleRequested_,false);filter=std::exchange(filterRequested_,false);capture=std::exchange(captureRequested_,false);canvasChanged=std::exchange(canvasRequested_,false);steps=std::exchange(stepsRequested_,{});hidden=hidden_;settings=canvasSettings_;}
         if(replay&&executor)try{
             if(toggle){if(playback.ended()){playback.start();playingAt=Clock::now();}else if(playback.paused())playback.resume();else if(playback.playing())playback.pause();else {playback.start();playingAt=Clock::now();}std::lock_guard lock(mutex_);status_.phase=playback.paused()?Phase::Paused:Phase::Playing;}
             if(inspection.valid()&&inspection.wait_for(std::chrono::milliseconds(0))==std::future_status::ready){if(inspectedGeneration==generation){auto info=inspection.get();executor->setInspection(info);std::lock_guard lock(mutex_);status_.duration=info.durationMilliseconds;status_.frameCount=info.scenes;updateImages();}else inspection={};}
+            if(canvasChanged){playback.setCanvasSettings(settings);present();std::lock_guard lock(mutex_);updateCanvas();updateImages();}
             if(filter){executor->setHiddenImages(hidden);playback.refresh();present();std::lock_guard lock(mutex_);updateImages();}
             for(int direction:steps){auto before=Clock::now();bool moved=playback.step(direction);present();auto pixels=gpu.readback(executor->output());std::lock_guard lock(mutex_);status_.phase=Phase::Paused;status_.timestamp=playback.timestamp();status_.ordinal=playback.ordinal();status_.elapsed=playback.elapsedMilliseconds();status_.skipped=playback.skipped;if(moved)status_.frames++;status_.frameCrc=crc(pixels);status_.captureSerial++;status_.maxFrameMilliseconds=std::max(status_.maxFrameMilliseconds,std::chrono::duration<double,std::milli>(Clock::now()-before).count());status_.frozen=false;updateImages();frozenChecked=false;}
             auto before=Clock::now();bool changed=playback.tick();RECT r;GetClientRect(canvas_,&r);bool resized=r.right!=oldWidth||r.bottom!=oldHeight;
@@ -74,7 +77,7 @@ void PlaybackController::run(){try{
                 if(test_&&!frozenChecked&&Clock::now()-endedAt>std::chrono::milliseconds(800)){bool same=crc(gpu.readback(executor->output()))==finalCrc;std::lock_guard lock(mutex_);status_.frozen=same;status_.finalCrc=finalCrc;frozenChecked=true;}
             }
         }catch(const std::exception& e){releaseReplay();std::lock_guard lock(mutex_);status_.phase=Phase::Error;status_.message=wide(e.what());}
-        std::unique_lock lock(mutex_);condition_.wait_for(lock,std::chrono::milliseconds(playback.playing()?1:20),[&]{return quitting_||generation_!=consumed_||toggleRequested_||filterRequested_||captureRequested_||!stepsRequested_.empty();});
+        std::unique_lock lock(mutex_);condition_.wait_for(lock,std::chrono::milliseconds(playback.playing()?1:20),[&]{return quitting_||generation_!=consumed_||toggleRequested_||filterRequested_||captureRequested_||canvasRequested_||!stepsRequested_.empty();});
     }
     if(inspection.valid())inspection.wait();gpu.flush();
 }catch(const std::exception& e){std::lock_guard lock(mutex_);status_.phase=Phase::Error;status_.message=wide(e.what());}}

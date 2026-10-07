@@ -1,6 +1,7 @@
 #pragma once
 #include "bindings.hpp"
 #include "fonts.hpp"
+#include "canvas.hpp"
 #include <optional>
 #include <functional>
 #include <chrono>
@@ -35,6 +36,8 @@ private:
     Gpu& gpu_;Assets& assets_;Binder binder_;Fonts fonts_;
     Replay* replay_=nullptr;
     Target output_,canvas_,working_,raw_,localMask_,globalMask_;
+    CanvasSettings canvasSettings_;
+    CanvasLayout canvasLayout_;
     bool localCapture_=false,globalCapture_=false;
     int localTarget_=0,globalTarget_=0;
     std::map<std::pair<int,uint32_t>,Camera> cameras_;
@@ -59,6 +62,9 @@ private:
     void markDrawn(size_t call);
     bool hidden(const std::string& path)const;
     Target& renderTarget(int context);
+    void resizeCanvas(const CanvasLayout& layout);
+    std::array<int,4> canvasClip()const;
+    std::array<int,4> physicalClip(std::array<int,4> clip)const;
     void draw(Sprite sprite,State& state);
     void capture(const Instruction& instruction,std::span<const uint8_t> payload,bool global,State& state);
 public:
@@ -66,6 +72,9 @@ public:
     Executor(Gpu& gpu,Assets& assets,const std::filesystem::path& cache,const std::filesystem::path& clientRoot={});
     ~Executor();
     void attach(Replay& replay);
+    void setCanvasSettings(const CanvasSettings& settings);
+    const CanvasSettings& canvasSettings()const{return canvasSettings_;}
+    const CanvasLayout& canvasLayout()const{return canvasLayout_;}
     void prepare(const std::function<bool()>& cancelled={});
     void execute(const Scene& scene);
     void redraw(const Scene& scene);
@@ -97,6 +106,7 @@ public:
     bool seek(int64_t elapsedMilliseconds);
     bool step(int direction);
     bool refresh();
+    bool setCanvasSettings(const CanvasSettings& settings);
     bool paused()const{return paused_;}
     int64_t elapsedMilliseconds()const;
     bool ended()const{return ended_;}

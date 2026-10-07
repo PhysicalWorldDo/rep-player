@@ -13,6 +13,7 @@ struct ExportOptions {
     std::wstring fileName;
     std::unordered_set<std::string> hiddenImages;
     ClientProtocolSelection protocol;
+    CanvasSettings canvas;
 };
 struct ExportProgress {
     uint64_t completedFrames=0,totalFrames=0;

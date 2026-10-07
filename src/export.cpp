@@ -96,12 +96,14 @@ ExportResult exportReplay(Gpu& gpu,Assets& assets,const std::filesystem::path& c
     Replay replay(replayPath,clientReplayOptions(client,options.protocol));Scene scene;int32_t duration=0;uint64_t sceneCount=0;
     while(replay.next(scene)){duration=std::max(duration,scene.timestamp);sceneCount++;checkCancelled();}
     if(!sceneCount)throw Error("REP has no scenes to export");replay.rewind();
-    ExportResult result;result.outputPath=output;result.width=replay.header.width();result.height=replay.header.height();
+    ExportResult result;result.outputPath=output;
     result.fps=options.fps;result.durationMilliseconds=duration;result.frames=(uint64_t(duration)*options.fps+999)/1000+1;
     result.alpha=options.alpha&&options.format!=ExportFormat::Mp4;result.hiddenImageCount=options.hiddenImages.size();
     update.totalFrames=result.frames;if(progress)progress(update);
     Executor executor(gpu,assets,cache,client);executor.setTransparent(result.alpha);executor.setHiddenImages(options.hiddenImages);
-    executor.attach(replay);executor.prepare(cancelled);checkCancelled();
+    executor.setCanvasSettings(options.canvas);executor.attach(replay);
+    result.width=executor.output().image.width;result.height=executor.output().image.height;
+    executor.prepare(cancelled);checkCancelled();
     std::filesystem::create_directories(directory);if(png)std::filesystem::create_directory(staging);
     auto target=png?staging/L"frame_%06d.png":staging;
     std::wstring arguments=L" -hide_banner -loglevel error -nostdin -n -f rawvideo -pixel_format rgba -video_size "+

@@ -113,11 +113,33 @@ void Executor::markDrawn(size_t call){if(call==SIZE_MAX)return;currentImages_[ca
 void Executor::setInspection(ReplayInspection inspection){durationMilliseconds_=inspection.durationMilliseconds;for(auto& image:inspection.images){image.hidden=hidden(image.path);mergeImage(allImages_,std::move(image),false);}}
 void Executor::resetPlaybackState(){gpu_.flush();for(auto& pixels:movies_->pixels())gpu_.forgetTexture(pixels.get());cameras_.clear();samplerOffsets_.clear();lastBlend_=0;movies_->reset();localCapture_=globalCapture_=localHidden_=globalHidden_=false;binder_.setReplay(replay_);selectedContext_=219;contextBound_.fill(false);sceneEntryValid_=false;}
 Target& Executor::renderTarget(int context){if(context>=219&&context<=230&&contexts_[context-219])return *contexts_[context-219];return output_;}
+// Keep camera transforms and recorded clips in REP screen coordinates. Apply
+// the canvas offset only to final vertices, scissor rectangles and RT sampling.
+std::array<int,4> Executor::canvasClip()const{return {-canvasLayout_.left,-canvasLayout_.top,canvasLayout_.width-canvasLayout_.left,canvasLayout_.height-canvasLayout_.top};}
+std::array<int,4> Executor::physicalClip(std::array<int,4> clip)const{
+    for(int n=0;n<4;n++){
+        int offset=(n&1)?canvasLayout_.top:canvasLayout_.left,bound=(n&1)?canvasLayout_.height:canvasLayout_.width;
+        clip[n]=int(std::clamp(int64_t(clip[n])+offset,int64_t(0),int64_t(bound)));
+    }
+    return clip;
+}
+void Executor::resizeCanvas(const CanvasLayout& layout){
+    gpu_.flush();
+    bool resized=output_.image.width!=layout.width||output_.image.height!=layout.height;
+    if(resized){output_=gpu_.target(layout.width,layout.height);canvas_=gpu_.target(layout.width,layout.height,false);working_=gpu_.target(layout.width,layout.height,false);raw_=gpu_.target(layout.width,layout.height,false);localMask_=gpu_.target(layout.width,layout.height,false);globalMask_=gpu_.target(layout.width,layout.height,false);}
+    if(resized||canvasLayout_!=layout){for(auto& a:actors_)a.reset();for(auto& c:contexts_)c.reset();}
+    canvasLayout_=layout;
+    float black[4]={0,0,0,transparent_?0.f:1.f};gpu_.begin(output_,black);
+}
+void Executor::setCanvasSettings(const CanvasSettings& settings){
+    if(replay_){auto layout=settings.resolve(replay_->header.width(),replay_->header.height());if(layout!=canvasLayout_)resizeCanvas(layout);}
+    else settings.resolve(1,1);
+    canvasSettings_=settings;
+}
 void Executor::attach(Replay& replay){
     gpu_.flush();
     replay_=&replay;statistics={};resetPlaybackState();currentImages_.clear();allImages_.clear();durationMilliseconds_=0;registeredImages(replay,allImages_);
-    int w=replay.header.width(),h=replay.header.height();if(output_.image.width!=w||output_.image.height!=h){output_=gpu_.target(w,h);canvas_=gpu_.target(w,h,false);working_=gpu_.target(w,h,false);raw_=gpu_.target(w,h,false);localMask_=gpu_.target(w,h,false);globalMask_=gpu_.target(w,h,false);for(auto& a:actors_)a.reset();for(auto& c:contexts_)c.reset();}
-    float black[4]={0,0,0,transparent_?0.f:1.f};gpu_.begin(output_,black);
+    resizeCanvas(canvasSettings_.resolve(replay.header.width(),replay.header.height()));
 }
 void Executor::prepare(const std::function<bool()>& cancelled){
     if(!replay_)return;std::set<std::pair<std::string,int>> requested;
@@ -203,17 +225,17 @@ void Executor::draw(Sprite s,State& state){
             const auto& c=it->second;if(c.width==0||c.height==0)return;
             if(state.worldClip&&!s.screenClip){
                 constexpr std::array<int,4> unbounded{-1000000,-1000000,1000000,1000000};
-                clip=state.clip==unbounded?std::array{0,0,output_.image.width,output_.image.height}:cameraClip(state.clip,c,s.bypassZoom);
+                clip=state.clip==unbounded?canvasClip():cameraClip(state.clip,c,s.bypassZoom);
             }
             double zoom=s.bypassZoom?1:c.zoom;
-            cameraZoom=zoom;cameraScaleX=zoom*output_.image.width/c.width;cameraScaleY=zoom*output_.image.height/c.height;
-            m.x=output_.image.width*.5+cameraScaleX*(m.x-c.x-c.width*.5);
-            m.y=output_.image.height*.5+cameraScaleY*(m.y-c.y-c.height*.5);
+            cameraZoom=zoom;cameraScaleX=zoom*replay_->header.width()/c.width;cameraScaleY=zoom*replay_->header.height()/c.height;
+            m.x=replay_->header.width()*.5+cameraScaleX*(m.x-c.x-c.width*.5);
+            m.y=replay_->header.height()*.5+cameraScaleY*(m.y-c.y-c.height*.5);
         }else{
             // Native GameRenderCamera creates absent layer entries with identity
             // view/projection (CN 148CA8E20 -> 148CA8800). Coordinates are clip
             // space until opcode50 initializes that layer, not screen pixels.
-            cameraScaleX=output_.image.width*.5;cameraScaleY=-output_.image.height*.5;
+            cameraScaleX=replay_->header.width()*.5;cameraScaleY=-replay_->header.height()*.5;
             m.x=(m.x+1)*cameraScaleX;m.y=(m.y-1)*cameraScaleY;
         }
         m.a*=cameraScaleX;m.b*=cameraScaleX;m.c*=cameraScaleY;m.d*=cameraScaleY;
@@ -234,7 +256,7 @@ void Executor::draw(Sprite s,State& state){
         if(contextEffect.floats.size()!=7)contextEffect.floats.assign(7,0);
         // 1472FC8C0 normalizes sprite origin and integer scaled source size
         // against the selected render texture before binding native type54.
-        contextEffect.floats[0]=float(m.x)/mask->width;contextEffect.floats[1]=float(m.y)/mask->height;
+        contextEffect.floats[0]=float(m.x+canvasLayout_.left)/mask->width;contextEffect.floats[1]=float(m.y+canvasLayout_.top)/mask->height;
         contextEffect.floats[2]=int(originalWidth*c.scaleX)*float(cameraScaleX)/mask->width*(c.direction==1?1:-1);
         contextEffect.floats[3]=int(originalHeight*c.scaleY)*float(cameraScaleY)/mask->height;
         c.external[1]=std::move(mask);effect=&contextEffect;
@@ -253,7 +275,7 @@ void Executor::draw(Sprite s,State& state){
     float insetX=inset&&(scaled(at<float>(s.params,20))||rotated||cameraZoom!=1)?.5f:0;
     float insetY=inset&&(scaled(at<float>(s.params,24))||rotated||cameraZoom!=1)?.5f:0;
     if(frame.rotated&&!s.specialUv)std::swap(insetX,insetY);
-    std::vector<Vertex> vertices;auto add=[&](double left,double top,double right,double bottom,std::array<float,4> uv){int corners[]={0,1,2,2,1,3};for(int corner:corners){Vertex v;auto xy=m.apply(corner&1?right:left,corner>>1?bottom:top);v.position[0]=xy[0];v.position[1]=xy[1];auto col=vertexColor;if(s.gradient&&corner>>1){auto lower=color(s.lower);std::copy_n(lower.data(),3,col.data());}std::copy(col.begin(),col.end(),v.color);
+    std::vector<Vertex> vertices;auto add=[&](double left,double top,double right,double bottom,std::array<float,4> uv){int corners[]={0,1,2,2,1,3};for(int corner:corners){Vertex v;auto xy=m.apply(corner&1?right:left,corner>>1?bottom:top);v.position[0]=xy[0]+canvasLayout_.left;v.position[1]=xy[1]+canvasLayout_.top;auto col=vertexColor;if(s.gradient&&corner>>1){auto lower=color(s.lower);std::copy_n(lower.data(),3,col.data());}std::copy(col.begin(),col.end(),v.color);
             float xx=corner&1?uv[2]:uv[0],yy=corner>>1?uv[3]:uv[1];auto& rect=frame.rect;double u,vv;
             if(frame.rotated){u=(s.specialUv?rect[0]+uv[corner>>1?0:2]:rect[2]-yy)/frame.texture->width;vv=(rect[1]+(s.specialUv?uv[corner&1?3:1]:xx))/frame.texture->height;}else{u=(rect[0]+xx*(rect[2]<rect[0]?-1:1))/frame.texture->width;vv=(rect[1]+yy*(rect[3]<rect[1]?-1:1))/frame.texture->height;}
             if(directUv){
@@ -274,6 +296,7 @@ void Executor::draw(Sprite s,State& state){
     bool sourceHidden=(s.call!=SIZE_MAX&&currentImages_[s.call].hidden)||(s.actualCall!=SIZE_MAX&&currentImages_[s.actualCall].hidden);
     if(sourceHidden||dependencyHidden||(captureActive&&(s.offscreen?localHidden_:globalHidden_))){if(state.phase==1&&state.channel>=0)state.hiddenStencil[state.channel].insert(state.reference);return;}
     if(state.phase==2&&state.channel>=0&&state.hiddenStencil[state.channel].contains(state.reference))return;
+    clip=physicalClip(clip);
     if(std::max(0,clip[0])>=std::min(output_.image.width,clip[2])||std::max(0,clip[1])>=std::min(output_.image.height,clip[3]))return;
     if(writeColor)markDrawn(s.actualCall==SIZE_MAX?s.call:s.actualCall);
     if(captureActive||stencil){float clear[4]{};gpu_.begin(working_,clear);auto unblended=material;unblended.blend=0x8000;gpu_.draw(vertices,unblended,clip);
@@ -294,11 +317,11 @@ void Executor::capture(const Instruction& i,std::span<const uint8_t> payload,boo
     put(s.params,20,at<float>(payload,scaleOffset));put(s.params,24,at<float>(payload,scaleOffset+4));put(s.params,16,at<float>(payload,rotationOffset));float px=at<float>(payload,pivotOffset),py=at<float>(payload,pivotOffset+4);put(s.params,28,px>1e30?-s.x:px);put(s.params,32,py>1e30?-s.y:py);
     if(!global){s.params[6]=payload[32];channel=payload[33];}else channel=0;
     auto matrix=affine(s,*s.frame);if(std::abs(matrix.a*matrix.d-matrix.b*matrix.c)<1e-12)return;Material material=binder_.bind(nullptr,gpu_.texture(s.frame->texture),{});material.blend=0x8000;
-    std::array<Vertex,6> vertices{};int corners[]={0,1,2,2,1,3};auto& f=*s.frame;for(int n=0;n<6;n++){int corner=corners[n];auto& v=vertices[n];auto xy=matrix.apply((corner&1)*f.width,(corner>>1)*f.height);v.position[0]=xy[0];v.position[1]=xy[1];if(f.rotated){v.texcoord[0][0]=float(f.rect[2]-(corner>>1)*f.height)/f.texture->width;v.texcoord[0][1]=float(f.rect[1]+(corner&1)*f.width)/f.texture->height;}else{v.texcoord[0][0]=float(f.rect[corner&1?2:0])/f.texture->width;v.texcoord[0][1]=float(f.rect[corner>>1?3:1])/f.texture->height;}v.texcoord[2][0]=1;v.texcoord[7][0]=v.texcoord[7][1]=1;}
+    std::array<Vertex,6> vertices{};int corners[]={0,1,2,2,1,3};auto& f=*s.frame;for(int n=0;n<6;n++){int corner=corners[n];auto& v=vertices[n];auto xy=matrix.apply((corner&1)*f.width,(corner>>1)*f.height);v.position[0]=xy[0]+canvasLayout_.left;v.position[1]=xy[1]+canvasLayout_.top;if(f.rotated){v.texcoord[0][0]=float(f.rect[2]-(corner>>1)*f.height)/f.texture->width;v.texcoord[0][1]=float(f.rect[1]+(corner&1)*f.width)/f.texture->height;}else{v.texcoord[0][0]=float(f.rect[corner&1?2:0])/f.texture->width;v.texcoord[0][1]=float(f.rect[corner>>1?3:1])/f.texture->height;}v.texcoord[2][0]=1;v.texcoord[7][0]=v.texcoord[7][1]=1;}
     float clear[4]{};gpu_.begin(target,clear);gpu_.draw(vertices,material,{0,0,output_.image.width,output_.image.height});gpu_.begin(renderTarget(state.context));active=true;
 }
 void Executor::execute(const Scene& scene){
-    if(!replay_)throw Error("executor has no replay");sceneEntryCameras_=cameras_;sceneEntryOffsets_=samplerOffsets_;sceneEntryBlend_=lastBlend_;sceneEntryRandom_=binder_.randomState();sceneEntryValid_=true;currentImages_.clear();durationMilliseconds_=std::max(durationMilliseconds_,scene.timestamp);State state;state.clip={0,0,output_.image.width,output_.image.height};auto initialize=[&](State& s){s.context=replay_->header.renderMode==2?(replay_->version>=17||replay_->version<=11?82:10):(replay_->version>=17?81:10);};initialize(state);
+    if(!replay_)throw Error("executor has no replay");sceneEntryCameras_=cameras_;sceneEntryOffsets_=samplerOffsets_;sceneEntryBlend_=lastBlend_;sceneEntryRandom_=binder_.randomState();sceneEntryValid_=true;currentImages_.clear();durationMilliseconds_=std::max(durationMilliseconds_,scene.timestamp);State state;state.clip=canvasClip();auto initialize=[&](State& s){s.context=replay_->header.renderMode==2?(replay_->version>=17||replay_->version<=11?82:10):(replay_->version>=17?81:10);};initialize(state);
     std::map<size_t,std::vector<GlyphQuad>> textQuads;size_t cursor=0;Reader aux(scene.aux);
     for(auto id:scene.ids)if(auto command=replay_->command(id))for(const auto& i:command->instructions){auto payload=std::span(command->raw).subspan(i.offset,i.payloadBytes);float x=0,y=0;if(i.auxBytes){x=aux.get<int16_t>();y=aux.get<int16_t>();}
         if(i.opcode==16||i.opcode==17)layer(state,i,payload,*replay_);
@@ -308,7 +331,7 @@ void Executor::execute(const Scene& scene){
             else {cameras_[{cameraId(state.context,target),target}]=camera;statistics.cameraUpdates++;}}
         if(i.opcode==5||i.opcode==48){if(i.opcode==48&&replay_->header.minor<7){x=at<float>(i.native,44);y=at<float>(i.native,48);}textQuads[cursor]=fonts_.prepare(i,*replay_,x,y);}cursor++;
     }
-    aux.end();state={};state.clip={0,0,output_.image.width,output_.image.height};initialize(state);statistics.lastContext=state.context;cursor=0;Reader data(scene.aux);localCapture_=globalCapture_=localHidden_=globalHidden_=false;float black[4]={0,0,0,transparent_?0.f:1.f};gpu_.begin(output_,black);std::array<bool,12> activated{};
+    aux.end();state={};state.clip=canvasClip();initialize(state);statistics.lastContext=state.context;cursor=0;Reader data(scene.aux);localCapture_=globalCapture_=localHidden_=globalHidden_=false;float black[4]={0,0,0,transparent_?0.f:1.f};gpu_.begin(output_,black);std::array<bool,12> activated{};
     std::set<const Pixels*> updatedFonts;
     for(auto id:scene.ids){statistics.references++;auto command=replay_->command(id);if(!command)continue;
         for(const auto& i:command->instructions){auto payload=std::span(command->raw).subspan(i.offset,i.payloadBytes);float x=0,y=0;if(i.auxBytes){x=data.get<int16_t>();y=data.get<int16_t>();}statistics.opcodes[i.opcode]++;
@@ -330,7 +353,7 @@ void Executor::execute(const Scene& scene){
             case 19:if(i.effect.present&&!i.effect.obsolete){if(i.effect.type<67)statistics.effects[i.effect.type]++;if(i.effect.programNull()){state.phantom++;statistics.phantomPushes++;}else {State::EffectBinding binding{&i.effect,{}};if(dnfProfile(replay_->options.profile)&&i.effect.type==54&&i.effect.floats.size()==7&&i.effect.floats[6]!=0){int slot=selectedContext_-219;if(contextBound_[slot]&&contexts_[slot])binding.mask=gpu_.view(*contexts_[slot]);}state.effects.push_back(std::move(binding));}}break;
             case 20:if(state.phantom)state.phantom--;else if(!state.effects.empty())state.effects.pop_back();break;
             case 21:statistics.nullCaches++;break;
-            case 23:{auto instance=at<uint64_t>(payload,8);auto timestamp=at<uint32_t>(payload,36);auto frame=movies_->frame(replay_->path(i.resource),instance,timestamp);if(!frame)break;auto s=sprite();s.opcode=3;s.params=drawDefaults();s.frame=frame;s.x=at<int32_t>(payload,16);s.y=at<int32_t>(payload,20);s.layer=i.layer;s.explicitCamera=replay_->version>=17;s.update=true;put(s.params,28,0.f);put(s.params,32,0.f);put(s.params,20,at<float>(payload,24));put(s.params,24,at<float>(payload,28));put(s.params,8,movies_->color(instance,at<uint32_t>(payload,32),replay_->version>=17));auto oldClip=state.clip;std::array<int,4> movieClip;bool any=false;for(int n=0;n<4;n++){movieClip[n]=at<int16_t>(payload,40+n*2);any|=movieClip[n]!=0;}if(any){for(int n=0;n<4;n++)state.clip[n]=n<2?std::max(oldClip[n],movieClip[n]):std::min(oldClip[n],movieClip[n]);if(state.clip[0]>=state.clip[2]||state.clip[1]>=state.clip[3])state.clip={0,0,output_.image.width,output_.image.height};}draw(std::move(s),state);state.clip=oldClip;break;}
+            case 23:{auto instance=at<uint64_t>(payload,8);auto timestamp=at<uint32_t>(payload,36);auto frame=movies_->frame(replay_->path(i.resource),instance,timestamp);if(!frame)break;auto s=sprite();s.opcode=3;s.params=drawDefaults();s.frame=frame;s.x=at<int32_t>(payload,16);s.y=at<int32_t>(payload,20);s.layer=i.layer;s.explicitCamera=replay_->version>=17;s.update=true;put(s.params,28,0.f);put(s.params,32,0.f);put(s.params,20,at<float>(payload,24));put(s.params,24,at<float>(payload,28));put(s.params,8,movies_->color(instance,at<uint32_t>(payload,32),replay_->version>=17));auto oldClip=state.clip;std::array<int,4> movieClip;bool any=false;for(int n=0;n<4;n++){movieClip[n]=at<int16_t>(payload,40+n*2);any|=movieClip[n]!=0;}if(any){for(int n=0;n<4;n++)state.clip[n]=n<2?std::max(oldClip[n],movieClip[n]):std::min(oldClip[n],movieClip[n]);if(state.clip[0]>=state.clip[2]||state.clip[1]>=state.clip[3])state.clip=canvasClip();}draw(std::move(s),state);state.clip=oldClip;break;}
             case 24:{auto id=at<uint64_t>(payload,8);if(auto pixels=movies_->pixels(id))gpu_.forgetTexture(pixels.get());movies_->stop(id);break;}
             case 26:case 27:case 28:case 29:{int channel=payload[0];if(channel>=3)break;if(i.opcode==26){state.channel=channel;state.phase=1;state.nextStencil[channel]=std::array{1,64,128}[channel];if(channel==0||channel==2){gpu_.clearStencil(renderTarget(state.context));for(auto& hiddenRefs:state.hiddenStencil)hiddenRefs.clear();}}else if(i.opcode==27){state.channel=channel;state.phase=2;state.reference=std::array{1,64,128}[channel];}else if(i.opcode==28){state.invert=payload[1]!=0;if(state.phase==1){state.reference=state.nextStencil[channel]-int(state.invert);if(!state.invert)state.nextStencil[channel]++;}else state.reference=payload[2];}else{state.channel=-1;state.phase=0;}break;}
             case 32:{Reader grid(payload);grid.take(4);State::Grid value;auto count=grid.get<uint8_t>();while(count--)value.xs.push_back(grid.get<int16_t>());count=grid.get<uint8_t>();while(count--)value.ys.push_back(grid.get<int16_t>());state.grids[{i.resource,i.frame}]=std::move(value);break;}
@@ -372,6 +395,20 @@ bool Playback::refresh(){
     // their dependencies instead of retaining copies of all twelve targets.
     if(contextDependent_){bool wasEnded=ended_;bool changed=rebuildToOrdinal(scene_.ordinal);ended_=wasEnded;return changed;}
     executor_->redraw(scene_);return true;
+}
+bool Playback::setCanvasSettings(const CanvasSettings& settings){
+    if(!executor_)return false;
+    auto before=executor_->canvasLayout();
+    auto elapsed=elapsedMilliseconds();
+    executor_->setCanvasSettings(settings);
+    if(!replay_||!hasScene_||before==executor_->canvasLayout())return false;
+    bool wasEnded=ended_,wasStopped=stopped_,wasPaused=paused_;
+    auto oldSelected=selected,oldSkipped=skipped;
+    bool changed=rebuildToOrdinal(scene_.ordinal);
+    ended_=wasEnded;stopped_=wasStopped;paused_=wasPaused;
+    elapsed_=elapsed;start_=std::chrono::steady_clock::now()-std::chrono::milliseconds(elapsed_);
+    selected=oldSelected;skipped=oldSkipped;
+    return changed;
 }
 bool Playback::seek(int64_t elapsed){if(!replay_)return false;bool wasPaused=paused_,wasStopped=stopped_;replay_->rewind();executor_->resetPlaybackState();hasScene_=ended_=false;stopped_=false;paused_=false;sequentialState_=true;elapsed=std::max<int64_t>(0,elapsed);Scene next;bool changed=false;
     while(!hasScene_||scene_.timestamp<elapsed){if(!replay_->next(next)){ended_=true;break;}scene_=std::move(next);hasScene_=true;executor_->execute(scene_);selected++;changed=true;}

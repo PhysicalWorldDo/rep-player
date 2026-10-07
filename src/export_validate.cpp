@@ -11,6 +11,7 @@ int wmain(int argc,wchar_t** argv){try{
         if(key==L"--client")client=value;else if(key==L"--replay")replay=value;
         else if(key==L"--profile")options.protocol.profile=rep::clientProfile(value);
         else if(key==L"--codepage")options.protocol.codePage=rep::clientCodePage(value);
+        else if(rep::parseCanvasOption(options.canvas,key,value))continue;
         else if(key==L"--output")options.outputDirectory=value;else if(key==L"--name")options.fileName=value;
         else if(key==L"--fps")options.fps=std::stoi(value);else if(key==L"--alpha")options.alpha=value==L"1";
         else if(key==L"--hide")options.hiddenImages.insert(rep::canonical(rep::utf8(value)));

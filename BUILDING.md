@@ -112,13 +112,15 @@ $CLIENT = Read-Host '输入完整客户端根目录'
 .\build\rep_validate.exe --profile dnf-july --structural --batch .\validation\paths.txt
 ```
 
-GUI、`rep_export` 和GPU验证工具也接受 `--profile` / `--codepage`。GUI及导出默认按所选客户端根下的程序名选择profile（DNF为`dnf-compatible`）；验证工具默认DFO。`dnf-july`对应2026-07-09原生证据，不认证其他构建中的未知指令。`dnf-compatible`沿用已确认的DNF合同，仅对REP1.8/minor6、整条独立字典命令`4200000000`启用经用户批准的跳过策略；它不是已确认的原生66语义。验证JSON记录`compatibility_ignored_commands/references`，GPU及导出记录`compatibility_ignored_instructions`。
+GUI、`rep_export` 和GPU验证工具也接受 `--profile` / `--codepage`。GUI及导出自动优先识别所选根下的 `DNF.exe`，选择 `dnf-compatible`；没有 DNF.exe 时使用 `dfo`。两个 EXE 同时存在时仍优先 DNF，显式 `--profile` 优先于自动识别。验证工具默认DFO。`dnf-july`对应2026-07-09原生证据，不认证其他构建中的未知指令。`dnf-compatible`沿用已确认的DNF合同，仅对REP1.8/minor6、整条独立字典命令`4200000000`启用经用户批准的跳过策略；它不是已确认的原生66语义。验证JSON记录`compatibility_ignored_commands/references`，GPU及导出记录`compatibility_ignored_instructions`。
 
 开发命令行导出示例：
 
 ```powershell
 .\build\rep_export.exe --client $CLIENT --replay (Join-Path $CLIENT 'Replay\SkillReplay\Swordman\BloodyRave.rep') --format mov --fps 60 --alpha 1 --output .\exports --name BloodyRave
 ```
+
+`rep_gpu` 与 `rep_export` 可添加一个画布选项：`--canvas-scale 2`、`--canvas-size 1920x1080` 或 `--canvas-padding 256,128,256,128`（左、上、右、下）。选项扩大实际渲染纹理，原始投影尺寸保持不变；指定宽高不足时按 REP 原始尺寸容纳。默认不扩展。输出宽高为实际画布，GPU 报告另保留 `original_width/original_height`。
 
 随后完整解压用户 ZIP 到其他可写目录，直接启动根 EXE，检查客户端选择、名称显示、播放、暂停、前后帧、重播和导出。运行依赖须以解压包自身验证。
 
