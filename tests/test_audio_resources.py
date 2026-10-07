@@ -120,10 +120,11 @@ class AudioResourcesTests(unittest.TestCase):
         self.assertAlmostEqual(got['gain'], 0.75)
 
     def test_group_members_retain_native_delays_without_rechoosing_randoms(self):
-        got = self.run_probe(tags=['G_PARENT', 'R_PARENT'])['items']
+        got = self.run_probe(tags=['G_PARENT', 'R_PARENT', 'RG_PARENT'])['items']
         self.assertEqual(got[0].get('children', []), [{'tag': 'TONE', 'delay_ms': 500, 'delay_range_ms': 0}])
         self.assertFalse(got[0].get('native_filtered', True))
         self.assertTrue(got[1].get('native_filtered', False))
+        self.assertTrue(got[2].get('native_filtered', False))
 
     def test_comments_do_not_register_fake_audio(self):
         item = self.run_probe(tags=['COMMENTED'])['items'][0]
