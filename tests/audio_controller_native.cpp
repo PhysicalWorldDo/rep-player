@@ -32,6 +32,17 @@ void exercise(HWND window,int argc,wchar_t** argv){
         }
         player.open(argv[4]);
         auto opened=waitFor(player,[](const auto& s){return s.phase==Phase::Playing&&s.audioAvailable&&s.audioPosition>=80;});
+        if(mode==L"canvas-active"){
+            rep::CanvasSettings busy;busy.mode=rep::CanvasMode::Size;busy.width=busy.height=4096;
+            auto before=Clock::now();player.setCanvasSettings(busy);
+            auto resized=waitFor(player,[](const auto& s){return s.canvasWidth==4096;});
+            auto rebuild=std::chrono::duration<double,std::milli>(Clock::now()-before).count();
+            std::this_thread::sleep_for(std::chrono::milliseconds(60));resized=player.status();
+            auto difference=std::abs(resized.audioPosition-resized.elapsed);
+            std::cout<<"{\"implemented\":true,\"difference\":"<<difference<<",\"rebuild_ms\":"<<rebuild
+                     <<",\"elapsed\":"<<resized.elapsed<<",\"audio_position\":"<<resized.audioPosition
+                     <<",\"playing\":"<<(resized.phase==Phase::Playing?"true":"false")<<"}\n";return;
+        }
         if(mode==L"error"){
             player.open(std::filesystem::path(argv[2])/L"broken.rep");
             auto deadline=Clock::now()+std::chrono::seconds(12);auto failed=player.status();

@@ -50,6 +50,14 @@ class AudioControllerTests(unittest.TestCase):
         cls.silent = cls.folder / 'silent.rep'
         cls.silent.write_bytes(pack_replay(1.7, {1: draw}, [(n, (1,), struct.pack('<2h', 2, 3)) for n in range(0, 1501, 100)],
             ['TONE', 'sprite/test/frame.img'], header=header))
+        cls.heavy = cls.folder / 'heavy.rep'
+        heavy_params = params.copy()
+        struct.pack_into('<2f', heavy_params, 20, 256, 256)
+        heavy_draw = struct.pack('<II', 3, 64) + heavy_params
+        heavy_scenes = [(n, ((0,) if n == 0 else ()) + (1,) * 6000,
+                         struct.pack('<2h', 2, 3) * 6000) for n in range(0, 1501, 5)]
+        cls.heavy.write_bytes(pack_replay(1.7, {0: sound, 1: heavy_draw}, heavy_scenes,
+            ['TONE', 'sprite/test/frame.img'], header=header))
         cls.exe = cls.folder / 'audio_controller_probe.exe'
         shutil.copy2(ROOT / 'build/ffmpeg.exe', cls.folder / 'ffmpeg.exe')
         subprocess.run(['powershell', '-NoProfile', '-Command',
@@ -121,6 +129,12 @@ class AudioControllerTests(unittest.TestCase):
         self.assertTrue(report['error'])
         self.assertFalse(report['available'])
         self.assertEqual((report['events'], report['position']), (0, 0))
+
+    def test_playing_canvas_rebuild_preserves_audio_visual_clock_alignment(self):
+        report = self.result('canvas-active', self.heavy)
+        self.assertTrue(report['playing'], str(report))
+        self.assertGreater(report['rebuild_ms'], 100, 'fixture did not exercise an expensive real GPU rebuild')
+        self.assertLessEqual(report['difference'], 35, 'audio kept advancing while canvas rebuild preserved the REP time: ' + str(report))
 
 
 if __name__ == '__main__':
