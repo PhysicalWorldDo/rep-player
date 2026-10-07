@@ -29,7 +29,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\setup-dependencies.p
 
 准备后应存在 `toolchain\llvm-mingw-20260616-ucrt-x86_64\bin\clang++.exe`、`vendor\zlib\libz.a` 和 `vendor\freetype\libfreetype.a`。FreeType 保留默认字体模块，通过 `FT_CONFIG_OPTION_SYSTEM_ZLIB` 共用静态 zlib 支持压缩 PCF；关闭外部 PNG、BZip2、Brotli 和 HarfBuzz 集成。脚本无参数，每次重新编译两个静态库，复用已下载的源码和工具链。
 
-FFmpeg 用于 AVI 解码和素材导出，编译播放器本身不需要它。可从 v1.0.1 运行 ZIP 提取同版静态 FFmpeg，供开发目录运行及打包使用：
+FFmpeg 用于 AVI 画面解码、REP 声音解码和素材导出，编译播放器本身不需要它。可从 v1.0.1 运行 ZIP 提取同版静态 FFmpeg，供开发目录运行及打包使用：
 
 ```powershell
 New-Item -ItemType Directory -Path .\dependency-cache -Force | Out-Null
@@ -40,6 +40,8 @@ Copy-Item -LiteralPath .\dependency-cache\runtime\resources\ffmpeg.exe -Destinat
 ```
 
 FFmpeg 版本保持 `n8.1.2-29-g703dcc25b9-20260721`，支持 libx264、ProRes 4444 和 PNG，通过独立进程调用。其构建源码和完整依赖源码均使用上游固定下载链接，本项目 v1.0.1 Release 不重复附带大源码包；来源和重建方法见 [FFMPEG_SOURCE.md](licenses/FFMPEG_SOURCE.md)。
+
+声音输出使用 Windows 10/11 自带的 XAudio2 2.9；现有工具链已提供头文件和导入库，不需要安装声音 SDK 或增加运行 DLL。MOV 音频使用 PCM，MP4 使用 AAC，PNG 不生成音频。`rep_export --audio 0` 可关闭视频导出音轨，默认 `--audio 1`。只有实际包含声音指令的录像才会建立导出音轨；声音元数据及执行边界见 [AUDIO.md](AUDIO.md)。
 
 ## 编译与开发运行
 
