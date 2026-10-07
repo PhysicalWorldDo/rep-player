@@ -35,7 +35,7 @@ class NativeAudioExportTests(unittest.TestCase):
         with wave.open(str(music / 'tone.wav'), 'wb') as output:
             output.setparams((1, 2, 48000, 0, 'NONE', 'not compressed'))
             output.writeframes(b''.join(struct.pack('<h', int(16000 * math.sin(2 * math.pi * 440 * n / 48000))) for n in range(4800)))
-        (cls.client / 'audio.xml').write_text('<AUDIO><MUSIC TAG="TEST_TONE" FILE="music/tone.wav" /></AUDIO>', encoding='utf8')
+        (cls.client / 'audio.xml').write_text('<AUDIO><MUSIC ID="TEST_TONE" FILE="music/tone.wav" /></AUDIO>', encoding='utf8')
         params = bytearray(_default_draw_params(b''))
         struct.pack_into('<I', params, 0, 1)
         struct.pack_into('<2f', params, 28, 0, 0)
