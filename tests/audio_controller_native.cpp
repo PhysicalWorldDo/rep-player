@@ -32,6 +32,14 @@ void exercise(HWND window,int argc,wchar_t** argv){
         }
         player.open(argv[4]);
         auto opened=waitFor(player,[](const auto& s){return s.phase==Phase::Playing&&s.audioAvailable&&s.audioPosition>=80;});
+        if(mode==L"error"){
+            player.open(std::filesystem::path(argv[2])/L"broken.rep");
+            auto deadline=Clock::now()+std::chrono::seconds(12);auto failed=player.status();
+            while(Clock::now()<deadline&&failed.phase!=Phase::Error){std::this_thread::sleep_for(std::chrono::milliseconds(2));failed=player.status();}
+            std::cout<<"{\"implemented\":true,\"error\":"<<(failed.phase==Phase::Error?"true":"false")
+                     <<",\"available\":"<<(failed.audioAvailable?"true":"false")<<",\"events\":"<<failed.audioEvents
+                     <<",\"position\":"<<failed.audioPosition<<"}\n";return;
+        }
         if(mode==L"end"){
             auto ended=waitFor(player,[](const auto& s){return s.phase==Phase::Ended;});
             std::this_thread::sleep_for(std::chrono::milliseconds(80));auto later=player.status();
@@ -54,6 +62,8 @@ void exercise(HWND window,int argc,wchar_t** argv){
         player.replay();auto restarted=waitFor(player,[&](const auto& s){return s.phase==Phase::Playing&&s.audioAvailable&&s.ordinal<=1&&s.audioEvents==2;});
         bool settings=restarted.audioMuted&&std::abs(restarted.audioVolume-.35f)<.0001f;
         player.stop();auto stopped=waitFor(player,[](const auto& s){return s.phase==Phase::Stopped&&!s.audioAvailable&&s.audioPosition==0;});
+        player.togglePause();waitFor(player,[](const auto& s){return s.phase==Phase::Playing&&s.audioAvailable&&s.audioPosition>=25;});
+        player.stop();waitFor(player,[](const auto& s){return s.phase==Phase::Stopped&&!s.audioAvailable;});
         player.configureClient(argv[5]);player.open(argv[6]);
         auto silent=waitFor(player,[](const auto& s){return s.phase==Phase::Playing;});
         std::cout<<"{\"implemented\":true,\"pause_stable\":"<<(pauseStable?"true":"false")

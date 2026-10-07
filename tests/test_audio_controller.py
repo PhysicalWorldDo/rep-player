@@ -44,6 +44,7 @@ class AudioControllerTests(unittest.TestCase):
         header = b'\x0b\0' + struct.pack('<8h', *([16, 16] * 4))
         scenes = [(n, (0, 1) if n in (0, 500) else (1,), struct.pack('<2h', 2, 3)) for n in range(0, 1501, 100)]
         cls.replay = cls.folder / 'tone.rep'
+        (cls.folder / 'broken.rep').write_bytes(b'broken REP fixture')
         cls.replay.write_bytes(pack_replay(1.7, {0: sound, 1: draw}, scenes,
             ['TONE', 'sprite/test/frame.img'], header=header))
         cls.silent = cls.folder / 'silent.rep'
@@ -114,6 +115,12 @@ class AudioControllerTests(unittest.TestCase):
         self.assertGreater(report['missing'], 0)
         self.assertFalse(report['message_empty'])
         self.assertEqual(report['events'], 2)
+
+    def test_failed_replay_switch_releases_audio_and_clears_audio_status(self):
+        report = self.result('error')
+        self.assertTrue(report['error'])
+        self.assertFalse(report['available'])
+        self.assertEqual((report['events'], report['position']), (0, 0))
 
 
 if __name__ == '__main__':
