@@ -68,12 +68,13 @@ class AudioMixerTests(unittest.TestCase):
         built = subprocess.run(command, capture_output=True, text=True)
         if built.returncode: raise RuntimeError(built.stdout + built.stderr)
 
-    def mix(self, commands, scenes, seek=0, resources=('A', 'B', 'M', 'R', 'L', 'S', 'P', 'G', 'OFFSET'), player=False):
+    def mix(self, commands, scenes, seek=0, resources=('A', 'B', 'M', 'R', 'L', 'S', 'P', 'G', 'OFFSET'), player=False, profile='dfo'):
         path = self.folder / (self._testMethodName + '.rep')
         header = b'\x0b\0' + struct.pack('<8h', *([16] * 8))
         path.write_bytes(pack_replay(1.7, commands, [(time, ids, b'') for time, ids in scenes], resources, header=header))
         args = [str(self.exe), str(self.client), str(path), str(seek)]
         if player: args.append(player if isinstance(player, str) else 'player')
+        if profile != 'dfo': args.append(profile)
         result = subprocess.run(args, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         data = json.loads(result.stdout)
@@ -186,6 +187,19 @@ class AudioMixerTests(unittest.TestCase):
                         resources=names, player='player-cold')
         self.assertTrue(data['available'])
         self.assertGreaterEqual(data['first'], 300, 'cold future resource decoding stalled the 30ms device queue')
+
+    def test_music_owner_stop_is_available_only_in_dnf_profile(self):
+        commands = {0: play(2, 10), 1: control(0, 10, 1)}
+        scenes = [(0, (0,)), (20, (1,)), (100, ())]
+        dfo = self.mix(commands, scenes)
+        dnf = self.mix(commands, scenes, profile='dnf-july')
+        self.assertAlmostEqual(dfo['samples'][20], .125, places=4)
+        self.assertAlmostEqual(dnf['samples'][20], 0, places=4)
+
+    def test_music_does_not_belong_to_type2_ordinary_voice_map(self):
+        data = self.mix({0: play(2, 10), 1: play(0, 10), 2: control(2, 10)},
+                        [(0, (0, 1)), (20, (2,)), (100, ())], profile='dnf-july')
+        self.assertAlmostEqual(data['samples'][20], .125, places=4)
 
 
 if __name__ == '__main__': unittest.main()

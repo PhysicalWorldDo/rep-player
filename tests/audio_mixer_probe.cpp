@@ -8,7 +8,9 @@
 int wmain(int argc,wchar_t** argv){try{
 #ifdef HAS_AUDIO
     if(argc<4)return 2;
-    rep::Replay replay(argv[2]);
+    rep::ReplayOptions options;
+    for(int n=4;n<argc;n++)if(std::wstring_view(argv[n])==L"dnf-july")options.profile=rep::ProtocolProfile::DnfJuly2026;
+    rep::Replay replay(argv[2],options);
     auto owned=std::make_unique<rep::AudioTrack>(argv[1],std::filesystem::path(argv[1])/L"cache",replay);
     if(argc>4&&(std::wstring_view(argv[4])==L"player"||std::wstring_view(argv[4])==L"player-cold")){
         owned->prepare(0);rep::AudioPlayer player(std::move(owned));player.volume(0,true);player.play();
