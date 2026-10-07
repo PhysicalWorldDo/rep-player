@@ -101,8 +101,9 @@ void PlaybackController::run(){try{
                 std::lock_guard lock(mutex_);status_.phase=playback.paused()?Phase::Paused:Phase::Playing;updateAudio();
             }
             if(inspection.valid()&&inspection.wait_for(std::chrono::milliseconds(0))==std::future_status::ready){if(inspectedGeneration==generation){auto info=inspection.get();executor->setInspection(info);std::lock_guard lock(mutex_);status_.duration=info.durationMilliseconds;status_.frameCount=info.scenes;updateImages();}else inspection={};}
-            if(canvasChanged){playback.setCanvasSettings(settings);present();std::lock_guard lock(mutex_);updateCanvas();updateImages();}
-            if(filter){executor->setHiddenImages(hidden);playback.refresh();present();std::lock_guard lock(mutex_);updateImages();}
+            if(canvasChanged){bool wasPlaying=playback.playing();if(audio)audio->pause();playback.setCanvasSettings(settings);present();if(audio&&wasPlaying)audio->seek(playback.elapsedMilliseconds(),true);std::lock_guard lock(mutex_);updateCanvas();updateImages();}
+            if(filter){bool wasPlaying=playback.playing();if(audio)audio->pause();executor->setHiddenImages(hidden);playback.refresh();present();if(audio&&wasPlaying)audio->seek(playback.elapsedMilliseconds(),true);std::lock_guard lock(mutex_);updateImages();}
+            if(!steps.empty()&&audio)audio->pause();
             for(int direction:steps){auto before=Clock::now();bool moved=playback.step(direction);if(audio)audio->seek(playback.elapsedMilliseconds(),false);present();auto pixels=gpu.readback(executor->output());std::lock_guard lock(mutex_);status_.phase=Phase::Paused;status_.timestamp=playback.timestamp();status_.ordinal=playback.ordinal();status_.elapsed=playback.elapsedMilliseconds();status_.skipped=playback.skipped;if(moved)status_.frames++;status_.frameCrc=crc(pixels);status_.captureSerial++;status_.maxFrameMilliseconds=std::max(status_.maxFrameMilliseconds,std::chrono::duration<double,std::milli>(Clock::now()-before).count());status_.frozen=false;updateImages();updateAudio();frozenChecked=false;}
             auto before=Clock::now();bool changed=playback.tick();RECT r;GetClientRect(canvas_,&r);bool resized=r.right!=oldWidth||r.bottom!=oldHeight;
             if(changed||resized)present();
