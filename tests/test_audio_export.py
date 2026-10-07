@@ -166,6 +166,7 @@ class NativeAudioExportTests(unittest.TestCase):
         return samples
 
     def test_mov_contains_pcm_and_pads_to_the_video_duration(self):
+        previous_audio_files = set(self.folder.glob('*.audio-*.wav'))
         result = self.export()
         streams = self.streams(result['output'])
         audio = next((s for s in streams if s['codec_type'] == 'audio'), None)
@@ -177,7 +178,7 @@ class NativeAudioExportTests(unittest.TestCase):
         self.assertEqual(max(abs(x) for x in samples[24000:]), 0)
         self.assertTrue(result['audio'])
         self.assertEqual(result['missing_sounds'], 0)
-        self.assertFalse(list(self.folder.glob('*.audio-*.wav')))
+        self.assertEqual(set(self.folder.glob('*.audio-*.wav')), previous_audio_files)
 
     def test_mp4_contains_aac_with_audible_recorded_sound(self):
         result = self.export('mp4')
@@ -194,11 +195,12 @@ class NativeAudioExportTests(unittest.TestCase):
         self.assertEqual(result['frames'], 16)
 
     def test_png_audio_option_never_creates_a_sound_artifact(self):
+        previous_audio_files = set(self.folder.glob('*.audio-*.wav'))
         result = self.export('png', audio=True)
         self.assertFalse(result['audio'])
         self.assertEqual(len(list(Path(result['output']).glob('frame_*.png'))), 16)
         self.assertFalse(list(Path(result['output']).glob('*.wav')))
-        self.assertFalse(list(self.folder.glob('*.audio-*.wav')))
+        self.assertEqual(set(self.folder.glob('*.audio-*.wav')), previous_audio_files)
 
     def test_missing_sound_is_reported_without_failing_export(self):
         client = self.folder / 'missing-client'

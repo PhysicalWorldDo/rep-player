@@ -1,6 +1,8 @@
 #include "export.hpp"
 #include "runtime_paths.hpp"
+#include "audio.hpp"
 #include <algorithm>
+#include <atomic>
 #include <cwctype>
 #include <fstream>
 #include <limits>
@@ -45,11 +47,16 @@ public:
         Handle logHandle(CreateFileW(log.c_str(),GENERIC_WRITE,FILE_SHARE_READ,&security,CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,nullptr));
         Handle nullHandle(CreateFileW(L"NUL",GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE,&security,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,nullptr));
         if(logHandle.get()==INVALID_HANDLE_VALUE||nullHandle.get()==INVALID_HANDLE_VALUE)throw Error("Cannot create export encoder diagnostics");
-        STARTUPINFOW startup{};startup.cb=sizeof(startup);startup.dwFlags=STARTF_USESTDHANDLES;
-        startup.hStdInput=readHandle.get();startup.hStdOutput=nullHandle.get();startup.hStdError=logHandle.get();PROCESS_INFORMATION process{};
+        STARTUPINFOEXW startup{};startup.StartupInfo.cb=sizeof(startup);startup.StartupInfo.dwFlags=STARTF_USESTDHANDLES;
+        startup.StartupInfo.hStdInput=readHandle.get();startup.StartupInfo.hStdOutput=nullHandle.get();startup.StartupInfo.hStdError=logHandle.get();PROCESS_INFORMATION process{};
+        SIZE_T size=0;InitializeProcThreadAttributeList(nullptr,1,0,&size);std::vector<uint8_t> attributes(size);
+        startup.lpAttributeList=reinterpret_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(attributes.data());
+        if(!InitializeProcThreadAttributeList(startup.lpAttributeList,1,0,&size))throw Error("Cannot initialize export encoder handles");
+        HANDLE inherited[]{readHandle.get(),nullHandle.get(),logHandle.get()};
+        bool configured=UpdateProcThreadAttribute(startup.lpAttributeList,0,PROC_THREAD_ATTRIBUTE_HANDLE_LIST,inherited,sizeof(inherited),nullptr,nullptr);
         auto command=quote(executable.wstring())+arguments;
-        if(!CreateProcessW(executable.c_str(),command.data(),nullptr,nullptr,TRUE,CREATE_NO_WINDOW,nullptr,executable.parent_path().c_str(),&startup,&process))
-            throw Error("Cannot start bundled FFmpeg export encoder");
+        bool started=configured&&CreateProcessW(executable.c_str(),command.data(),nullptr,nullptr,TRUE,CREATE_NO_WINDOW|EXTENDED_STARTUPINFO_PRESENT,nullptr,executable.parent_path().c_str(),&startup.StartupInfo,&process);
+        DeleteProcThreadAttributeList(startup.lpAttributeList);if(!started)throw Error("Cannot start bundled FFmpeg export encoder");
         process_.reset(process.hProcess);CloseHandle(process.hThread);
     }
     ~Encoder(){if(!finished_&&process_.get()){TerminateProcess(process_.get(),1);WaitForSingleObject(process_.get(),2000);}}
@@ -69,6 +76,36 @@ public:
         DWORD code=1;if(!GetExitCodeProcess(process_.get(),&code))throw Error("Cannot read export encoder result");
         finished_=true;if(code)throw Error("Export encoding failed: "+encoderError(log_));
     }
+};
+class AudioFile {
+    std::filesystem::path path_;
+    Handle file_;
+public:
+    AudioFile(const std::filesystem::path& directory,const std::wstring& name,uint32_t samples){
+        static std::atomic<uint64_t> sequence{0};
+        HANDLE file;
+        do {
+            path_=directory/(name+L".audio-"+std::to_wstring(GetCurrentProcessId())+L"-"+std::to_wstring(sequence++)+L".wav");
+            file=CreateFileW(path_.c_str(),GENERIC_WRITE,FILE_SHARE_READ,nullptr,CREATE_NEW,FILE_ATTRIBUTE_TEMPORARY,nullptr);
+        }while(file==INVALID_HANDLE_VALUE&&GetLastError()==ERROR_FILE_EXISTS);
+        if(file==INVALID_HANDLE_VALUE)throw Error("Cannot create export audio file");
+        file_.reset(file);
+        Bytes header(44);std::memcpy(header.data(),"RIFF",4);put(header,4,samples*8+36);std::memcpy(header.data()+8,"WAVEfmt ",8);
+        put(header,16,16u);put(header,20,uint16_t(3));put(header,22,uint16_t(2));put(header,24,uint32_t(AudioTrack::SampleRate));
+        put(header,28,uint32_t(AudioTrack::SampleRate*8));put(header,32,uint16_t(8));put(header,34,uint16_t(32));
+        std::memcpy(header.data()+36,"data",4);put(header,40,samples*8);
+        try{write(header);}catch(...){file_.reset();std::error_code error;std::filesystem::remove(path_,error);throw;}
+    }
+    ~AudioFile(){file_.reset();std::error_code error;std::filesystem::remove(path_,error);}
+    const std::filesystem::path& path()const{return path_;}
+    void write(std::span<const uint8_t> bytes){
+        size_t offset=0;while(offset<bytes.size()){DWORD count=0;
+            if(!WriteFile(file_.get(),bytes.data()+offset,DWORD(std::min<size_t>(bytes.size()-offset,1024*1024)),&count,nullptr)||!count)
+                throw Error("Cannot write export audio file");
+            offset+=count;
+        }
+    }
+    void close(){file_.reset();}
 };
 }
 ExportResult exportReplay(Gpu& gpu,Assets& assets,const std::filesystem::path& client,const std::filesystem::path& cache,
@@ -105,9 +142,33 @@ ExportResult exportReplay(Gpu& gpu,Assets& assets,const std::filesystem::path& c
     result.width=executor.output().image.width;result.height=executor.output().image.height;
     executor.prepare(cancelled);checkCancelled();
     std::filesystem::create_directories(directory);if(png)std::filesystem::create_directory(staging);
+    std::unique_ptr<AudioFile> audioFile;
+    if(options.audio&&!png){
+        AudioTrack audio(client,cache,replay,cancelled);
+        if(audio.hasEvents()){
+            const uint64_t samples=(result.frames*AudioTrack::SampleRate+options.fps-1)/options.fps;
+            if(samples>(std::numeric_limits<uint32_t>::max()-36)/8)throw Error("Audio export exceeds the WAV size limit");
+            audioFile=std::make_unique<AudioFile>(directory,name,uint32_t(samples));
+            update.stage=L"Mixing audio";if(progress)progress(update);audio.seek(0);
+            std::vector<float> pcm(4096*2);
+            for(uint64_t offset=0;offset<samples;){
+                checkCancelled();size_t count=size_t(std::min<uint64_t>(4096,samples-offset))*2;
+                audio.render(std::span<float>(pcm.data(),count));
+                audioFile->write({reinterpret_cast<const uint8_t*>(pcm.data()),count*sizeof(float)});offset+=count/2;
+            }
+            audioFile->close();result.audio=true;
+        }
+        result.missingSoundCount=audio.missingResources();replay.rewind();
+    }
+    checkCancelled();
     auto target=png?staging/L"frame_%06d.png":staging;
     std::wstring arguments=L" -hide_banner -loglevel error -nostdin -n -f rawvideo -pixel_format rgba -video_size "+
-        std::to_wstring(result.width)+L"x"+std::to_wstring(result.height)+L" -framerate "+std::to_wstring(options.fps)+L" -i pipe:0 -an -threads 4 ";
+        std::to_wstring(result.width)+L"x"+std::to_wstring(result.height)+L" -framerate "+std::to_wstring(options.fps)+L" -i pipe:0 ";
+    if(audioFile){
+        arguments+=L"-i "+quote(audioFile->path().wstring())+L" -map 0:v:0 -map 1:a:0 -ar 48000 -ac 2 ";
+        arguments+=options.format==ExportFormat::Mov?L"-c:a pcm_s16le ":L"-c:a aac -b:a 192k ";
+    }else arguments+=L"-an ";
+    arguments+=L"-threads 4 ";
     switch(options.format){
     case ExportFormat::Mov:arguments+=L"-c:v prores_ks -profile:v 4 -pix_fmt ";arguments+=result.alpha?L"yuva444p10le -alpha_bits 16 ":L"yuv444p10le ";arguments+=L"-f mov ";break;
     case ExportFormat::Mp4:arguments+=L"-c:v libx264 -preset medium -crf 18 -pix_fmt ";arguments+=(result.width%2||result.height%2)?L"yuv444p ":L"yuv420p ";arguments+=L"-movflags +faststart -f mp4 ";break;
