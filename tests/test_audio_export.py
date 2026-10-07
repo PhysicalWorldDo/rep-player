@@ -40,7 +40,7 @@ class NativeAudioExportTests(unittest.TestCase):
         struct.pack_into('<I', params, 0, 1)
         struct.pack_into('<2f', params, 28, 0, 0)
         draw = struct.pack('<II', 3, 64) + params
-        sound = struct.pack('<II9i', 6, 36, 0, 1, 0, 1, 1, 0, 0, -1, -1)
+        sound = struct.pack('<II9i', 6, 36, 0, 0, 0, 1, 1, 0, 0, -1, -1)
         header = b'\x0b\0' + struct.pack('<8h', *([16, 16] * 4))
         cls.replay = cls.folder / 'tone.rep'
         cls.replay.write_bytes(pack_replay(1.7, {0: sound, 1: draw},

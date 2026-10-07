@@ -1,5 +1,6 @@
 """Sound controls exercised in an owned copy of the actual native window."""
 import json
+import struct
 import time
 import unittest
 
@@ -40,7 +41,7 @@ class NativeAudioUiTests(canvas_ui.NativeCanvasUiTests):
         settings = self.folder / 'runtime' / 'audio.txt'
         self.wait(lambda: settings.is_file() and settings.read_text().split() == ['25', '0'], 'saved preview volume')
         self.assertIn('25', self.text(self.control(popup, 402)))
-        self.user.PostMessageW(popup, 0x0010, 0, 0)
+        self.user.PostMessageW(slider, 0x0100, 0x1B, 1)
         self.wait(lambda: not self.user.IsWindowVisible(popup), 'closed volume popup')
         self.command(self.main, 23)
         self.wait(lambda: settings.read_text().split() == ['25', '1'], 'saved mute state')
@@ -71,6 +72,20 @@ class NativeAudioUiTests(canvas_ui.NativeCanvasUiTests):
         self.assertTrue(self.user.IsWindowEnabled(checkbox))
         self.assertEqual(self.user.SendMessageW(checkbox, 0x00F0, 0, 0), 1)
         self.command(dialog, 2)
+
+    def test_missing_recorded_sound_is_visible_in_playback_status(self):
+        params = bytearray(canvas_ui._default_draw_params(b''))
+        struct.pack_into('<2f', params, 28, 0, 0)
+        draw = struct.pack('<II', 3, 64) + params
+        sound = struct.pack('<II9i', 6, 36, 1, 0, 0, 1, 1, 0, 0, -1, -1)
+        header = b'\x0b\0' + struct.pack('<8h', *([16, 16] * 4))
+        (self.client / 'audio.xml').write_text('<AUDIO><MUSIC ID="MISSING_SOUND" FILE="music/missing.wav" /></AUDIO>', encoding='utf8')
+        self.replay.write_bytes(canvas_ui.pack_replay(1.7, {0: sound, 1: draw},
+            [(0, (0, 1), struct.pack('<2h', 2, 3)), (1000, (1,), struct.pack('<2h', 4, 3))],
+            ['sprite/test/frame.img', 'MISSING_SOUND'], header=header))
+        self.start_player()
+        self.wait(lambda: '缺少声音' in self.text(self.control(self.main, 6)) or 'Missing sounds' in self.text(self.control(self.main, 6)), 'visible missing sound diagnostic')
+        self.snapshots.append({'status': self.text(self.control(self.main, 6))})
 
 
 if __name__ == '__main__':
