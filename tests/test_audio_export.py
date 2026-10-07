@@ -40,6 +40,23 @@ int wmain(int argc,wchar_t** argv){try{
 }catch(const std::exception& e){std::cerr<<e.what();return 1;}}
 '''
 
+MOVIE_PROBE = r'''
+#include "movies.hpp"
+#include <iostream>
+int wmain(int argc,wchar_t** argv){try{
+    if(argc!=3)throw rep::Error("probe requires owned client and cache directories");
+    SECURITY_ATTRIBUTES security{sizeof(security),nullptr,TRUE};HANDLE reader,writer;
+    if(!CreatePipe(&reader,&writer,&security,0))throw rep::Error("probe pipe failed");
+    SetHandleInformation(reader,HANDLE_FLAG_INHERIT,0);
+    rep::Movies movies(argv[1],argv[2]);auto frame=movies.frame("movie.avi",1,0);
+    if(!frame||frame->texture->rgba.empty())throw rep::Error("owned AVI frame was not decoded");
+    CloseHandle(writer);DWORD available=0;bool retained=PeekNamedPipe(reader,nullptr,0,nullptr,&available,nullptr)!=FALSE;
+    DWORD error=GetLastError();movies.reset();CloseHandle(reader);
+    std::cout<<"{\"unrelated_pipe_has_writer\":"<<(retained?"true":"false")<<",\"pipe_error\":"<<error<<"}";
+    return 0;
+}catch(const std::exception& e){std::cerr<<e.what();return 1;}}
+'''
+
 
 class NativeExportHandleTests(unittest.TestCase):
     def test_encoder_does_not_inherit_a_parallel_sound_decoder_pipe(self):
@@ -63,6 +80,32 @@ class NativeExportHandleTests(unittest.TestCase):
         (folder / 'result.json').write_text(json.dumps(data, indent=2), encoding='utf8')
         self.assertFalse(data['unrelated_pipe_has_writer'], 'export encoder retains a parallel sound decoder pipe and delays EOF')
         self.assertEqual(data['pipe_error'], 109)  # ERROR_BROKEN_PIPE
+
+    def test_movie_video_decoder_does_not_retain_a_parallel_sound_pipe(self):
+        import shutil
+        folder = ROOT / 'validation' / 'audio_export' / ('movie_handles_' + uuid.uuid4().hex[:10])
+        client = folder / 'client'
+        client.mkdir(parents=True)
+        shutil.copy2(ROOT / 'build' / 'ffmpeg.exe', folder / 'ffmpeg.exe')
+        generated = subprocess.run([str(folder / 'ffmpeg.exe'), '-v', 'error', '-f', 'lavfi', '-i',
+            'testsrc2=size=32x24:rate=30:duration=3', '-c:v', 'rawvideo', '-pix_fmt', 'yuv420p', str(client / 'movie.avi')],
+            capture_output=True, timeout=20)
+        self.assertEqual(generated.returncode, 0, generated.stderr)
+        source, probe = folder / 'movie_probe.cpp', folder / 'movie_probe.exe'
+        source.write_text(MOVIE_PROBE, encoding='utf8')
+        compiler = ROOT / 'toolchain' / 'llvm-mingw-20260616-ucrt-x86_64' / 'bin' / 'clang++.exe'
+        command = [compiler, '-std=c++20', '-O2', '-DNOMINMAX', '-municode', '-static', '-I', ROOT / 'src',
+                   '-I', ROOT / 'vendor' / 'zlib', source, ROOT / 'src' / 'movies.cpp', ROOT / 'src' / 'protocol.cpp',
+                   ROOT / 'vendor' / 'zlib' / 'libz.a', '-o', probe]
+        environment = dict(os.environ, TMP=str(folder), TEMP=str(folder))
+        compiled = subprocess.run(list(map(str, command)), capture_output=True, text=True, timeout=30, env=environment)
+        self.assertEqual(compiled.returncode, 0, compiled.stderr)
+        result = subprocess.run([str(probe), str(client), str(folder / 'cache')], capture_output=True, text=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        data = json.loads(result.stdout)
+        (folder / 'result.json').write_text(json.dumps(data, indent=2), encoding='utf8')
+        self.assertFalse(data['unrelated_pipe_has_writer'], 'movie FFmpeg retains a parallel sound pipe and delays EOF')
+        self.assertEqual(data['pipe_error'], 109)
 
 
 class NativeAudioExportTests(unittest.TestCase):
