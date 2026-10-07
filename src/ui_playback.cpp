@@ -70,7 +70,7 @@ void PlaybackController::run(){try{
             try{if(client!=activeClient){
                 releaseReplay();assets.reset();assets=std::make_unique<Assets>(client/L"ImagePacks2");
                 activeClient=client;
-            }}catch(const std::exception& e){std::lock_guard lock(mutex_);status_.phase=Phase::Error;status_.message=wide(e.what());continue;}
+            }}catch(const std::exception& e){std::lock_guard lock(mutex_);status_.phase=Phase::Error;status_.message=wide(e.what());updateAudio();continue;}
             if(stop){releaseAudio();std::lock_guard lock(mutex_);status_.phase=path.empty()?Phase::Empty:Phase::Stopped;status_.client=activeClient;updateAudio();}
             else try{
                 if(inspection.valid())inspection.wait();
@@ -88,7 +88,7 @@ void PlaybackController::run(){try{
                 playback.start();if(audio)audio->play(playback.elapsedMilliseconds());playingAt=Clock::now();auto before=Clock::now();playback.tick();present();auto after=Clock::now();
                 frameTimes={std::chrono::duration<double,std::milli>(after-before).count()};
                 {std::lock_guard lock(mutex_);status_.phase=Phase::Playing;status_.path=path.wstring();status_.client=activeClient;status_.readySeconds=std::chrono::duration<double>(after-requestedAt).count();status_.processReadySeconds=std::chrono::duration<double>(after-processStart_).count();status_.frames=1;status_.frameCount=0;status_.skipped=0;status_.ordinal=playback.ordinal();status_.timestamp=playback.timestamp();status_.elapsed=playback.elapsedMilliseconds();status_.width=replay->header.width();status_.height=replay->header.height();status_.maxFrameMilliseconds=frameTimes.back();status_.message.clear();status_.frozen=false;status_.compatibilityIgnored=replay->hasCompatibilityIgnored;status_.duration=0;updateImages();updateCanvas();updateAudio();}frozenChecked=false;
-            }catch(const std::exception& e){releaseReplay();std::lock_guard lock(mutex_);status_.phase=Phase::Error;status_.message=wide(e.what());}
+            }catch(const std::exception& e){releaseReplay();std::lock_guard lock(mutex_);status_.phase=Phase::Error;status_.message=wide(e.what());updateAudio();}
         }
         bool toggle,filter,capture,canvasChanged,audioSettings,muted;float volume;std::unordered_set<std::string> hidden;std::vector<int> steps;CanvasSettings settings;
         {std::lock_guard lock(mutex_);toggle=std::exchange(toggleRequested_,false);filter=std::exchange(filterRequested_,false);capture=std::exchange(captureRequested_,false);canvasChanged=std::exchange(canvasRequested_,false);audioSettings=std::exchange(audioSettingsRequested_,false);muted=audioMuted_;volume=audioVolume_;steps=std::exchange(stepsRequested_,{});hidden=hidden_;settings=canvasSettings_;}
@@ -114,9 +114,9 @@ void PlaybackController::run(){try{
                 if(newEnd){if(audio)audio->seek(playback.timestamp(),false);{std::lock_guard lock(mutex_);updateAudio();}endedAt=Clock::now();if(test_){auto pixels=gpu.readback(executor->output());finalCrc=crc(pixels);std::ofstream out(root_/L"validation"/L"ui_last_frame.rgba",std::ios::binary);out.write(reinterpret_cast<const char*>(pixels.data()),pixels.size());std::sort(frameTimes.begin(),frameTimes.end());auto percentile=[&](double p){return frameTimes[std::min(frameTimes.size()-1,size_t(p*(frameTimes.size()-1)))];};std::lock_guard lock(mutex_);status_.p50Frame=percentile(.50);status_.p95Frame=percentile(.95);status_.p99Frame=percentile(.99);}}
                 if(test_&&!frozenChecked&&Clock::now()-endedAt>std::chrono::milliseconds(800)){bool same=crc(gpu.readback(executor->output()))==finalCrc;std::lock_guard lock(mutex_);status_.frozen=same;status_.finalCrc=finalCrc;frozenChecked=true;}
             }
-        }catch(const std::exception& e){releaseReplay();std::lock_guard lock(mutex_);status_.phase=Phase::Error;status_.message=wide(e.what());}
+        }catch(const std::exception& e){releaseReplay();std::lock_guard lock(mutex_);status_.phase=Phase::Error;status_.message=wide(e.what());updateAudio();}
         std::unique_lock lock(mutex_);condition_.wait_for(lock,std::chrono::milliseconds(playback.playing()?1:20),[&]{return quitting_||generation_!=consumed_||toggleRequested_||filterRequested_||captureRequested_||canvasRequested_||audioSettingsRequested_||!stepsRequested_.empty();});
     }
     if(inspection.valid())inspection.wait();gpu.flush();
-}catch(const std::exception& e){std::lock_guard lock(mutex_);status_.phase=Phase::Error;status_.message=wide(e.what());}}
+}catch(const std::exception& e){std::lock_guard lock(mutex_);status_.phase=Phase::Error;status_.message=wide(e.what());status_.audioAvailable=false;status_.audioEvents=status_.missingSoundCount=0;status_.audioPosition=0;status_.audioMessage.clear();}}
 }
