@@ -25,9 +25,7 @@ inline ReplayOptions clientReplayOptions(const std::filesystem::path& client,con
     ReplayOptions options;
     if(selection.profile)options.profile=*selection.profile;
     else {
-        const bool dfo=std::filesystem::is_regular_file(client/L"DFO.exe");
         const bool dnf=std::filesystem::is_regular_file(client/L"DNF.exe");
-        if(dfo&&dnf)throw Error("Client contains both DFO.exe and DNF.exe; select --profile dfo, dnf-july or dnf-compatible");
         options.profile=dnf?ProtocolProfile::DnfCompatible:ProtocolProfile::Dfo;
     }
     options.resourceCodePage=selection.codePage;

@@ -34,9 +34,9 @@ class ClientProtocolTests(unittest.TestCase):
             replay.write_bytes(data)
         cls.replay = cls.client / 'Replay' / 'SkillReplay' / 'Swordman' / 'BloodSword.rep'
 
-    def export(self, client, *options):
+    def export(self, client, *options, replay=None):
         result = subprocess.run([
-            str(ROOT / 'build' / 'rep_export.exe'), '--client', str(client), '--replay', str(self.replay),
+            str(ROOT / 'build' / 'rep_export.exe'), '--client', str(client), '--replay', str(replay or self.replay),
             '--format', 'png', '--fps', '30', '--alpha', '1', '--output', str(self.folder),
             '--name', self._testMethodName, *options,
         ], capture_output=True, text=True, encoding='utf-8', timeout=30)
@@ -44,9 +44,41 @@ class ClientProtocolTests(unittest.TestCase):
         data = json.loads(result.stdout)
         self.assertEqual(data['executed_scenes'], 2)
         self.assertEqual(len(list(Path(data['output']).glob('frame_*.png'))), 31)
+        return data
 
     def test_export_selects_dnf_profile_from_selected_client(self):
         self.export(self.client)
+
+    def dual_client(self):
+        client = self.folder / 'clients' / self._testMethodName / 'client'
+        (client / 'ImagePacks2').mkdir(parents=True)
+        for name in ('DNF.exe', 'DFO.exe'):
+            (client / name).write_bytes(b'owned test marker; never executed')
+        return client
+
+    def test_export_prefers_dnf_when_both_executables_exist(self):
+        self.export(self.dual_client())
+
+    def test_dual_client_auto_uses_compatible_dnf_profile(self):
+        client = self.dual_client()
+        replay = client.parent / 'compatible.rep'
+        header = b'\x0b\0' + struct.pack('<8h', *([16, 16] * 4))
+        header += b'\x0c' + struct.pack('<H', 6) + bytes(126)
+        replay.write_bytes(pack_replay(1.8, {0: bytes.fromhex('4200000000')},
+                                      [(0, (0,), b''), (1000, (0,), b'')], header=header))
+        data = self.export(client, replay=replay)
+        self.assertEqual(data['compatibility_ignored_instructions'], 2)
+
+    def test_dual_client_explicit_july_profile_still_overrides_auto(self):
+        self.export(self.dual_client(), '--profile', 'dnf-july', '--codepage', '949')
+
+    def test_dual_client_explicit_dfo_profile_still_overrides_auto(self):
+        client = self.dual_client()
+        replay = client.parent / 'dfo.rep'
+        header = b'\x0b\0' + struct.pack('<8h', *([16, 16] * 4))
+        replay.write_bytes(pack_replay(1.4, {0: struct.pack('<I', 22)},
+                                      [(0, (0,), b''), (1000, (0,), b'')], header=header))
+        self.export(client, '--profile', 'dfo', replay=replay)
 
     def test_export_accepts_explicit_profile_for_custom_client(self):
         custom = self.folder / 'custom_client'
