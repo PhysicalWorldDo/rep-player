@@ -149,8 +149,14 @@ Command decodeCommand(Bytes raw,int v,int minor,ProtocolProfile profile) {
                 i.native=padded(r,i.storedSize,std::move(d)); i.resource=at<uint32_t>(i.native,0);}
             i.auxBytes=4;break;
         }
-        case 6: {auto s=r.get<uint32_t>(); if(s>36) throw Error("audio payload exceeds ABI"); r.take(s);break;}
-        case 7:r.take(20);break;
+        case 6: {
+            i.storedSize=r.get<uint32_t>();
+            if(i.storedSize>36)throw Error("audio payload exceeds ABI");
+            Bytes defaults(36);put(defaults,28,-1);put(defaults,32,-1);
+            i.native=padded(r,i.storedSize,std::move(defaults));
+            i.resource=at<uint32_t>(i.native,0);break;
+        }
+        case 7: {i.storedSize=20;auto b=r.take(20);i.native.assign(b.begin(),b.end());break;}
         case 10: {
             auto count=r.get<uint32_t>(); auto p=r.take(64); std::copy(p.begin(),p.end(),i.params.begin()); i.hasParams=true;
             i.resource=at<uint32_t>(i.params,0); i.auxBytes=4;
