@@ -95,9 +95,12 @@ std::shared_ptr<Frame> Movies::frame(std::string logical,uint64_t id,uint32_t ti
     }else{
         if(requested<instance.next||!instance.pipe){instance.closePipe();SECURITY_ATTRIBUTES attributes{sizeof(attributes),nullptr,TRUE};HANDLE writer; if(!CreatePipe(&instance.pipe,&writer,&attributes,0))throw Error("CreatePipe movie failed");SetHandleInformation(instance.pipe,HANDLE_FLAG_INHERIT,0);
             HANDLE nullFile=CreateFileW(L"NUL",GENERIC_WRITE|GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE,&attributes,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,nullptr);
-            STARTUPINFOW startup{};startup.cb=sizeof(startup);startup.dwFlags=STARTF_USESTDHANDLES;startup.hStdOutput=writer;startup.hStdError=startup.hStdInput=nullFile;PROCESS_INFORMATION process{};
+            STARTUPINFOEXW startup{};startup.StartupInfo.cb=sizeof(startup);startup.StartupInfo.dwFlags=STARTF_USESTDHANDLES;startup.StartupInfo.hStdOutput=writer;startup.StartupInfo.hStdError=startup.StartupInfo.hStdInput=nullFile;PROCESS_INFORMATION process{};
+            SIZE_T size=0;InitializeProcThreadAttributeList(nullptr,1,0,&size);std::vector<uint8_t> attributesStorage(size);startup.lpAttributeList=reinterpret_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(attributesStorage.data());
+            if(!InitializeProcThreadAttributeList(startup.lpAttributeList,1,0,&size)){CloseHandle(writer);CloseHandle(nullFile);instance.closePipe();throw Error("cannot initialize movie decoder handles");}
+            HANDLE inherited[]{writer,nullFile};bool configured=UpdateProcThreadAttribute(startup.lpAttributeList,0,PROC_THREAD_ATTRIBUTE_HANDLE_LIST,inherited,sizeof(inherited),nullptr,nullptr);
             auto cmd=quote(ffmpeg_.wstring())+L" -v error -nostdin -i "+quote(instance.path.wstring())+L" -vf \"select=gte(n\\,"+std::to_wstring(requested)+L")\" -fps_mode passthrough -f rawvideo -pix_fmt rgba pipe:1";
-            bool started=CreateProcessW(ffmpeg_.c_str(),cmd.data(),nullptr,nullptr,TRUE,CREATE_NO_WINDOW,nullptr,nullptr,&startup,&process);CloseHandle(writer);CloseHandle(nullFile);
+            bool started=configured&&CreateProcessW(ffmpeg_.c_str(),cmd.data(),nullptr,nullptr,TRUE,CREATE_NO_WINDOW|EXTENDED_STARTUPINFO_PRESENT,nullptr,nullptr,&startup.StartupInfo,&process);DeleteProcThreadAttributeList(startup.lpAttributeList);CloseHandle(writer);CloseHandle(nullFile);
             if(!started)throw Error("cannot start bundled native AVI decoder");CloseHandle(process.hThread);instance.process=process.hProcess;instance.next=requested;
         }
         while(instance.next<=requested){size_t pos=0;while(pos<out.size()){DWORD count=0;if(!ReadFile(instance.pipe,out.data()+pos,DWORD(out.size()-pos),&count,nullptr)||!count)throw Error("native AVI frame decode failed");pos+=count;}instance.next++;}
