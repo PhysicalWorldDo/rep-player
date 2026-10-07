@@ -2,6 +2,7 @@
 import array
 import json
 import math
+import os
 from pathlib import Path
 import struct
 import subprocess
@@ -18,6 +19,50 @@ from rep_protocol import _default_draw_params
 
 ROOT = Path(__file__).resolve().parents[1]
 FFPROBE = Path(r'D:\ffmpeg\ffprobe.exe')
+
+ENCODER_PROBE = r'''
+#include <iostream>
+int wmain(int argc,wchar_t** argv){try{
+    if(argc==2&&std::wstring_view(argv[1])==L"--encoder-child"){
+        char data[32];DWORD count;while(ReadFile(GetStdHandle(STD_INPUT_HANDLE),data,sizeof(data),&count,nullptr)&&count){}
+        return 0;
+    }
+    if(argc!=2)throw rep::Error("probe requires an owned output directory");
+    SECURITY_ATTRIBUTES security{sizeof(security),nullptr,TRUE};HANDLE reader,writer;
+    if(!CreatePipe(&reader,&writer,&security,0))throw rep::Error("probe pipe failed");
+    rep::Handle readHandle(reader),writeHandle(writer);SetHandleInformation(reader,HANDLE_FLAG_INHERIT,0);
+    wchar_t name[32768];GetModuleFileNameW(nullptr,name,32768);
+    rep::Encoder encoder(name,L" --encoder-child",std::filesystem::path(argv[1])/L"probe.log");
+    writeHandle.reset();DWORD available=0;bool retained=PeekNamedPipe(reader,nullptr,0,nullptr,&available,nullptr)!=FALSE;
+    DWORD error=GetLastError();encoder.finish({});
+    std::cout<<"{\"unrelated_pipe_has_writer\":"<<(retained?"true":"false")<<",\"pipe_error\":"<<error<<"}";
+    return 0;
+}catch(const std::exception& e){std::cerr<<e.what();return 1;}}
+'''
+
+
+class NativeExportHandleTests(unittest.TestCase):
+    def test_encoder_does_not_inherit_a_parallel_sound_decoder_pipe(self):
+        folder = ROOT / 'validation' / 'audio_export' / ('handles_' + uuid.uuid4().hex[:10])
+        folder.mkdir(parents=True)
+        source, probe = folder / 'encoder_probe.cpp', folder / 'encoder_probe.exe'
+        # Compile the actual private Encoder, excluding unrelated GPU export code.
+        export_source = (ROOT / 'src' / 'export.cpp').read_text(encoding='utf8')
+        source.write_text(export_source[:export_source.index('class AudioFile')] + '\n}\n}\n' + ENCODER_PROBE, encoding='utf8')
+        compiler = ROOT / 'toolchain' / 'llvm-mingw-20260616-ucrt-x86_64' / 'bin' / 'clang++.exe'
+        command = [compiler, '-std=c++20', '-O2', '-DNOMINMAX', '-municode', '-static',
+                   '-I', ROOT / 'src',
+                   '-I', ROOT / 'vendor' / 'freetype' / 'include', '-I', ROOT / 'vendor' / 'zlib',
+                   source, '-o', probe]
+        environment = dict(os.environ, TMP=str(folder), TEMP=str(folder))
+        compiled = subprocess.run(list(map(str, command)), capture_output=True, text=True, timeout=30, env=environment)
+        self.assertEqual(compiled.returncode, 0, compiled.stderr)
+        result = subprocess.run([str(probe), str(folder)], capture_output=True, text=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        data = json.loads(result.stdout)
+        (folder / 'result.json').write_text(json.dumps(data, indent=2), encoding='utf8')
+        self.assertFalse(data['unrelated_pipe_has_writer'], 'export encoder retains a parallel sound decoder pipe and delays EOF')
+        self.assertEqual(data['pipe_error'], 109)  # ERROR_BROKEN_PIPE
 
 
 class NativeAudioExportTests(unittest.TestCase):
