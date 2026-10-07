@@ -38,7 +38,20 @@ bool chooseRepFile(HWND owner,const std::filesystem::path& initial,const wchar_t
     rep::Com<IShellItem> initialItem;if(SUCCEEDED(SHCreateItemFromParsingName(initial.c_str(),nullptr,IID_IShellItem,reinterpret_cast<void**>(initialItem.out()))))dialog->SetFolder(initialItem.get());
     if(FAILED(dialog->Show(owner)))return false;rep::Com<IShellItem> item;if(FAILED(dialog->GetResult(item.out())))return false;PWSTR path=nullptr;if(FAILED(item->GetDisplayName(SIGDN_FILESYSPATH,&path)))return false;result=path;CoTaskMemFree(path);return true;
 }
-void drawButton(const DRAWITEMSTRUCT& d,bool active){COLORREF fill=(d.itemState&ODS_SELECTED)?RGB(72,73,77):(active?Selected:Panel);SetDCBrushColor(d.hDC,fill);FillRect(d.hDC,&d.rcItem,reinterpret_cast<HBRUSH>(GetStockObject(DC_BRUSH)));SetDCBrushColor(d.hDC,RGB(69,70,75));FrameRect(d.hDC,&d.rcItem,reinterpret_cast<HBRUSH>(GetStockObject(DC_BRUSH)));SetBkMode(d.hDC,TRANSPARENT);SetTextColor(d.hDC,active?Yellow:((d.itemState&ODS_DISABLED)?Muted:Text));RECT r=d.rcItem;auto s=controlText(d.hwndItem);DrawTextW(d.hDC,s.c_str(),int(s.size()),&r,DT_CENTER|DT_VCENTER|DT_SINGLELINE);if(d.itemState&ODS_FOCUS){InflateRect(&r,-3,-3);DrawFocusRect(d.hDC,&r);}}
+void drawButton(const DRAWITEMSTRUCT& d,bool active){
+    COLORREF fill=(d.itemState&ODS_SELECTED)?RGB(72,73,77):(active?Selected:Panel);SetDCBrushColor(d.hDC,fill);FillRect(d.hDC,&d.rcItem,reinterpret_cast<HBRUSH>(GetStockObject(DC_BRUSH)));SetDCBrushColor(d.hDC,RGB(69,70,75));FrameRect(d.hDC,&d.rcItem,reinterpret_cast<HBRUSH>(GetStockObject(DC_BRUSH)));SetBkMode(d.hDC,TRANSPARENT);COLORREF foreground=active?Yellow:((d.itemState&ODS_DISABLED)?Muted:Text);SetTextColor(d.hDC,foreground);RECT r=d.rcItem;
+    if(d.CtlID==AudioMute){
+        int x=(r.left+r.right)/2,y=(r.top+r.bottom)/2;SetDCBrushColor(d.hDC,foreground);
+        RECT body{x-10,y-3,x-6,y+3};FillRect(d.hDC,&body,reinterpret_cast<HBRUSH>(GetStockObject(DC_BRUSH)));
+        auto oldPen=SelectObject(d.hDC,GetStockObject(NULL_PEN)),oldBrush=SelectObject(d.hDC,GetStockObject(DC_BRUSH));
+        POINT cone[]={{x-6,y-3},{x,y-7},{x,y+7},{x-6,y+3}};Polygon(d.hDC,cone,4);
+        auto pen=CreatePen(PS_SOLID,2,foreground);SelectObject(d.hDC,pen);
+        if(active){MoveToEx(d.hDC,x+4,y-4,nullptr);LineTo(d.hDC,x+12,y+4);MoveToEx(d.hDC,x+4,y+4,nullptr);LineTo(d.hDC,x+12,y-4);}
+        else{POINT inner[]={{x+4,y-3},{x+6,y},{x+4,y+3}},outer[]={{x+7,y-6},{x+10,y-3},{x+11,y},{x+10,y+3},{x+7,y+6}};Polyline(d.hDC,inner,3);Polyline(d.hDC,outer,5);}
+        SelectObject(d.hDC,oldPen);SelectObject(d.hDC,oldBrush);DeleteObject(pen);
+    }else{auto s=controlText(d.hwndItem);DrawTextW(d.hDC,s.c_str(),int(s.size()),&r,DT_CENTER|DT_VCENTER|DT_SINGLELINE);}
+    if(d.itemState&ODS_FOCUS){InflateRect(&r,-3,-3);DrawFocusRect(d.hDC,&r);}
+}
 struct ImageRow {std::string path;std::wstring metadata;uint64_t timelineCount=0,runtimeCount=0;bool dependency=false,drawn=false,registered=false;};
 struct Application;
 LRESULT CALLBACK treeInput(HWND,UINT,WPARAM,LPARAM,UINT_PTR,DWORD_PTR);
