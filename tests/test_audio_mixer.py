@@ -15,8 +15,8 @@ from test_rep_protocol_versions import pack_replay
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def play(resource, key=1, sub=1, delay=0, slot=-1, source=0, loops=1):
-    return struct.pack('<II9i', 6, 36, resource, loops, delay, key, sub, 0, source, slot, -1)
+def play(resource, key=1, sub=1, delay=0, slot=-1, source=0):
+    return struct.pack('<II9i', 6, 36, resource, 0, delay, key, sub, 0, source, slot, -1)
 
 
 def control(kind, key=1, sub=0, flag=0, threshold=0):
@@ -35,7 +35,7 @@ class AudioMixerTests(unittest.TestCase):
                 out.setnchannels(1); out.setsampwidth(2); out.setframerate(48000)
                 out.writeframes(struct.pack('<h', value) * 48000)
         (cls.client / 'audio.xml').write_text(
-            '<AUDIO><EFFECT TAG="A" FILE="music/a.wav"/><EFFECT TAG="B" FILE="music/b.wav"/>'
+            '<AUDIO><EFFECT TAG="A" FILE="music/a.wav" LOOP_DELAY="0"/><EFFECT TAG="B" FILE="music/b.wav"/>'
             '<MUSIC TAG="M" FILE="music/quiet.wav" LOOP_DELAY="0"/>'
             '<RANDOM TAG="R"><ITEM TAG="A" PROB="100"/></RANDOM></AUDIO>', encoding='utf-8')
         cls.exe = cls.folder / 'mixer_probe.exe'
