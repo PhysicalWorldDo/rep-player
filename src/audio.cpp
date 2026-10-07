@@ -231,6 +231,9 @@ struct AudioPlayer::Impl {
     std::atomic<bool> available=false;
     std::atomic<int64_t> position=0;
     std::string failure;
+    // PCM storage outlives the worker's try scope and remains valid until
+    // DestroyVoice has finished consuming every queued buffer.
+    std::array<std::array<float,960>,4> buffers{};
     void run(){
         auto co=CoInitializeEx(nullptr,COINIT_MULTITHREADED);IXAudio2* engine=nullptr;IXAudio2MasteringVoice* master=nullptr;IXAudio2SourceVoice* voice=nullptr;
         std::future<void> prefetch;std::atomic<bool> cancelPrefetch=false;
@@ -243,7 +246,7 @@ struct AudioPlayer::Impl {
             // Decoding ahead must never wait on the 30ms device fill queue.
             prefetch=std::async(std::launch::async,[&]{track->prepare(0,track->durationMilliseconds(),[&]{std::lock_guard lock(mutex);return quit||cancelPrefetch.load();});});
             {std::lock_guard lock(mutex);available=true;ready=true;condition.notify_all();}
-            std::array<std::array<float,960>,4> buffers{};size_t bufferIndex=0;bool active=false;int64_t base=0;
+            size_t bufferIndex=0;bool active=false;int64_t base=0;
             while(true){
                 bool wanted,seek;int64_t target;float gain;
                 {std::unique_lock lock(mutex);if(quit)break;wanted=playing;seek=std::exchange(seekRequested,false);target=requested;gain=muted?0.f:volume;
