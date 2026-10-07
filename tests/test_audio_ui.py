@@ -3,6 +3,7 @@ import json
 import struct
 import time
 import unittest
+from PIL import Image
 
 import test_canvas_ui as canvas_ui
 
@@ -21,6 +22,49 @@ class NativeAudioUiTests(canvas_ui.NativeCanvasUiTests):
     def open_volume(self):
         self.command(self.main, 24)
         return self.wait(lambda: next((w for w, kind in self.windows() if kind == 'RepAudioVolume'), None), 'volume popup')
+
+    def capture_control(self, handle, name):
+        C, W = canvas_ui.C, canvas_ui.W
+        gdi = C.WinDLL('gdi32', use_last_error=True)
+        self.user.GetWindowDC.argtypes = [W.HWND]
+        self.user.GetWindowDC.restype = W.HDC
+        self.user.ReleaseDC.argtypes = [W.HWND, W.HDC]
+        self.user.PrintWindow.argtypes = [W.HWND, W.HDC, W.UINT]
+        gdi.CreateCompatibleDC.argtypes = [W.HDC]
+        gdi.CreateCompatibleDC.restype = W.HDC
+        gdi.CreateCompatibleBitmap.argtypes = [W.HDC, canvas_ui.C.c_int, C.c_int]
+        gdi.CreateCompatibleBitmap.restype = W.HBITMAP
+        gdi.SelectObject.argtypes = [W.HDC, C.c_void_p]
+        gdi.SelectObject.restype = C.c_void_p
+        gdi.DeleteObject.argtypes = [C.c_void_p]
+        gdi.DeleteDC.argtypes = [W.HDC]
+        class Header(C.Structure):
+            _fields_ = [('size', W.DWORD), ('width', W.LONG), ('height', W.LONG), ('planes', W.WORD),
+                        ('bits', W.WORD), ('compression', W.DWORD), ('image_bytes', W.DWORD),
+                        ('x_resolution', W.LONG), ('y_resolution', W.LONG), ('colors', W.DWORD), ('important', W.DWORD)]
+        class Info(C.Structure):
+            _fields_ = [('header', Header), ('colors', W.DWORD * 3)]
+        gdi.GetDIBits.argtypes = [W.HDC, W.HBITMAP, W.UINT, W.UINT, C.c_void_p, C.POINTER(Info), W.UINT]
+        rectangle = self.rect(handle)
+        width, height = rectangle.right - rectangle.left, rectangle.bottom - rectangle.top
+        window_dc = self.user.GetWindowDC(handle)
+        memory_dc = gdi.CreateCompatibleDC(window_dc)
+        bitmap = gdi.CreateCompatibleBitmap(window_dc, width, height)
+        old = gdi.SelectObject(memory_dc, bitmap)
+        try:
+            self.assertTrue(self.user.PrintWindow(handle, memory_dc, 2), 'owned sound button PrintWindow failed')
+            info = Info()
+            info.header = Header(C.sizeof(Header), width, -height, 1, 32, 0, width * height * 4, 0, 0, 0, 0)
+            pixels = C.create_string_buffer(width * height * 4)
+            self.assertEqual(gdi.GetDIBits(memory_dc, bitmap, 0, height, pixels, C.byref(info), 0), height)
+            image = Image.frombytes('RGB', (width, height), pixels.raw, 'raw', 'BGRX')
+            image.save(self.folder / (name + '.png'))
+            return image
+        finally:
+            gdi.SelectObject(memory_dc, old)
+            gdi.DeleteObject(bitmap)
+            gdi.DeleteDC(memory_dc)
+            self.user.ReleaseDC(handle, window_dc)
 
     def test_mute_volume_persist_and_fit_the_minimum_window(self):
         self.start_player()
@@ -86,6 +130,19 @@ class NativeAudioUiTests(canvas_ui.NativeCanvasUiTests):
         self.start_player()
         self.wait(lambda: '缺少声音' in self.text(self.control(self.main, 6)) or 'Missing sounds' in self.text(self.control(self.main, 6)), 'visible missing sound diagnostic')
         self.snapshots.append({'status': self.text(self.control(self.main, 6))})
+
+    def test_muted_icon_has_a_visible_speaker_body_and_cone(self):
+        self.start_player()
+        self.command(self.main, 23)
+        self.wait(lambda: self.text(self.control(self.main, 23)) == '🔇', 'muted speaker state')
+        image = self.capture_control(self.control(self.main, 23), 'mute_icon')
+        x, y = image.width // 2, image.height // 2
+        yellow = (234, 208, 91)
+        body = sum(image.getpixel((px, py)) == yellow for px in range(x - 10, x - 6) for py in range(y - 3, y + 3))
+        cone = sum(image.getpixel((px, py)) == yellow for px in range(x - 6, x + 1) for py in range(y - 6, y + 7))
+        self.snapshots.append({'speaker_body_pixels': body, 'speaker_cone_pixels': cone})
+        self.assertGreaterEqual(body, 20, 'font fallback draws a circular symbol instead of the speaker body')
+        self.assertGreaterEqual(cone, 45, 'the mute icon needs a filled speaker cone')
 
 
 if __name__ == '__main__':
