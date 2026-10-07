@@ -52,7 +52,8 @@ class AudioMixerTests(unittest.TestCase):
             '<EFFECT ID="P" FILE="Music/a.wav" DUPLICATE_LIMIT="1"/>'
             '<GROUP ID="G"><ITEM TAG="A" DELAY=".02"/></GROUP>'
             '<MUSIC ID="OFFSET" FILE="Music/ramp.wav"/>'
-            '<AMBIENT ID="AM" FILE="Music/quiet.wav" LOOP_DELAY="0"/></AUDIO>', encoding='utf-8')
+            '<AMBIENT ID="AM" FILE="Music/quiet.wav" LOOP_DELAY="0"/>'
+            '<EFFECT ID="FRACTION" FILE="Music/short.wav" LOOP_DELAY="0.0005" LOOP_TIMES="1"/></AUDIO>', encoding='utf-8')
         text = (cls.client / 'audio.xml').read_text(encoding='utf-8')
         entries = ''
         for n in range(24):
@@ -71,7 +72,7 @@ class AudioMixerTests(unittest.TestCase):
         built = subprocess.run(command, capture_output=True, text=True, env=environment)
         if built.returncode: raise RuntimeError(built.stdout + built.stderr)
 
-    def mix(self, commands, scenes, seek=0, resources=('A', 'B', 'M', 'R', 'L', 'S', 'P', 'G', 'OFFSET', 'AM'), player=False, profile='dfo', client=None):
+    def mix(self, commands, scenes, seek=0, resources=('A', 'B', 'M', 'R', 'L', 'S', 'P', 'G', 'OFFSET', 'AM', 'FRACTION'), player=False, profile='dfo', client=None):
         path = self.folder / (self._testMethodName + '.rep')
         header = b'\x0b\0' + struct.pack('<8h', *([16] * 8))
         path.write_bytes(pack_replay(1.7, commands, [(time, ids, b'') for time, ids in scenes], resources, header=header))
@@ -217,6 +218,13 @@ class AudioMixerTests(unittest.TestCase):
         self.assertEqual(data['events'], 0)
         self.assertEqual(data['missing'], 0, 'silent recordings must not report an unused audio.xml as missing sound')
         self.assertTrue(all(value == 0 for value in data['samples']))
+
+    def test_submillisecond_loop_delay_uses_native_zero_delay_loop_contract(self):
+        data = self.mix({0: play(10)}, [(0, (0,)), (100, ())])
+        self.assertAlmostEqual(data['samples'][0], .25, places=4)
+        self.assertAlmostEqual(data['samples'][10], .25, places=4)
+        self.assertAlmostEqual(data['samples'][19], .25, places=4)
+        self.assertAlmostEqual(data['samples'][20], 0, places=4)
 
 
 if __name__ == '__main__': unittest.main()
