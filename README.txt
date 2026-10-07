@@ -1,13 +1,17 @@
-REP 播放器 1.0.4
+REP 播放器 1.1.0
 
 完整解压 Windows x64 运行包后，双击 rep_player.exe。
 点击“选择客户端”，选择包含 Replay 和 ImagePacks2 的客户端根目录。
 
 支持分层录像列表、中英技能搜索、打开指定 REP、逐帧查看、IMG 隐藏及 MOV / MP4 / PNG 导出。
-当前源码新增 REP 声音预览、静音/音量及 MOV/MP4 音频导出；PNG 不附 WAV，AVI/BK2 音轨不恢复。
-现有 1.0.4 下载包尚不包含声音和画布设置，本轮没有发布新运行包。
+支持 REP 已记录的音效、配音、音乐和环境声。底部可静音、调整 0–100% 预览音量，设置自动保存。
+声音跟随播放、暂停、停止、重播与跳转同步；逐帧时静音并暂停。
+MOV/MP4 可选择包含音频，默认开启；预览静音和音量不影响导出。PNG 不附 WAV，AVI/BK2 影片音轨不恢复。
+画布可按倍数、指定宽高或四边留边扩展，预览与导出共用设置。
+同时存在 DNF.exe 和 DFO.exe 时优先使用 DNF 兼容模式。
+声音仅还原已记录且资源可用的内容，不保证与原客户端逐采样一致。
 切换不同录像时释放旧素材缓存，视频临时文件使用后自动回收。
 DNF 默认启用有限兼容模式；出现“兼容播放”提示时，部分未识别指令已跳过，画面可能与客户端不同。
 
 完整使用说明：https://github.com/PhysicalWorldDo/rep-player/blob/main/README.md
-下载：https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.0.4
+下载：https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.1.0
