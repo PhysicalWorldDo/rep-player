@@ -150,7 +150,7 @@ struct AudioTrack::Impl {
 };
 AudioTrack::AudioTrack(const std::filesystem::path& client,const std::filesystem::path& cache,Replay& replay,const std::function<bool()>& cancelled)
     :impl_(std::make_unique<Impl>()){
-    impl_->resources=std::make_shared<AudioResources>(client,cache);impl_->cancelled=cancelled;impl_->profile=replay.options.profile;
+    impl_->cancelled=cancelled;impl_->profile=replay.options.profile;
     std::unordered_map<uint32_t,std::vector<AudioEvent>> commands;
     for(const auto& [id,command]:replay.dictionary){
         for(const auto& i:command.instructions){
@@ -173,14 +173,15 @@ AudioTrack::AudioTrack(const std::filesystem::path& client,const std::filesystem
     }}catch(...){replay.rewind();throw;}
     replay.rewind();
     std::stable_sort(impl_->events.begin(),impl_->events.end(),[](const AudioEvent& a,const AudioEvent& b){return a.sample<b.sample;});
+    if(!impl_->events.empty())impl_->resources=std::make_shared<AudioResources>(client,cache);
 }
 AudioTrack::~AudioTrack()=default;
 bool AudioTrack::hasEvents()const{return !impl_->events.empty();}
 uint64_t AudioTrack::eventCount()const{return impl_->events.size();}
-uint64_t AudioTrack::missingResources()const{return impl_->resources->missing();}
+uint64_t AudioTrack::missingResources()const{return impl_->resources?impl_->resources->missing():0;}
 int64_t AudioTrack::positionMilliseconds()const{return impl_->position.load()*1000/SampleRate;}
 int64_t AudioTrack::durationMilliseconds()const{return impl_->duration;}
-std::vector<std::string> AudioTrack::diagnostics()const{auto notes=impl_->resources->diagnostics();notes.insert(notes.end(),impl_->notes.begin(),impl_->notes.end());return notes;}
+std::vector<std::string> AudioTrack::diagnostics()const{auto notes=impl_->resources?impl_->resources->diagnostics():std::vector<std::string>{};notes.insert(notes.end(),impl_->notes.begin(),impl_->notes.end());return notes;}
 void AudioTrack::prepare(int64_t milliseconds,int64_t horizon,const std::function<bool()>& cancelled){
     auto first=sampleAt(milliseconds),last=sampleAt(milliseconds+std::max<int64_t>(0,horizon));
     std::vector<std::string> tags;std::unordered_map<std::string,bool> seen;
