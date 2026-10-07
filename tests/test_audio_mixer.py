@@ -1,5 +1,6 @@
 """Sample-level REP audio timing, concurrent voices and control contracts."""
 import json
+import os
 from pathlib import Path
 import struct
 import shutil
@@ -66,7 +67,8 @@ class AudioMixerTests(unittest.TestCase):
         for source in ('audio_resources.cpp', 'audio.cpp'):
             if (ROOT / 'src' / source).exists(): command.append(str(ROOT / 'src' / source))
         command += [str(ROOT / 'vendor/zlib/libz.a'), '-lxaudio2_9', '-lole32', '-o', str(cls.exe)]
-        built = subprocess.run(command, capture_output=True, text=True)
+        environment = dict(os.environ, TEMP=str(cls.folder), TMP=str(cls.folder))
+        built = subprocess.run(command, capture_output=True, text=True, env=environment)
         if built.returncode: raise RuntimeError(built.stdout + built.stderr)
 
     def mix(self, commands, scenes, seek=0, resources=('A', 'B', 'M', 'R', 'L', 'S', 'P', 'G', 'OFFSET', 'AM'), player=False, profile='dfo'):

@@ -18,12 +18,13 @@ class AudioProtocolTests(unittest.TestCase):
         cls.folder.mkdir(parents=True)
         cls.exe = cls.folder / "audio_protocol_probe.exe"
         compiler = ROOT / "toolchain/llvm-mingw-20260616-ucrt-x86_64/bin/clang++.exe"
+        environment = dict(os.environ, TEMP=str(cls.folder), TMP=str(cls.folder))
         result = subprocess.run([
             str(compiler), "-std=c++20", "-O2", "-municode", "-static", "-DNOMINMAX",
             "-I", str(ROOT / "src"), "-I", str(ROOT / "vendor/zlib"),
             str(ROOT / "tests/audio_protocol_probe.cpp"), str(ROOT / "src/protocol.cpp"),
             str(ROOT / "vendor/zlib/libz.a"), "-o", str(cls.exe),
-        ], capture_output=True, text=True, encoding="utf-8")
+        ], capture_output=True, text=True, encoding="utf-8", env=environment)
         if result.returncode:
             raise RuntimeError(result.stderr)
 

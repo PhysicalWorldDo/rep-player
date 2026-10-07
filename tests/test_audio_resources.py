@@ -1,6 +1,7 @@
 """TAG registration, read-only package acquisition and shared native PCM decode."""
 import json
 import math
+import os
 from pathlib import Path
 import shutil
 import struct
@@ -45,7 +46,8 @@ class AudioResourcesTests(unittest.TestCase):
         command = [compiler, '-std=c++20', '-O2', '-DNOMINMAX', '-municode', '-static', '-I', ROOT / 'src',
                    ROOT / 'tests' / 'audio_resources_probe.cpp', ROOT / 'src' / 'audio_resources.cpp',
                    ROOT / 'build' / 'protocol.o', ROOT / 'vendor' / 'zlib' / 'libz.a', '-o', cls.probe]
-        compile_result = subprocess.run(list(map(str, command)), capture_output=True, text=True)
+        environment = dict(os.environ, TEMP=str(cls.folder), TMP=str(cls.folder))
+        compile_result = subprocess.run(list(map(str, command)), capture_output=True, text=True, env=environment)
         (cls.folder / 'compile.log').write_text(compile_result.stdout + compile_result.stderr, encoding='utf8')
         if compile_result.returncode:
             raise AssertionError(compile_result.stderr)

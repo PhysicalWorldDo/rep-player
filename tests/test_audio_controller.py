@@ -1,5 +1,6 @@
 """Muted real-device/render-thread audio control contracts in an owned window."""
 import json
+import os
 from pathlib import Path
 import shutil
 import struct
@@ -67,6 +68,7 @@ class AudioControllerTests(unittest.TestCase):
         flags = ['-std=c++20', '-O2', '-DNOMINMAX', '-DUNICODE', '-D_UNICODE', '-municode', '-static',
                  '-I', str(ROOT / 'src'), '-I', str(ROOT / 'vendor/zlib'), '-I', str(ROOT / 'vendor/freetype/include')]
         objects = []
+        environment = dict(os.environ, TEMP=str(cls.folder), TMP=str(cls.folder))
         for name in ('resources', 'gpu', 'bindings', 'fonts', 'movies', 'engine'):
             destination = cls.folder / (name + '.o')
             shutil.copy2(ROOT / 'build' / (name + '.o'), destination)
@@ -76,14 +78,14 @@ class AudioControllerTests(unittest.TestCase):
                              ('harness', ROOT / 'tests/audio_controller_native.cpp')]:
             destination = cls.folder / (name + '.o')
             result = subprocess.run([str(compiler), *flags, '-c', str(source), '-o', str(destination)],
-                                    capture_output=True, text=True, timeout=120)
+                                    capture_output=True, text=True, timeout=120, env=environment)
             if result.returncode:
                 raise RuntimeError(result.stderr)
             objects.append(destination)
         result = subprocess.run([str(compiler), '-municode', '-static', *map(str, objects),
             str(ROOT / 'vendor/freetype/libfreetype.a'), str(ROOT / 'vendor/zlib/libz.a'),
             '-ld3d11', '-ldxgi', '-ld3dcompiler', '-ldxguid', '-lxaudio2_9', '-lole32', '-o', str(cls.exe)],
-            capture_output=True, text=True, timeout=120)
+            capture_output=True, text=True, timeout=120, env=environment)
         if result.returncode:
             raise RuntimeError(result.stderr)
 
