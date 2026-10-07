@@ -12,14 +12,18 @@ struct AudioClip {
     std::vector<float> samples;
     uint64_t frames()const{return channels>0?samples.size()/size_t(channels):0;}
 };
-enum class AudioKind {Voice,Effect,Music,Ambient,UninterruptedEffect,Composite,Unknown};
+enum class AudioKind {Voice,Effect,Music,Ambient,UninterruptedEffect,Composite,Unknown,Random,Group,RandomGroup};
+struct SoundChild {std::string tag;double delayMs=0,delayRangeMs=0;};
 struct SoundDefinition {
     std::string tag,file;
     AudioKind kind=AudioKind::Unknown;
-    bool playable=false;
+    bool playable=false,nativeFiltered=false;
+    // The XML stores delays in seconds; native sources store milliseconds.
     double loopDelay=-1,loopDelayRange=0;
-    int duplicateLimit=0;
-    std::string duplicatePolicy,volumeAdjust,fadeData,sidechainData;
+    int loopCount=0,duplicateLimit=0;
+    double volumeAdjust=0,volumeAdjustRange=0;
+    std::string duplicatePolicy,fadeData,sidechainData;
+    std::vector<SoundChild> children;
     bool ignore3dSound=false;
     float gain=1;
 };

@@ -49,7 +49,7 @@ Attributes attributes(std::string_view text,size_t position){
 }
 AudioKind kind(std::string_view name){
     if(name=="VOICE")return AudioKind::Voice;if(name=="EFFECT")return AudioKind::Effect;if(name=="MUSIC")return AudioKind::Music;if(name=="AMBIENT")return AudioKind::Ambient;
-    if(name=="UNINTERRUPTED_EFFECT")return AudioKind::UninterruptedEffect;if(name=="RANDOM"||name=="GROUP"||name=="PLAYTAG")return AudioKind::Composite;return AudioKind::Unknown;
+    if(name=="UNINTERRUPTED_EFFECT")return AudioKind::UninterruptedEffect;if(name=="RANDOM")return AudioKind::Random;if(name=="GROUP")return AudioKind::Group;if(name=="PLAYTAG")return AudioKind::RandomGroup;return AudioKind::Unknown;
 }
 double number(const Attributes& values,const std::string& key,double fallback){
     auto it=values.find(key);if(it==values.end())return fallback;char* tail=nullptr;auto value=std::strtod(it->second.c_str(),&tail);
@@ -98,19 +98,28 @@ void AudioResources::report(const std::string& key,std::string message,bool miss
 void AudioResources::loadDefinitions(){
     auto path=client_/L"audio.xml";if(!std::filesystem::is_regular_file(path)){report("registry","Client audio.xml is unavailable",true);return;}
     try{
-        auto bytes=readFile(path);std::string_view xml(reinterpret_cast<const char*>(bytes.data()),bytes.size());size_t position=0;
+        auto bytes=readFile(path);std::string_view xml(reinterpret_cast<const char*>(bytes.data()),bytes.size());size_t position=0;std::vector<std::string> sources;
         while((position=xml.find('<',position))!=std::string_view::npos){
             if(xml.substr(position,4)=="<!--"){auto end=xml.find("-->",position+4);position=end==std::string_view::npos?xml.size():end+3;continue;}
             if(xml.substr(position,9)=="<![CDATA["){auto end=xml.find("]]>",position+9);position=end==std::string_view::npos?xml.size():end+3;continue;}
-            size_t start=++position;if(position==xml.size())break;if(xml[position]=='/'||xml[position]=='?'||xml[position]=='!'){auto end=xml.find('>',position);position=end==std::string_view::npos?xml.size():end+1;continue;}
-            while(position<xml.size()&&!whitespace(xml[position])&&xml[position]!='/'&&xml[position]!='>')position++;auto type=kind(xml.substr(start,position-start));auto attributeStart=position;
+            size_t start=++position;if(position==xml.size())break;if(xml[position]=='/'||xml[position]=='?'||xml[position]=='!'){if(xml[position]=='/'&&!sources.empty())sources.pop_back();auto end=xml.find('>',position);position=end==std::string_view::npos?xml.size():end+1;continue;}
+            while(position<xml.size()&&!whitespace(xml[position])&&xml[position]!='/'&&xml[position]!='>')position++;auto element=xml.substr(start,position-start);auto type=kind(element);auto attributeStart=position;
             char quote=0;while(position<xml.size()){char c=xml[position];if(quote){if(c==quote)quote=0;}else if(c=='\''||c=='\"')quote=c;else if(c=='>')break;position++;}
-            auto values=attributes(xml.substr(attributeStart,position-attributeStart),0);if(position<xml.size())position++;
-            if(type==AudioKind::Unknown||!values.contains("ID"))continue;SoundDefinition definition;definition.tag=values["ID"];definition.kind=type;definition.file=values["FILE"];
-            definition.playable=type!=AudioKind::Composite&&!definition.file.empty();definition.loopDelay=number(values,"LOOP_DELAY",-1);definition.loopDelayRange=number(values,"LOOP_DELAY_RANGE",0);
-            definition.duplicateLimit=int(std::clamp(number(values,"DUPLICATE_LIMIT",0),0.,double(INT_MAX)));definition.duplicatePolicy=values["DUPLICATE_POLICY"];definition.volumeAdjust=values["VOLUME_ADJUST"];
-            definition.fadeData=values["FADE_DATA"];definition.sidechainData=values["SIDECHAIN_DATA"];definition.ignore3dSound=values["IGNORE_3DSOUND"]=="TRUE";
-            definitions_.try_emplace(definition.tag,std::move(definition));
+            auto body=xml.substr(attributeStart,position-attributeStart);auto last=body.find_last_not_of(" \t\r\n");bool selfClosing=last!=std::string_view::npos&&body[last]=='/';auto values=attributes(body,0);if(position<xml.size())position++;
+            std::string source=sources.empty()?std::string{}:sources.back();
+            if(element=="ITEM"&&!source.empty()&&values.contains("TAG")){auto active=definitions_.find(source);if(active!=definitions_.end()&&active->second.kind==AudioKind::Group)
+                active->second.children.push_back({values["TAG"],number(values,"DELAY",0)*1000,number(values,"DELAY_RANGE",0)*1000});}
+            if(type!=AudioKind::Unknown&&values.contains("ID")){
+                SoundDefinition definition;definition.tag=values["ID"];definition.kind=type;definition.file=values["FILE"];definition.nativeFiltered=type==AudioKind::Random;
+                definition.playable=(type==AudioKind::Voice||type==AudioKind::Effect||type==AudioKind::Music||type==AudioKind::Ambient||type==AudioKind::UninterruptedEffect)&&!definition.file.empty();
+                definition.loopDelay=values.contains("LOOP_DELAY")?number(values,"LOOP_DELAY",-.001)*1000:-1;definition.loopDelayRange=number(values,"LOOP_DELAY_RANGE",0)*1000;
+                definition.loopCount=int(std::clamp(number(values,"LOOP_TIMES",0),0.,double(INT_MAX)));definition.duplicateLimit=int(std::clamp(number(values,"DUPLICATE_LIMIT",0),0.,double(INT_MAX)));definition.duplicatePolicy=values["DUPLICATE_POLICY"];
+                definition.volumeAdjust=number(values,"VOLUME_ADJUST",0);definition.volumeAdjustRange=number(values,"VOLUME_ADJUST_RANGE",0);
+                auto nativeAdjust=int(std::clamp(definition.volumeAdjust*100,double(INT_MIN),double(INT_MAX)));definition.gain=float(std::clamp(int(nativeAdjust*.01)+100,0,100))*.01f;
+                definition.fadeData=values["FADE_DATA"];definition.sidechainData=values["SIDECHAIN_DATA"];definition.ignore3dSound=values["IGNORE_3DSOUND"]=="TRUE";
+                source=definition.tag;definitions_.try_emplace(source,std::move(definition));
+            }
+            if(!selfClosing)sources.push_back(std::move(source));
         }
     }catch(const std::exception& error){report("registry","Cannot read audio.xml: "+std::string(error.what()),true);}
 }
