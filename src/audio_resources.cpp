@@ -55,6 +55,10 @@ double number(const Attributes& values,const std::string& key,double fallback){
     auto it=values.find(key);if(it==values.end())return fallback;char* tail=nullptr;auto value=std::strtod(it->second.c_str(),&tail);
     return tail!=it->second.c_str()&&!*tail&&std::isfinite(value)?value:fallback;
 }
+double nativeDelay(const Attributes& values,const std::string& key,double fallbackSeconds=0){
+    // Native XML sources convert seconds to float milliseconds, then truncate toward zero.
+    return int(float(number(values,key,fallbackSeconds)*1000));
+}
 struct Handle {
     HANDLE value=nullptr;
     Handle()=default;explicit Handle(HANDLE handle):value(handle){}
@@ -108,11 +112,11 @@ void AudioResources::loadDefinitions(){
             auto body=xml.substr(attributeStart,position-attributeStart);auto last=body.find_last_not_of(" \t\r\n");bool selfClosing=last!=std::string_view::npos&&body[last]=='/';auto values=attributes(body,0);if(position<xml.size())position++;
             std::string source=sources.empty()?std::string{}:sources.back();
             if(element=="ITEM"&&!source.empty()&&values.contains("TAG")){auto active=definitions_.find(source);if(active!=definitions_.end()&&active->second.kind==AudioKind::Group)
-                active->second.children.push_back({values["TAG"],number(values,"DELAY",0)*1000,number(values,"DELAY_RANGE",0)*1000});}
+                active->second.children.push_back({values["TAG"],nativeDelay(values,"DELAY"),nativeDelay(values,"DELAY_RANGE")});}
             if(type!=AudioKind::Unknown&&values.contains("ID")){
                 SoundDefinition definition;definition.tag=values["ID"];definition.kind=type;definition.file=values["FILE"];definition.nativeFiltered=type==AudioKind::Random||type==AudioKind::RandomGroup;
                 definition.playable=(type==AudioKind::Voice||type==AudioKind::Effect||type==AudioKind::Music||type==AudioKind::Ambient||type==AudioKind::UninterruptedEffect)&&!definition.file.empty();
-                definition.loopDelay=values.contains("LOOP_DELAY")?number(values,"LOOP_DELAY",-.001)*1000:-1;definition.loopDelayRange=number(values,"LOOP_DELAY_RANGE",0)*1000;
+                definition.loopDelay=nativeDelay(values,"LOOP_DELAY",-.001);definition.loopDelayRange=nativeDelay(values,"LOOP_DELAY_RANGE");
                 definition.loopCount=int(std::clamp(number(values,"LOOP_TIMES",0),0.,double(INT_MAX)));definition.duplicateLimit=int(std::clamp(number(values,"DUPLICATE_LIMIT",0),0.,double(INT_MAX)));definition.duplicatePolicy=values["DUPLICATE_POLICY"];
                 definition.volumeAdjust=number(values,"VOLUME_ADJUST",0);definition.volumeAdjustRange=number(values,"VOLUME_ADJUST_RANGE",0);
                 auto nativeAdjust=int(std::clamp(definition.volumeAdjust*100,double(INT_MIN),double(INT_MAX)));definition.gain=float(std::clamp(int(nativeAdjust*.01)+100,0,100))*.01f;

@@ -18,7 +18,7 @@ struct SoundDefinition {
     std::string tag,file;
     AudioKind kind=AudioKind::Unknown;
     bool playable=false,nativeFiltered=false;
-    // The XML stores delays in seconds; native sources store milliseconds.
+    // XML delays are seconds; native sources store integer milliseconds truncated toward zero.
     double loopDelay=-1,loopDelayRange=0;
     int loopCount=0,duplicateLimit=0;
     double volumeAdjust=0,volumeAdjustRange=0;
