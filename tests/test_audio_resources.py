@@ -67,7 +67,7 @@ class AudioResourcesTests(unittest.TestCase):
         (cls.client / 'audio.xml').write_text('''<?xml version="1.0"?>
 <AudioTagDatabase>
 <!-- <EFFECT ID="COMMENTED" FILE="sounds/missing.ogg"/> -->
-<EFFECT ID="TONE" FILE="sounds\\char\\fixture\\tone.ogg" LOOP_DELAY="0.1" DUPLICATE_LIMIT="2" DUPLICATE_POLICY="SWITCH"/>
+<EFFECT ID="TONE" FILE="sounds\\char\\fixture\\tone.ogg" LOOP_DELAY="0.1" LOOP_DELAY_RANGE="0.5" LOOP_TIMES="3" VOLUME_ADJUST="-25" VOLUME_ADJUST_RANGE="0.5" DUPLICATE_LIMIT="2" DUPLICATE_POLICY="SWITCH"/>
 <VOICE ID='ALIAS' FILE='sounds/char/fixture/tone.ogg'/>
 <MUSIC ID="MUSIC&amp;TAG" FILE="music\\tone &amp; music.wav" LOOP_DELAY="0"/>
 <AMBIENT ID="AMBIENT" FILE="sounds/effect/unusual/fallback.ogg"/>
@@ -94,7 +94,7 @@ class AudioResourcesTests(unittest.TestCase):
         self.assertAlmostEqual(got['frames'] / got['rate'], 0.1, delta=0.01)
         self.assertGreater(got['mean_abs'], 0.1)
         self.assertTrue(got['finite'])
-        self.assertEqual((got['loop_delay'], got['duplicate_limit'], got['duplicate_policy']), (0.1, 2, 'SWITCH'))
+        self.assertEqual((got['loop_delay'], got['duplicate_limit'], got['duplicate_policy']), (100, 2, 'SWITCH'))
 
     def test_direct_music_and_xml_entities_preserve_chinese_root(self):
         got = self.run_probe(tags=['MUSIC&TAG', 'NUMERIC&TAG'])['items']
@@ -106,12 +106,24 @@ class AudioResourcesTests(unittest.TestCase):
         got = self.run_probe(tags=['AMBIENT', 'UNINTERRUPTED'])
         self.assertTrue(all(item['clip'] for item in got['items']))
         self.assertEqual(got['decoded'], 1)
-        self.assertEqual(got['items'][1]['loop_delay'], 1.5)
+        self.assertEqual(got['items'][1]['loop_delay'], 1500)
 
     def test_composites_are_registered_without_random_replay_or_decode(self):
         got = self.run_probe(tags=['R_PARENT', 'G_PARENT', 'RG_PARENT'])
         self.assertTrue(all(item['definition'] and not item['playable'] and not item['clip'] for item in got['items']))
         self.assertEqual(got['decoded'], 0)
+
+    def test_loop_times_and_ranges_retain_native_source_settings(self):
+        got = self.run_probe(tags=['TONE'])['items'][0]
+        self.assertEqual(got.get('loop_count', 0), 3)
+        self.assertEqual(got.get('loop_delay_range', 0), 500)
+        self.assertAlmostEqual(got['gain'], 0.75)
+
+    def test_group_members_retain_native_delays_without_rechoosing_randoms(self):
+        got = self.run_probe(tags=['G_PARENT', 'R_PARENT'])['items']
+        self.assertEqual(got[0].get('children', []), [{'tag': 'TONE', 'delay_ms': 500, 'delay_range_ms': 0}])
+        self.assertFalse(got[0].get('native_filtered', True))
+        self.assertTrue(got[1].get('native_filtered', False))
 
     def test_comments_do_not_register_fake_audio(self):
         item = self.run_probe(tags=['COMMENTED'])['items'][0]
