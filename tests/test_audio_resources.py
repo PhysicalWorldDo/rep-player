@@ -80,6 +80,11 @@ class AudioResourcesTests(unittest.TestCase):
 <EFFECT ID="MISSING" FILE="sounds/effect/absent.ogg"/>
 <EFFECT ID="BAD" FILE="sounds/effect/bad.ogg"/>
 <EFFECT ID="NUMERIC&#x26;TAG" FILE="sounds/char/fixture/tone.ogg"/>
+<EFFECT ID="SUB_MS_POSITIVE" LOOP_DELAY="0.0005" LOOP_DELAY_RANGE="0.0005" LOOP_TIMES="1"/>
+<EFFECT ID="SUB_MS_NEGATIVE" LOOP_DELAY="-0.0005" LOOP_DELAY_RANGE="-0.0005"/>
+<EFFECT ID="FRACTIONAL_MS" LOOP_DELAY="0.0019" LOOP_DELAY_RANGE="-0.0019"/>
+<EFFECT ID="FLOAT_MS_BOUNDARY" LOOP_DELAY="0.00099999999" LOOP_DELAY_RANGE="0.00199999999"/>
+<GROUP ID="G_SUB_MS"><ITEM TAG="TONE" DELAY="0.0005" DELAY_RANGE="-0.0005"/><ITEM TAG="ALIAS" DELAY="-0.0019" DELAY_RANGE="0.0019"/></GROUP>
 </AudioTagDatabase>''', encoding='utf8')
 
     def run_probe(self, mode='summary', tags=(), client=None):
@@ -127,6 +132,20 @@ class AudioResourcesTests(unittest.TestCase):
         self.assertFalse(got[0].get('native_filtered', True))
         self.assertTrue(got[1].get('native_filtered', False))
         self.assertTrue(got[2].get('native_filtered', False))
+
+    def test_loop_delays_quantize_to_native_integer_milliseconds(self):
+        got = self.run_probe(tags=['SUB_MS_POSITIVE', 'SUB_MS_NEGATIVE', 'FRACTIONAL_MS',
+                                   'FLOAT_MS_BOUNDARY', 'ALIAS'])['items']
+        self.assertEqual([(item['loop_delay'], item['loop_delay_range']) for item in got],
+                         [(0, 0), (0, 0), (1, -1), (1, 2), (-1, 0)])
+        self.assertEqual(got[0]['loop_count'], 1)
+
+    def test_group_delays_quantize_to_native_integer_milliseconds(self):
+        got = self.run_probe(tags=['G_SUB_MS'])['items'][0]
+        self.assertEqual(got['children'], [
+            {'tag': 'TONE', 'delay_ms': 0, 'delay_range_ms': 0},
+            {'tag': 'ALIAS', 'delay_ms': -1, 'delay_range_ms': 1},
+        ])
 
     def test_comments_do_not_register_fake_audio(self):
         item = self.run_probe(tags=['COMMENTED'])['items'][0]

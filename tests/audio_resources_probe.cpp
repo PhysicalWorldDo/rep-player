@@ -1,6 +1,7 @@
 #include "audio_resources.hpp"
 #include <cmath>
 #include <future>
+#include <iomanip>
 #include <iostream>
 #include <sstream>
 
@@ -8,6 +9,7 @@ static std::string json(std::string_view text){
     std::string out="\"";for(unsigned char c:text){if(c=='\\'||c=='\"'){out+='\\';out+=c;}else if(c=='\n')out+="\\n";else if(c=='\r')out+="\\r";else if(c=='\t')out+="\\t";else if(c<32)out+='?';else out+=c;}return out+'\"';
 }
 int wmain(int argc,wchar_t** argv){try{
+    std::cout<<std::setprecision(17);
     if(argc<4)return 2;rep::AudioResources resources(argv[2],argv[3]);auto mode=rep::utf8(argv[1]);
     if(mode=="cancel-retry"){
         auto cancelled=resources.clip("TONE",[]{return true;});auto retry=resources.clip("TONE");
