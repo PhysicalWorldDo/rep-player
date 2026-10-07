@@ -2,6 +2,7 @@
 import json
 from pathlib import Path
 import struct
+import shutil
 import subprocess
 import sys
 import unittest
@@ -30,14 +31,15 @@ class AudioMixerTests(unittest.TestCase):
         cls.client = cls.folder / 'client'
         music = cls.client / 'Music'
         music.mkdir(parents=True)
+        shutil.copy2(ROOT / 'build/ffmpeg.exe', cls.folder / 'ffmpeg.exe')
         for name, value in [('a', 8192), ('b', 16384), ('quiet', 4096)]:
             with wave.open(str(music / (name + '.wav')), 'wb') as out:
-                out.setnchannels(1); out.setsampwidth(2); out.setframerate(48000)
-                out.writeframes(struct.pack('<h', value) * 48000)
+                out.setnchannels(2); out.setsampwidth(2); out.setframerate(48000)
+                out.writeframes(struct.pack('<2h', value, value) * 48000)
         (cls.client / 'audio.xml').write_text(
-            '<AUDIO><EFFECT TAG="A" FILE="music/a.wav" LOOP_DELAY="0"/><EFFECT TAG="B" FILE="music/b.wav"/>'
-            '<MUSIC TAG="M" FILE="music/quiet.wav" LOOP_DELAY="0"/>'
-            '<RANDOM TAG="R"><ITEM TAG="A" PROB="100"/></RANDOM></AUDIO>', encoding='utf-8')
+            '<AUDIO><EFFECT ID="A" FILE="Music/a.wav" LOOP_DELAY="0"/><EFFECT ID="B" FILE="Music/b.wav"/>'
+            '<MUSIC ID="M" FILE="Music/quiet.wav" LOOP_DELAY="0"/>'
+            '<RANDOM ID="R"><ITEM TAG="A" PROB="100"/></RANDOM></AUDIO>', encoding='utf-8')
         cls.exe = cls.folder / 'mixer_probe.exe'
         command = [str(ROOT / 'toolchain/llvm-mingw-20260616-ucrt-x86_64/bin/clang++.exe'),
                    '-std=c++20', '-O2', '-municode', '-static', '-DNOMINMAX',
