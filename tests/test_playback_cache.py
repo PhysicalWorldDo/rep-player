@@ -51,6 +51,8 @@ class PlaybackCacheTests(unittest.TestCase):
             shutil.copy2(ROOT / 'build' / (name + '.o'), target)
             objects.append(target)
         for name, source in [('worker', ROOT / 'src/ui_playback.cpp'),
+                             ('audio', ROOT / 'src/audio.cpp'),
+                             ('audio_resources', ROOT / 'src/audio_resources.cpp'),
                              ('harness', ROOT / 'tests/playback_cache_native.cpp')]:
             target = cls.folder / (name + '.o')
             result = subprocess.run([str(compiler), *options, '-c', str(source), '-o', str(target)],
@@ -61,7 +63,7 @@ class PlaybackCacheTests(unittest.TestCase):
         cls.exe = cls.folder / 'playback_cache.exe'
         result = subprocess.run([str(compiler), '-municode', '-static', *map(str, objects),
                                  str(ROOT / 'vendor/freetype/libfreetype.a'), str(ROOT / 'vendor/zlib/libz.a'),
-                                 '-ld3d11', '-ldxgi', '-ld3dcompiler', '-ldxguid', '-lpsapi',
+                                 '-ld3d11', '-ldxgi', '-ld3dcompiler', '-ldxguid', '-lpsapi', '-lxaudio2_9', '-lole32',
                                  '-o', str(cls.exe)], capture_output=True, text=True, timeout=120)
         if result.returncode:
             raise RuntimeError(result.stderr)

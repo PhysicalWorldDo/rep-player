@@ -37,12 +37,13 @@ class CanvasControllerTests(unittest.TestCase):
         cls.binary = cls.folder / 'controller_probe.exe'
         compiler = ROOT / 'toolchain/llvm-mingw-20260616-ucrt-x86_64/bin/clang++.exe'
         objects = [ROOT / 'build' / (name + '.o') for name in
-                   ('protocol', 'resources', 'gpu', 'bindings', 'fonts', 'movies', 'engine', 'ui_playback')]
+                   ('protocol', 'resources', 'gpu', 'bindings', 'fonts', 'movies', 'engine')]
         result = subprocess.run([str(compiler), '-std=c++20', '-O2', '-DNOMINMAX', '-DUNICODE', '-D_UNICODE',
             '-municode', '-static', '-I', str(ROOT / 'vendor/zlib'), '-I', str(ROOT / 'vendor/freetype/include'),
-            str(ROOT / 'tests/canvas_controller_native.cpp'), *map(str, objects), str(ROOT / 'build/app.res.o'),
+            str(ROOT / 'tests/canvas_controller_native.cpp'), str(ROOT / 'src/ui_playback.cpp'),
+            str(ROOT / 'src/audio.cpp'), str(ROOT / 'src/audio_resources.cpp'), *map(str, objects), str(ROOT / 'build/app.res.o'),
             str(ROOT / 'vendor/freetype/libfreetype.a'), str(ROOT / 'vendor/zlib/libz.a'),
-            '-ld3d11', '-ldxgi', '-ld3dcompiler', '-ldxguid', '-o', str(cls.binary)],
+            '-ld3d11', '-ldxgi', '-ld3dcompiler', '-ldxguid', '-lxaudio2_9', '-lole32', '-o', str(cls.binary)],
             capture_output=True, text=True, timeout=60)
         if result.returncode:
             raise RuntimeError(result.stderr)

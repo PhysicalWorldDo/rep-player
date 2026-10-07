@@ -21,6 +21,11 @@ struct PlayerStatus {
     uint64_t ordinal=0,frames=0,frameCount=0,skipped=0,captureSerial=0;
     double readySeconds=0,maxFrameMilliseconds=0,processReadySeconds=0,p50Frame=0,p95Frame=0,p99Frame=0,playbackSeconds=0;
     bool frozen=false,compatibilityIgnored=false;
+    bool audioAvailable=false,audioMuted=false;
+    float audioVolume=1;
+    std::wstring audioMessage;
+    uint64_t missingSoundCount=0,audioEvents=0;
+    int64_t audioPosition=0;
     uint32_t finalCrc=0,frameCrc=0;
     std::vector<ImgCall> currentImages,allImages;
     std::unordered_set<std::string> hiddenImages;
@@ -42,6 +47,8 @@ class PlaybackController {
     std::atomic<uint64_t> generation_=0;
     uint64_t consumed_=0;
     bool stopRequested_=false,toggleRequested_=false,filterRequested_=false,captureRequested_=false,canvasRequested_=false;
+    bool audioSettingsRequested_=false,audioMuted_=false;
+    float audioVolume_=1;
     std::vector<int> stepsRequested_;
     std::unordered_set<std::string> hidden_;
     PlayerStatus status_;
@@ -57,6 +64,8 @@ public:
     void configureClient(const std::filesystem::path& client);
     void setHiddenImages(std::unordered_set<std::string> hidden);
     void setCanvasSettings(const CanvasSettings& settings);
+    void setAudioVolume(float volume);
+    void setAudioMuted(bool muted);
     void captureFrame();
     PlayerStatus status();
 };
