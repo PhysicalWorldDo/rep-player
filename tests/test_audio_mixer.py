@@ -71,11 +71,11 @@ class AudioMixerTests(unittest.TestCase):
         built = subprocess.run(command, capture_output=True, text=True, env=environment)
         if built.returncode: raise RuntimeError(built.stdout + built.stderr)
 
-    def mix(self, commands, scenes, seek=0, resources=('A', 'B', 'M', 'R', 'L', 'S', 'P', 'G', 'OFFSET', 'AM'), player=False, profile='dfo'):
+    def mix(self, commands, scenes, seek=0, resources=('A', 'B', 'M', 'R', 'L', 'S', 'P', 'G', 'OFFSET', 'AM'), player=False, profile='dfo', client=None):
         path = self.folder / (self._testMethodName + '.rep')
         header = b'\x0b\0' + struct.pack('<8h', *([16] * 8))
         path.write_bytes(pack_replay(1.7, commands, [(time, ids, b'') for time, ids in scenes], resources, header=header))
-        args = [str(self.exe), str(self.client), str(path), str(seek)]
+        args = [str(self.exe), str(client or self.client), str(path), str(seek)]
         if player: args.append(player if isinstance(player, str) else 'player')
         if profile != 'dfo': args.append(profile)
         result = subprocess.run(args, capture_output=True, text=True)
@@ -209,6 +209,14 @@ class AudioMixerTests(unittest.TestCase):
                         [(0, (0,)), (20, (1,)), (40, (2,)), (100, ())], profile='dnf-july')
         self.assertAlmostEqual(data['samples'][20], .125, places=4)
         self.assertAlmostEqual(data['samples'][40], .125, places=4)
+
+    def test_no_audio_events_do_not_require_a_sound_registry(self):
+        client = self.folder / 'client_without_audio'
+        client.mkdir(exist_ok=True)
+        data = self.mix({0: struct.pack('<I', 17)}, [(0, (0,)), (100, ())], client=client)
+        self.assertEqual(data['events'], 0)
+        self.assertEqual(data['missing'], 0, 'silent recordings must not report an unused audio.xml as missing sound')
+        self.assertTrue(all(value == 0 for value in data['samples']))
 
 
 if __name__ == '__main__': unittest.main()
