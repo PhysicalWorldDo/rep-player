@@ -80,7 +80,7 @@ struct AudioTrack::Impl {
         if(definition&&!definition->playable)return;
         auto clip=resources->clip(event.tag,cancelled);if(!clip||!clip->frames()||!definition)return;
         expire(at);if(!allowed(event,at))return;
-        int slot=event.words[7];if(definition->kind==AudioKind::Music)slot=25;
+        int slot=event.words[7];if(definition->kind==AudioKind::Music)slot=25;else if(definition->kind==AudioKind::Ambient)slot=15;
         if(slot<0){
             for(int candidate=0;candidate<256;candidate++){
                 if(candidate==14||candidate==15||candidate==25||candidate==38||candidate==39)continue;
