@@ -110,7 +110,7 @@ void AudioResources::loadDefinitions(){
             if(element=="ITEM"&&!source.empty()&&values.contains("TAG")){auto active=definitions_.find(source);if(active!=definitions_.end()&&active->second.kind==AudioKind::Group)
                 active->second.children.push_back({values["TAG"],number(values,"DELAY",0)*1000,number(values,"DELAY_RANGE",0)*1000});}
             if(type!=AudioKind::Unknown&&values.contains("ID")){
-                SoundDefinition definition;definition.tag=values["ID"];definition.kind=type;definition.file=values["FILE"];definition.nativeFiltered=type==AudioKind::Random;
+                SoundDefinition definition;definition.tag=values["ID"];definition.kind=type;definition.file=values["FILE"];definition.nativeFiltered=type==AudioKind::Random||type==AudioKind::RandomGroup;
                 definition.playable=(type==AudioKind::Voice||type==AudioKind::Effect||type==AudioKind::Music||type==AudioKind::Ambient||type==AudioKind::UninterruptedEffect)&&!definition.file.empty();
                 definition.loopDelay=values.contains("LOOP_DELAY")?number(values,"LOOP_DELAY",-.001)*1000:-1;definition.loopDelayRange=number(values,"LOOP_DELAY_RANGE",0)*1000;
                 definition.loopCount=int(std::clamp(number(values,"LOOP_TIMES",0),0.,double(INT_MAX)));definition.duplicateLimit=int(std::clamp(number(values,"DUPLICATE_LIMIT",0),0.,double(INT_MAX)));definition.duplicatePolicy=values["DUPLICATE_POLICY"];
