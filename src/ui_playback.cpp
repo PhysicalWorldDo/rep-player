@@ -16,7 +16,9 @@ void PlaybackController::replay(){auto s=status();if(s.path.empty())return;std::
 void PlaybackController::stop(){std::lock_guard lock(mutex_);stopRequested_=true;stepsRequested_.clear();generation_++;condition_.notify_all();}
 void PlaybackController::togglePause(){std::lock_guard lock(mutex_);if(status_.path.empty())return;toggleRequested_=true;condition_.notify_all();}
 void PlaybackController::stepFrame(int direction){if(!direction)return;std::lock_guard lock(mutex_);if(status_.path.empty()||status_.phase==Phase::Loading||status_.phase==Phase::Error)return;stepsRequested_.push_back(direction<0?-1:1);condition_.notify_all();}
-void PlaybackController::configureClient(const std::filesystem::path& client){std::lock_guard lock(mutex_);client_=client;requested_.clear();hidden_.clear();stepsRequested_.clear();stopRequested_=true;toggleRequested_=filterRequested_=captureRequested_=false;status_=PlayerStatus{};status_.client=client_;status_.audioVolume=audioVolume_;status_.audioMuted=audioMuted_;generation_++;condition_.notify_all();}
+void PlaybackController::configureClient(const std::filesystem::path& client){std::lock_guard lock(mutex_);client_=client;requested_.clear();hidden_.clear();stepsRequested_.clear();stopRequested_=true;toggleRequested_=filterRequested_=captureRequested_=false;refreshImagesRequested_=true;imageIndex_.reset();status_=PlayerStatus{};status_.client=client_;status_.audioVolume=audioVolume_;status_.audioMuted=audioMuted_;generation_++;condition_.notify_all();}
+void PlaybackController::refreshImages(){std::lock_guard lock(mutex_);if(client_.empty())return;requested_=status_.path;requestedAt_=Clock::now();stopRequested_=requested_.empty();stepsRequested_.clear();refreshImagesRequested_=true;imageIndex_.reset();status_.phase=Phase::Loading;status_.frameCount=0;status_.currentImages.clear();status_.allImages.clear();status_.message.clear();generation_++;condition_.notify_all();}
+Assets::IndexPtr PlaybackController::imageIndex(){std::lock_guard lock(mutex_);return imageIndex_;}
 void PlaybackController::setHiddenImages(std::unordered_set<std::string> hidden){std::lock_guard lock(mutex_);hidden_=std::move(hidden);status_.hiddenImages=hidden_;if(status_.path.empty())return;filterRequested_=true;condition_.notify_all();}
 void PlaybackController::setCanvasSettings(const CanvasSettings& settings){std::lock_guard lock(mutex_);canvasSettings_=settings;canvasRequested_=true;condition_.notify_all();}
 void PlaybackController::setAudioVolume(float volume){std::lock_guard lock(mutex_);audioVolume_=std::clamp(volume,0.f,1.f);status_.audioVolume=audioVolume_;audioSettingsRequested_=true;condition_.notify_all();}
@@ -64,13 +66,14 @@ void PlaybackController::run(){try{
     while(!quitting_){
         uint64_t generation=generation_;
         if(generation!=consumed_){
-            std::filesystem::path path,client;Clock::time_point requestedAt;bool stop;std::unordered_set<std::string> hidden;CanvasSettings settings;
-            {std::lock_guard lock(mutex_);path=requested_;client=client_;requestedAt=requestedAt_;stop=stopRequested_;hidden=hidden_;settings=canvasSettings_;toggleRequested_=false;filterRequested_=false;}
+            std::filesystem::path path,client;Clock::time_point requestedAt;bool stop,refresh;std::unordered_set<std::string> hidden;CanvasSettings settings;
+            {std::lock_guard lock(mutex_);generation=generation_;path=requested_;client=client_;requestedAt=requestedAt_;stop=stopRequested_;hidden=hidden_;settings=canvasSettings_;refresh=std::exchange(refreshImagesRequested_,false);toggleRequested_=false;filterRequested_=false;}
             consumed_=generation;playback.stop();if(audio)audio->stop();
-            try{if(client!=activeClient){
-                releaseReplay();assets.reset();assets=std::make_unique<Assets>(client/L"ImagePacks2");
+            try{if(refresh||client!=activeClient||!assets){
+                releaseReplay();assets.reset();if(!client.empty())assets=std::make_unique<Assets>(client/L"ImagePacks2");
                 activeClient=client;
             }}catch(const std::exception& e){std::lock_guard lock(mutex_);status_.phase=Phase::Error;status_.message=wide(e.what());updateAudio();continue;}
+            {std::lock_guard lock(mutex_);if(quitting_||generation_!=generation)continue;imageIndex_=assets?assets->index():Assets::IndexPtr{};}
             if(stop){releaseAudio();std::lock_guard lock(mutex_);status_.phase=path.empty()?Phase::Empty:Phase::Stopped;status_.client=activeClient;updateAudio();}
             else try{
                 if(inspection.valid())inspection.wait();

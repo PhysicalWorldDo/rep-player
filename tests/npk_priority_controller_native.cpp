@@ -65,9 +65,12 @@ int wmain(int argc,wchar_t** argv) {
                 waitFor(player,[](const auto& status){return status.phase==Phase::Ended;});results["refresh_applies_added_patch"]=capture(player)==expected;
                 auto status=player.status();results["refresh_preserves_settings"]=status.hiddenImages.contains("sprite/optional/hidden.img")&&status.canvasWidth==32&&status.canvasHeight==32&&status.audioMuted&&std::abs(status.audioVolume-.37f)<.0001f;
                 results["refresh_publishes_new_snapshot"]=bool(imageIndex(player))&&imageIndex(player)!=originalIndex;
-                std::filesystem::rename(client/L"ImagePacks2"/L"000_refresh_patch.NPK",client/L"ImagePacks2"/L"001_refresh_patch.NPK");
+                std::filesystem::copy_file(root/L"patch_red.NPK",client/L"ImagePacks2"/L"001_second_patch.NPK");
+                std::filesystem::rename(client/L"ImagePacks2"/L"000_refresh_patch.NPK",client/L"ImagePacks2"/L"002_refresh_patch.NPK");
+                refreshImages(player);waitFor(player,[](const auto& state){return state.phase==Phase::Ended;});results["refresh_rename_changes_priority"]=capture(player)==original;
+                std::filesystem::remove(client/L"ImagePacks2"/L"001_second_patch.NPK");
                 refreshImages(player);waitFor(player,[](const auto& state){return state.phase==Phase::Ended;});results["refresh_reopens_renamed_patch"]=capture(player)==expected;
-                std::filesystem::remove(client/L"ImagePacks2"/L"001_refresh_patch.NPK");
+                std::filesystem::remove(client/L"ImagePacks2"/L"002_refresh_patch.NPK");
                 refreshImages(player);waitFor(player,[](const auto& state){return state.phase==Phase::Ended;});results["refresh_removal_restores_original"]=capture(player)==original;
             }
         } else if(mode==L"same_root") {

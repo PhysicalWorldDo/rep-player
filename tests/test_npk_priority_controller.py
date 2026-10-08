@@ -90,6 +90,7 @@ class NpkPriorityControllerTests(unittest.TestCase):
         (packs / 'sprite_test.NPK').write_bytes(original)
         (reference_packs / 'sprite_test.NPK').write_bytes(patched)
         (folder / 'patch_green.NPK').write_bytes(patched)
+        (folder / 'patch_red.NPK').write_bytes(original)
         draw, aux = legacy(2, 3)
         header = b'\x0b\0' + struct.pack('<8h', *([16, 16] * 4)) + b'\x0c' + struct.pack('<H', 7) + bytes(126)
         payload = pack_replay(1.7, {0: draw}, [(0, (0,), aux), (10, (0,), aux)],
@@ -129,6 +130,7 @@ class NpkPriorityControllerTests(unittest.TestCase):
         self.assertTrue(report['ordinary_replay_keeps_snapshot'], report)
         self.assertTrue(report['switch_replay_keeps_snapshot'], report)
         self.assertTrue(report['refresh_applies_added_patch'], report)
+        self.assertTrue(report['refresh_rename_changes_priority'], report)
         self.assertTrue(report['refresh_reopens_renamed_patch'], report)
         self.assertTrue(report['refresh_removal_restores_original'], report)
         self.assertTrue(report['refresh_preserves_settings'], report)

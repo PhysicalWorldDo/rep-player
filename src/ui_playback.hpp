@@ -51,6 +51,8 @@ class PlaybackController {
     float audioVolume_=1;
     std::vector<int> stepsRequested_;
     std::unordered_set<std::string> hidden_;
+    Assets::IndexPtr imageIndex_;
+    bool refreshImagesRequested_=false;
     PlayerStatus status_;
     void run();
 public:
@@ -62,6 +64,8 @@ public:
     void togglePause();
     void stepFrame(int direction);
     void configureClient(const std::filesystem::path& client);
+    void refreshImages();
+    Assets::IndexPtr imageIndex();
     void setHiddenImages(std::unordered_set<std::string> hidden);
     void setCanvasSettings(const CanvasSettings& settings);
     void setAudioVolume(float volume);
