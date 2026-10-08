@@ -4,7 +4,7 @@
 
 ## 下载与运行
 
-从 [v1.1.0 Release](https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.1.0) 下载 `rep-player-v1.1.0-windows-x64.zip`，完整解压到可写目录，直接双击最外层的 **rep_player.exe**。
+从 [v1.1.1 Release](https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.1.1) 下载 `rep-player-v1.1.1-windows-x64.zip`，完整解压到可写目录，直接双击最外层的 **rep_player.exe**。
 
 ```text
 解压目录/
@@ -48,9 +48,9 @@
 
 透明底不会自动移除地图背景；导出透明素材前，可先隐藏背景。
 
-## NPK 补丁（main 源码新增，尚未发布）
+## NPK 补丁
 
-现有 v1.1.0 Release 尚不包含此功能。源码构建保留原资源定位方式，并加载 ImagePacks2 中按文件名排在最早 `sprite*.NPK` 之前的 NPK，例如以 `!` 或 `%` 开头的补丁。排序保留大小写，按 UTF-16 字符顺序比较；`10.npk` 排在 `2.npk` 前。同路径 IMG 使用最早的前置包，未覆盖路径继续使用原索引或原包定位。
+播放器保留原资源定位方式，并加载 ImagePacks2 中按文件名排在最早 `sprite*.NPK` 之前的 NPK，例如以 `!` 或 `%` 开头的补丁。排序保留大小写，按 UTF-16 字符顺序比较；`10.npk` 排在 `2.npk` 前。同路径 IMG 使用最早的前置包，未覆盖路径继续使用原索引或原包定位。
 
 改名、添加、删除或替换补丁后，点击顶部“刷新 NPK / Refresh NPK”。刷新会释放旧图片和纹理，从头重新播放当前 REP，保留 IMG 隐藏集合、画布和预览音量设置。普通播放、重播和切换 REP 复用资源索引；预览、逐帧和随后开始的导出共用当前索引。导出期间不能刷新。
 

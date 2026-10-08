@@ -1,4 +1,4 @@
-REP 播放器 1.1.0
+REP 播放器 1.1.1
 
 完整解压 Windows x64 运行包后，双击 rep_player.exe。
 点击“选择客户端”，选择包含 Replay 和 ImagePacks2 的客户端根目录。
@@ -13,11 +13,11 @@ MOV/MP4 可选择包含音频，默认开启；预览静音和音量不影响导
 切换不同录像时释放旧素材缓存，视频临时文件使用后自动回收。
 DNF 默认启用有限兼容模式；出现“兼容播放”提示时，部分未识别指令已跳过，画面可能与客户端不同。
 
-main 源码新增（尚未发布，v1.1.0 运行包不包含）：
+NPK 补丁支持：
 加载 ImagePacks2 中排在最早 sprite*.NPK 之前的前置补丁，保留原资源定位方式。
 补丁名按保留大小写的 UTF-16 字符顺序比较，同路径 IMG 使用最早前置包。
 改名、增删或替换补丁后点击顶部“刷新 NPK”；当前 REP 从头重播，隐藏、画布及音量设置保留。
 普通播放、重播和切换 REP 复用索引，预览、逐帧与导出共用。分界之后的包不作为补丁扫描。
 
 完整使用说明：https://github.com/PhysicalWorldDo/rep-player/blob/main/README.md
-下载：https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.1.0
+下载：https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.1.1

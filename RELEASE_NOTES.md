@@ -1,5 +1,28 @@
 # 更新记录
 
+## v1.1.1
+
+发布日期：2026-10-08。下载 [Windows x64 运行包](https://github.com/PhysicalWorldDo/rep-player/releases/download/v1.1.1/rep-player-v1.1.1-windows-x64.zip)。完整解压后直接运行 `rep_player.exe`。
+
+### 新增
+
+- 支持 ImagePacks2 前置 NPK 补丁，按文件名优先级覆盖同路径 IMG；补丁画面可用于预览、逐帧查看和素材导出。
+- 顶部增加“刷新 NPK”按钮，修改补丁名称、添加、删除或替换补丁后可重新加载；当前 REP 从头播放，保留 IMG 隐藏集合、画布和预览音量设置。
+
+### 优化
+
+- 沿用原资源定位方式，只建立前置补丁索引，减少初始化时的包表读取；普通播放、重播和切换 REP 复用已加载索引。
+- 预览、逐帧和导出使用相同的补丁选择结果，避免导出单独重新扫描后采用不同的资源来源。
+
+### 修复
+
+- 修复按 IMG 路径直接定位原包时，任意命名的前置补丁被绕过的问题。
+- 修复重新选择同一客户端目录时仍使用旧图片索引和 shader 图片缓存的问题。
+
+补丁文件名需排在目录中最早的 `sprite*.NPK` 之前，例如以 `!` 或 `%` 开头。排序区分大小写，按 UTF-16 字符顺序比较；分界之后的包不作为补丁扫描。客户端资源始终只读。
+
+声音还原和有限兼容模式的范围沿用 1.1.0；AVI/BK2 影片音轨不恢复，PNG 不另附 WAV。请使用与录像版本匹配的完整客户端资源，详见 [使用说明](https://github.com/PhysicalWorldDo/rep-player/blob/main/README.md)。
+
 ## v1.1.0
 
 发布日期：2026-10-07。下载 [Windows x64 运行包](https://github.com/PhysicalWorldDo/rep-player/releases/download/v1.1.0/rep-player-v1.1.0-windows-x64.zip)。完整解压后直接运行 `rep_player.exe`。
