@@ -101,7 +101,7 @@ python -B tests/test_npk_priority_controller.py -v
 python -B tests/test_npk_priority_ui.py -v
 ```
 
-先运行统一 `build.ps1`，确保所有对象文件与更新后的资源/控制器头文件一致。刷新按钮从头重载当前 REP；开、重播、切换 REP 复用当前索引。前置包按目录中最早的 `sprite*.NPK` 名称划界，保留旧 `NpkIndex.etc` / 按路径猜包定位，不读取分界后的包表，不增加磁盘索引缓存。
+先运行统一 `build.ps1`，确保所有对象文件与更新后的资源/控制器头文件一致。刷新按钮从头重载当前 REP；开、重播、切换 REP 复用当前索引。前置包按目录中最早的 `sprite*.NPK` 名称划界，保留旧 `NpkIndex.etc` / 按路径猜包定位，不预读分界后的包表，不增加磁盘索引缓存。
 
 工程根目录的 GPU 创建检查：
 
