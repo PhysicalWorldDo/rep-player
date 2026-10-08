@@ -31,18 +31,27 @@ public:
     std::shared_ptr<Frame> frame(int index,int palette=0);
 };
 class Assets {
+public:
+    struct Index;
+    using IndexPtr=std::shared_ptr<const Index>;
+private:
     struct Entry {std::string package;uint32_t offset,length;};
+    IndexPtr index_;
     std::filesystem::path root_;
     std::unordered_map<std::string,Entry> entries_;
     std::unordered_map<std::string,std::shared_ptr<Img>> images_;
     std::unordered_set<std::string> packages_;
     std::function<void(const std::string&,int)> frameObserver_;
-    void indexNative();
+    static IndexPtr buildIndex(std::filesystem::path root);
+    static void indexNative(Index& index);
+    static void readPackage(const std::filesystem::path& root,const std::string& name,std::unordered_map<std::string,Entry>& entries);
     void indexPackage(const std::string& name);
-    Entry* resolve(std::string name);
+    const Entry* resolve(std::string name);
 public:
     uint64_t fallbacks=0,decodedFrames=0;
     explicit Assets(std::filesystem::path root);
+    explicit Assets(IndexPtr index);
+    IndexPtr index()const{return index_;}
     const std::filesystem::path& root()const{return root_;}
     void clearDecodedImages(){images_.clear();}
     using FrameObserver=std::function<void(const std::string&,int)>;

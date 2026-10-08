@@ -104,26 +104,66 @@ std::shared_ptr<Frame> Img::frameInner(int index,int palette,std::unordered_set<
 }
 std::shared_ptr<Frame> Img::frame(int index,int palette){std::unordered_set<int> visiting;return frameInner(index,palette,visiting);}
 static std::string normalize(std::string name) {name=canonical(name);while(!name.empty()&&name[0]=='/')name.erase(0,1);if(name.rfind("sprite/",0)!=0)name="sprite/"+name;return name;}
-Assets::Assets(std::filesystem::path root):root_(std::move(root)){indexNative();}
-void Assets::indexNative() {
-    auto path=root_/L"NpkIndex.etc";if(!std::filesystem::exists(path))return;
+struct Assets::Index {
+    std::filesystem::path root;
+    std::unordered_map<std::string,Entry> entries;
+    std::unordered_set<std::string> packages;
+};
+Assets::Assets(std::filesystem::path root):Assets(buildIndex(std::move(root))){}
+Assets::Assets(IndexPtr index):index_(std::move(index)){
+    if(!index_)throw Error("resource index is absent");
+    root_=index_->root;
+}
+Assets::IndexPtr Assets::buildIndex(std::filesystem::path root){
+    auto index=std::make_shared<Index>();index->root=std::move(root);
+    std::vector<std::wstring> names;
+    if(std::filesystem::is_directory(index->root))for(const auto& file:std::filesystem::directory_iterator(index->root)){
+        if(!file.is_regular_file())continue;
+        auto extension=file.path().extension().native();
+        for(auto& c:extension)if(c>=L'A'&&c<=L'Z')c+=32;
+        if(extension==L".npk")names.push_back(file.path().filename().native());
+    }
+    std::sort(names.begin(),names.end(),[](const std::wstring& a,const std::wstring& b){
+        return std::lexicographical_compare(a.begin(),a.end(),b.begin(),b.end(),[](wchar_t x,wchar_t y){return uint16_t(x)<uint16_t(y);});
+    });
+    const auto boundary=std::find_if(names.begin(),names.end(),[](const std::wstring& name){
+        constexpr std::wstring_view prefix=L"sprite";
+        if(name.size()<prefix.size())return false;
+        for(size_t k=0;k<prefix.size();++k){auto c=name[k];if(c>=L'A'&&c<=L'Z')c+=32;if(c!=prefix[k])return false;}
+        return true;
+    });
+    // The naming convention limits overlay scans; original packages keep the
+    // established ETC/guessed-package lookup and are not eagerly indexed.
+    if(boundary!=names.end())for(auto it=names.begin();it!=boundary;++it){
+        auto name=utf8(*it);readPackage(index->root,name,index->entries);index->packages.insert(std::move(name));
+    }
+    indexNative(*index);
+    return index;
+}
+void Assets::indexNative(Index& index) {
+    auto path=index.root/L"NpkIndex.etc";if(!std::filesystem::exists(path))return;
     auto data=readFile(path);Reader r(data);auto rawLength=r.get<uint32_t>(),zipped=r.get<uint32_t>();auto s=r.take(zipped);r.end();Bytes encoded(s.begin(),s.end());
     for(size_t k=0;k<encoded.size();k++)encoded[k]=uint8_t(uint8_t((encoded[k]^0xaa)-k*7)^0xaa);
     auto raw=inflateAll(encoded);if(raw.size()!=rawLength)throw Error("native NPK index length mismatch");Reader d(raw);
     while(d.remaining()){auto count=d.get<uint32_t>();auto n=d.get<uint32_t>();auto b=d.take(n);std::string name(reinterpret_cast<const char*>(b.data()),n);name=canonical(name);name=name.substr(name.find_last_of('/')+1);
-        while(count--){n=d.get<uint32_t>();b=d.take(n);std::string logical(reinterpret_cast<const char*>(b.data()),n);auto offset=d.get<uint32_t>(),length=d.get<uint32_t>();entries_.try_emplace(normalize(logical),Entry{name,offset,length});}}
+        while(count--){n=d.get<uint32_t>();b=d.take(n);std::string logical(reinterpret_cast<const char*>(b.data()),n);auto offset=d.get<uint32_t>(),length=d.get<uint32_t>();index.entries.try_emplace(normalize(logical),Entry{name,offset,length});}}
 }
-void Assets::indexPackage(const std::string& name) {
-    if(packages_.contains(name))return;auto p=root_/wide(name);if(!std::filesystem::exists(p))return;
-    std::ifstream f(p,std::ios::binary);std::array<uint8_t,20> h{};f.read(reinterpret_cast<char*>(h.data()),20);
+void Assets::readPackage(const std::filesystem::path& root,const std::string& name,std::unordered_map<std::string,Entry>& entries) {try{
+    std::ifstream f(root/wide(name),std::ios::binary);std::array<uint8_t,20> h{};f.read(reinterpret_cast<char*>(h.data()),20);
     if(!f||std::memcmp(h.data(),"NeoplePack_Bill\0",16))throw Error("invalid NPK magic");
     auto n=at<uint32_t>(h,16);Bytes table(size_t(n)*264);f.read(reinterpret_cast<char*>(table.data()),table.size());if(!f)throw Error("truncated NPK table");
     std::string seed="puchikon@neople dungeon and fighter ";while(seed.size()<255)seed+="DNF";seed.resize(255);seed.push_back(0);
-    for(uint32_t k=0;k<n;k++){auto b=std::span(table).subspan(size_t(k)*264,264);std::string logical;for(int j=0;j<256;j++){auto c=char(b[8+j]^uint8_t(seed[j]));if(!c)break;logical.push_back(c);}entries_.try_emplace(normalize(logical),Entry{name,at<uint32_t>(b,0),at<uint32_t>(b,4)});}
+    for(uint32_t k=0;k<n;k++){auto b=std::span(table).subspan(size_t(k)*264,264);std::string logical;for(int j=0;j<256;j++){auto c=char(b[8+j]^uint8_t(seed[j]));if(!c)break;logical.push_back(c);}entries.try_emplace(normalize(logical),Entry{name,at<uint32_t>(b,0),at<uint32_t>(b,4)});}
+}catch(const std::exception& error){throw Error("NPK "+name+": "+error.what());}}
+void Assets::indexPackage(const std::string& name) {
+    if(packages_.contains(name)||index_->packages.contains(name))return;
+    if(!std::filesystem::exists(root_/wide(name)))return;
+    readPackage(root_,name,entries_);
     packages_.insert(name);
 }
-Assets::Entry* Assets::resolve(std::string name) {
-    name=normalize(name);if(auto it=entries_.find(name);it!=entries_.end())return &it->second;
+const Assets::Entry* Assets::resolve(std::string name) {
+    name=normalize(name);if(auto it=index_->entries.find(name);it!=index_->entries.end())return &it->second;
+    if(auto it=entries_.find(name);it!=entries_.end())return &it->second;
     auto parent=name.substr(0,name.find_last_of('/'));
     while(parent.find('/')!=std::string::npos){auto package=parent;std::replace(package.begin(),package.end(),'/','_');indexPackage(package+".NPK");if(auto it=entries_.find(name);it!=entries_.end())return &it->second;parent=parent.substr(0,parent.find_last_of('/'));}
     return nullptr;
