@@ -15,12 +15,16 @@ int wmain(int argc,wchar_t** argv){try{
         else if(key==L"--output")options.outputDirectory=value;else if(key==L"--name")options.fileName=value;
         else if(key==L"--fps")options.fps=std::stoi(value);else if(key==L"--alpha")options.alpha=value==L"1";
         else if(key==L"--audio")options.audio=value==L"1";
+        else if(key==L"--negative-img-offsets"){
+            if(value!=L"0"&&value!=L"1")throw rep::Error("Negative IMG offsets must be 0 or 1");
+            options.negativeImgOffsetsEnabled=value==L"1";
+        }
         else if(key==L"--hide")options.hiddenImages.insert(rep::canonical(rep::utf8(value)));
         else if(key==L"--cancel-after")cancelAfter=std::stoull(value);
         else if(key==L"--format"){if(value==L"mov")options.format=rep::ExportFormat::Mov;else if(value==L"mp4")options.format=rep::ExportFormat::Mp4;else if(value==L"png")options.format=rep::ExportFormat::Png;else throw rep::Error("Unknown export format");}
         else throw rep::Error("Unknown export argument");
     }
-    if(client.empty()||replay.empty())throw rep::Error("Usage: rep_export --client DIR --replay FILE --format mov|mp4|png --fps 30|60 --alpha 0|1 --output DIR --name NAME [--audio 0|1] [--hide IMG]");
+    if(client.empty()||replay.empty())throw rep::Error("Usage: rep_export --client DIR --replay FILE --format mov|mp4|png --fps 30|60 --alpha 0|1 --output DIR --name NAME [--audio 0|1] [--hide IMG] [--negative-img-offsets 0|1]");
     wchar_t name[32768]{};GetModuleFileNameW(nullptr,name,32768);auto root=std::filesystem::path(name).parent_path().parent_path();
     rep::Gpu gpu(root/L"assets"/L"shaders");rep::Assets assets(client/L"ImagePacks2");
     auto result=rep::exportReplay(gpu,assets,client,root/L"runtime"/L"cache",replay,options,

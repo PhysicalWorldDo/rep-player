@@ -10,6 +10,7 @@ struct ExportOptions {
     int fps=60;
     bool alpha=true;
     bool audio=true;
+    bool negativeImgOffsetsEnabled=false;
     std::filesystem::path outputDirectory;
     std::wstring fileName;
     std::unordered_set<std::string> hiddenImages;

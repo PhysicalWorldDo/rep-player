@@ -102,6 +102,9 @@ static void contextState(Executor::State& state,const Instruction& i){
 Executor::Executor(Gpu& gpu,Assets& assets,const std::filesystem::path& cache,const std::filesystem::path& clientRoot):gpu_(gpu),assets_(assets),binder_(gpu,assets),fonts_((clientRoot.empty()?assets.root().parent_path():clientRoot)/L"Fonts"),movies_(std::make_unique<Movies>(clientRoot.empty()?assets.root().parent_path():clientRoot,cache/L"movies")){}
 Executor::~Executor()=default;
 bool Executor::hidden(const std::string& path)const{return hiddenImages_.contains(imagePath(path));}
+bool Executor::negativeImgFrameSuppressed(const Frame& frame)const{
+    return !negativeImgOffsetsEnabled_&&!frame.actualPath.empty()&&(frame.x<0||frame.y<0);
+}
 void Executor::setHiddenImages(std::unordered_set<std::string> paths){hiddenImages_.clear();for(auto& path:paths){auto normalized=imagePath(path);if(!normalized.empty())hiddenImages_.insert(std::move(normalized));}for(auto& call:currentImages_)call.hidden=hidden(call.path);for(auto& call:allImages_)call.hidden=hidden(call.path);}
 size_t Executor::recordImage(std::string path,int frame,uint32_t layerId,std::string role,bool dependency,bool drawn){
     path=imagePath(std::move(path));if(path.empty())return SIZE_MAX;ImgCall value;value.path=std::move(path);value.frame=frame;value.layer=layerId;value.role=std::move(role);value.dependency=dependency;value.drawn=drawn;value.count=value.runtimeCount=1;value.hidden=hidden(value.path);
@@ -188,6 +191,7 @@ void Executor::draw(Sprite s,State& state){
         s.call=recordImage(path,s.frameIndex,s.layer,fallback?(stencil?"stencil-request":"missing-request"):stencil?"stencil":s.offscreen?"masked-draw":"draw",stencil);
         if(fallback)s.actualCall=recordImage(s.frame->actualPath,s.frame->actualFrame,s.layer,stencil?"stencil-placeholder":"placeholder",stencil);}
     if(!s.frame)return;if(s.frame->empty){statistics.emptyImages++;return;}
+    if(negativeImgFrameSuppressed(*s.frame))return;
     bool captureActive=s.offscreen?localCapture_:globalCapture_;if(s.offscreen&&!captureActive){statistics.nullCaptures++;return;}
     auto frame=*s.frame;
     if(!s.skipGrid){auto it=state.grids.find({s.resource,s.frameIndex});auto grid=s.grid?s.grid:(it!=state.grids.end()?std::optional{it->second}:std::nullopt);
@@ -312,6 +316,7 @@ void Executor::capture(const Instruction& i,std::span<const uint8_t> payload,boo
     if(global){if(!payload[0])return;payload=payload.subspan(1);}else payload=payload.subspan(4);
     recordImage(replay_->path(i.resource),i.frame,state.layer,"mask",true);maskHidden=hidden(replay_->path(i.resource));
     Sprite s;s.frame=assets_.frame(replay_->path(i.resource),i.frame);if(!s.frame||s.frame->empty)return;if(!s.frame->actualPath.empty()&&(s.frame->actualPath!=imagePath(replay_->path(i.resource))||s.frame->actualFrame!=i.frame)){recordImage(s.frame->actualPath,s.frame->actualFrame,state.layer,"mask-placeholder",true);maskHidden|=hidden(s.frame->actualPath);}
+    if(negativeImgFrameSuppressed(*s.frame))return;
     int scaleOffset=global?8:4,positionOffset=global?16:12,pivotOffset=global?24:20,rotationOffset=global?32:28;
     s.x=global?float(at<int32_t>(payload,positionOffset)):at<float>(payload,positionOffset);s.y=global?float(at<int32_t>(payload,positionOffset+4)):at<float>(payload,positionOffset+4);
     put(s.params,20,at<float>(payload,scaleOffset));put(s.params,24,at<float>(payload,scaleOffset+4));put(s.params,16,at<float>(payload,rotationOffset));float px=at<float>(payload,pivotOffset),py=at<float>(payload,pivotOffset+4);put(s.params,28,px>1e30?-s.x:px);put(s.params,32,py>1e30?-s.y:py);
@@ -402,6 +407,18 @@ bool Playback::setCanvasSettings(const CanvasSettings& settings){
     auto elapsed=elapsedMilliseconds();
     executor_->setCanvasSettings(settings);
     if(!replay_||!hasScene_||before==executor_->canvasLayout())return false;
+    bool wasEnded=ended_,wasStopped=stopped_,wasPaused=paused_;
+    auto oldSelected=selected,oldSkipped=skipped;
+    bool changed=rebuildToOrdinal(scene_.ordinal);
+    ended_=wasEnded;stopped_=wasStopped;paused_=wasPaused;
+    elapsed_=elapsed;start_=std::chrono::steady_clock::now()-std::chrono::milliseconds(elapsed_);
+    selected=oldSelected;skipped=oldSkipped;
+    return changed;
+}
+bool Playback::setNegativeImgOffsetsEnabled(bool enabled){
+    if(!executor_||executor_->negativeImgOffsetsEnabled()==enabled)return false;
+    auto elapsed=elapsedMilliseconds();executor_->setNegativeImgOffsetsEnabled(enabled);
+    if(!replay_||!hasScene_)return false;
     bool wasEnded=ended_,wasStopped=stopped_,wasPaused=paused_;
     auto oldSelected=selected,oldSkipped=skipped;
     bool changed=rebuildToOrdinal(scene_.ordinal);

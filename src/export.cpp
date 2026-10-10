@@ -138,6 +138,7 @@ ExportResult exportReplay(Gpu& gpu,Assets& assets,const std::filesystem::path& c
     result.alpha=options.alpha&&options.format!=ExportFormat::Mp4;result.hiddenImageCount=options.hiddenImages.size();
     update.totalFrames=result.frames;if(progress)progress(update);
     Executor executor(gpu,assets,cache,client);executor.setTransparent(result.alpha);executor.setHiddenImages(options.hiddenImages);
+    executor.setNegativeImgOffsetsEnabled(options.negativeImgOffsetsEnabled);
     executor.setCanvasSettings(options.canvas);executor.attach(replay);
     result.width=executor.output().image.width;result.height=executor.output().image.height;
     executor.prepare(cancelled);checkCancelled();

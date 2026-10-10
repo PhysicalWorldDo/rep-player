@@ -52,6 +52,7 @@ private:
     std::vector<ImgCall> currentImages_,allImages_;
     std::unordered_set<std::string> hiddenImages_;
     bool transparent_=false,localHidden_=false,globalHidden_=false;
+    bool negativeImgOffsetsEnabled_=false;
     int32_t durationMilliseconds_=0;
     std::map<std::pair<int,uint32_t>,Camera> sceneEntryCameras_;
     std::map<int,std::array<float,2>> sceneEntryOffsets_;
@@ -61,6 +62,7 @@ private:
     size_t recordImage(std::string path,int frame,uint32_t layer,std::string role,bool dependency,bool drawn=false);
     void markDrawn(size_t call);
     bool hidden(const std::string& path)const;
+    bool negativeImgFrameSuppressed(const Frame& frame)const;
     Target& renderTarget(int context);
     void resizeCanvas(const CanvasLayout& layout);
     std::array<int,4> canvasClip()const;
@@ -80,6 +82,8 @@ public:
     void redraw(const Scene& scene);
     void resetPlaybackState();
     void setHiddenImages(std::unordered_set<std::string> paths);
+    void setNegativeImgOffsetsEnabled(bool enabled){negativeImgOffsetsEnabled_=enabled;}
+    bool negativeImgOffsetsEnabled()const{return negativeImgOffsetsEnabled_;}
     const auto& hiddenImages()const{return hiddenImages_;}
     const auto& currentImages()const{return currentImages_;}
     const auto& allImages()const{return allImages_;}
@@ -107,6 +111,7 @@ public:
     bool step(int direction);
     bool refresh();
     bool setCanvasSettings(const CanvasSettings& settings);
+    bool setNegativeImgOffsetsEnabled(bool enabled);
     bool paused()const{return paused_;}
     int64_t elapsedMilliseconds()const;
     bool ended()const{return ended_;}

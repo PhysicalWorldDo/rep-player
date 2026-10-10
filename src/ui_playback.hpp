@@ -21,6 +21,7 @@ struct PlayerStatus {
     uint64_t ordinal=0,frames=0,frameCount=0,skipped=0,captureSerial=0;
     double readySeconds=0,maxFrameMilliseconds=0,processReadySeconds=0,p50Frame=0,p95Frame=0,p99Frame=0,playbackSeconds=0;
     bool frozen=false,compatibilityIgnored=false;
+    bool negativeImgOffsetsEnabled=false;
     bool audioAvailable=false,audioMuted=false;
     float audioVolume=1;
     std::wstring audioMessage;
@@ -48,6 +49,7 @@ class PlaybackController {
     uint64_t consumed_=0;
     bool stopRequested_=false,toggleRequested_=false,filterRequested_=false,captureRequested_=false,canvasRequested_=false;
     bool audioSettingsRequested_=false,audioMuted_=false;
+    bool negativeImgOffsetsRequested_=false,negativeImgOffsetsEnabled_=false;
     float audioVolume_=1;
     std::vector<int> stepsRequested_;
     std::unordered_set<std::string> hidden_;
@@ -68,6 +70,7 @@ public:
     Assets::IndexPtr imageIndex();
     void setHiddenImages(std::unordered_set<std::string> hidden);
     void setCanvasSettings(const CanvasSettings& settings);
+    void setNegativeImgOffsetsEnabled(bool enabled);
     void setAudioVolume(float volume);
     void setAudioMuted(bool muted);
     void captureFrame();
