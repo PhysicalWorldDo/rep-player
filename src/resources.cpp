@@ -74,7 +74,19 @@ Img::Img(Bytes data):data_(std::move(data)) {
         records_.push_back(std::move(a));}
     if(version!=1&&indexBytes&&r.pos-start!=indexBytes)throw Error("IMG frame table length mismatch");
     for(auto& a:atlases_){atlasOffsets_.push_back(r.pos);if(a[3]<0)throw Error("negative atlas length");r.take(a[3]);}
-    if(version!=1)for(auto& a:records_){offsets_.push_back(r.pos);if(a[0]!=17&&a[1]!=7){if(a[1]==5)a[4]=a[2]*a[3]*(a[0]==16?4:2);if(a[4]<0)throw Error("negative IMG pixel length");r.take(a[4]);}}
+    if(version!=1)for(size_t index=0;index<records_.size();++index){
+        auto& a=records_[index];offsets_.push_back(r.pos);
+        if(a[0]==17||a[1]==7)continue;
+        if(a[1]==5)a[4]=a[2]*a[3]*(a[0]==16?4:2);
+        if(a[4]<0)throw Error("negative IMG pixel length");
+        // Native empty frames never read pixels. Some v2 patches omit the
+        // final raw pixel slot; linked frames still share the empty frame.
+        // Existing padding and any subsequent data-bearing frame stay strict.
+        const bool omittedEmptyTail=version==2&&a[1]==5&&(a[0]==14||a[0]==15||a[0]==16)
+            &&a[2]==1&&a[3]==1&&a[5]==a[7]&&a[6]==0&&r.remaining()==0
+            &&std::all_of(records_.begin()+index+1,records_.end(),[](const auto& next){return next[0]==17;});
+        if(!omittedEmptyTail)r.take(a[4]);
+    }
 }
 std::shared_ptr<Pixels> Img::atlas(int index) {
     if(auto it=atlasTextures_.find(index);it!=atlasTextures_.end())return it->second;
@@ -171,9 +183,14 @@ const Assets::Entry* Assets::resolve(std::string name) {
 std::shared_ptr<Img> Assets::preload(std::string logical) {
     auto name=normalize(logical);if(auto it=images_.find(name);it!=images_.end())return it->second;
     auto e=resolve(name);if(!e)return {};
-    std::ifstream f(root_/wide(e->package),std::ios::binary);if(!f)throw Error("NPK file absent: "+e->package);
-    Bytes b(e->length);f.seekg(e->offset);f.read(reinterpret_cast<char*>(b.data()),b.size());if(!f)throw Error("truncated IMG entry");
-    auto img=std::make_shared<Img>(std::move(b));images_[name]=img;return img;
+    try {
+        std::ifstream f(root_/wide(e->package),std::ios::binary);if(!f)throw Error("NPK file absent: "+e->package);
+        Bytes b(e->length);f.seekg(e->offset);f.read(reinterpret_cast<char*>(b.data()),b.size());if(!f)throw Error("truncated IMG entry");
+        auto img=std::make_shared<Img>(std::move(b));images_[name]=img;return img;
+    } catch(const Error& error) {
+        throw Error("IMG "+name+" in NPK "+e->package+" (offset "+std::to_string(e->offset)
+            +", length "+std::to_string(e->length)+"): "+error.what());
+    }
 }
 std::shared_ptr<Frame> Assets::frame(std::string logical,int index,int palette,bool fallback) {
     if(logical.empty())return {};notifyFrame(normalize(logical),index);auto img=preload(logical);
