@@ -1,5 +1,29 @@
 # 更新记录
 
+## v1.1.2
+
+发布日期：2026-10-10。下载 [Windows x64 运行包](https://github.com/PhysicalWorldDo/rep-player/releases/download/v1.1.2/rep-player-v1.1.2-windows-x64.zip)。完整解压后直接运行 `rep_player.exe`。
+
+### 新增
+
+- 右侧 IMG 面板增加“负坐标生效”按钮，默认关闭：IMG 帧自身的 X 或 Y 为负时不绘制，正常坐标帧继续显示；开启后恢复原有符号偏移，链接帧按目标帧坐标判断。
+- 负坐标显示选择自动保存，切换 REP、刷新 NPK 和重开程序后保留；预览、逐帧及 MOV / MP4 / PNG 导出共用规则。
+
+### 优化
+
+- 切换负坐标显示后更新当前画面，保留进度和播放状态，不转换坐标或自动扩大画布；进行中的导出保持开始时的选择。
+- IMG 读取报错补充图像路径、NPK 包名、条目位置和长度，便于定位问题资源。
+
+### 修复
+
+- 修复 `RapidMoveSlash.rep` 使用部分补丁空图时，报 `truncated structure at byte 124` 等错误的问题。符合空图条件的占位帧按透明图处理，链接帧可正常读取。
+
+空图兼容限于已确认的 IMG v2 未压缩占位图：符合空图标记、在文件尾部省略整段像素且后续只有链接帧；其他损坏或截断的 IMG 仍会报错。
+
+前置 NPK 补丁规则沿用 1.1.1：文件名需排在目录中最早的 `sprite*.NPK` 之前，例如以 `!` 或 `%` 开头；排序区分大小写，按 UTF-16 字符顺序比较，分界之后的包不作为补丁扫描。客户端资源始终只读。
+
+声音还原和有限兼容模式的范围沿用 1.1.0；AVI/BK2 影片音轨不恢复，PNG 不另附 WAV。请使用与录像版本匹配的完整客户端资源，详见 [使用说明](https://github.com/PhysicalWorldDo/rep-player/blob/main/README.md)。
+
 ## v1.1.1
 
 发布日期：2026-10-08。下载 [Windows x64 运行包](https://github.com/PhysicalWorldDo/rep-player/releases/download/v1.1.1/rep-player-v1.1.1-windows-x64.zip)。完整解压后直接运行 `rep_player.exe`。
