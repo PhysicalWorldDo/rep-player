@@ -617,7 +617,7 @@ LRESULT CALLBACK procedure(HWND window,UINT message,WPARAM wp,LPARAM lp){auto* a
     case WM_ERASEBKGND:{RECT r;GetClientRect(window,&r);FillRect(reinterpret_cast<HDC>(wp),&r,app->backgroundBrush);RECT side{app->sidebarX,44,r.right,r.bottom};FillRect(reinterpret_cast<HDC>(wp),&side,app->surfaceBrush);return 1;}
     case WM_PAINT:{PAINTSTRUCT p;BeginPaint(window,&p);EndPaint(window,&p);return 0;}
     case WM_ACTIVATEAPP:if(!wp){app->clearHeldArrow();app->finishProgress(false);}return 0;case WM_TIMER:app->timer();return 0;
-    case WM_CLOSE:KillTimer(window,1);app->syncAppliedPatches();app->cancelExport=true;app->worker.reset();DestroyWindow(window);if(wp)PostQuitMessage(1);return 0;case WM_DESTROY:PostQuitMessage(0);return 0;
+    case WM_CLOSE:KillTimer(window,1);app->clearHeldArrow();app->draggingProgress=false;if(GetCapture()==app->progress)ReleaseCapture();app->syncAppliedPatches();app->cancelExport=true;app->worker.reset();DestroyWindow(window);if(wp)PostQuitMessage(1);return 0;case WM_DESTROY:PostQuitMessage(0);return 0;
     }return DefWindowProcW(window,message,wp,lp);
 }
 }

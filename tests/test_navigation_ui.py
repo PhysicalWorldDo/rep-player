@@ -279,6 +279,33 @@ class NativeNavigationUiTests(OwnedPlayerUi):
             self.snapshots.append({'cancelled_from': phase, 'frame': self.frame_number()})
             self.close_player()
 
+    def test_close_during_drag_exits_cleanly(self):
+        self.start_player()
+        self.user.EnableWindow(self.main, True)
+        progress, point = self.progress_point(.25)
+        self.user.SendMessageW(progress, 0x0201, 1, point)
+        progress, point = self.progress_point(.5)
+        self.user.SendMessageW(progress, 0x0200, 1, point)
+        self.wait(lambda: self.text(progress).startswith(('目标 ', 'Target ')), 'active drag before closing')
+
+        class GuiThreadInfo(C.Structure):
+            _fields_ = [('size', W.DWORD), ('flags', W.DWORD),
+                        ('active', W.HWND), ('focus', W.HWND), ('capture', W.HWND),
+                        ('menu_owner', W.HWND), ('move_size', W.HWND), ('caret', W.HWND),
+                        ('caret_rect', W.RECT)]
+        self.user.GetGUIThreadInfo.argtypes = [W.DWORD, C.POINTER(GuiThreadInfo)]
+        pid = W.DWORD()
+        thread = self.user.GetWindowThreadProcessId(progress, C.byref(pid))
+        self.assertEqual(pid.value, self.process.pid)
+        info = GuiThreadInfo()
+        info.size = C.sizeof(info)
+        self.assertTrue(self.user.GetGUIThreadInfo(thread, C.byref(info)))
+        self.assertEqual(info.capture, progress, 'the owned progress control must really hold capture for this regression')
+        self.assertTrue(self.user.PostMessageW(self.main, 0x0010, 0, 0))
+        exit_code = self.process.wait(timeout=8)
+        self.snapshots.append({'close_during_drag_exit_code': exit_code, 'progress_had_capture': True})
+        self.assertEqual(exit_code, 0, 'closing while scrub capture is held must exit cleanly')
+
 
 if __name__ == '__main__':
     unittest.main()
