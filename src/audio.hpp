@@ -37,7 +37,9 @@ public:
     void pause();
     void resume(int64_t milliseconds);
     void stop();
-    void seek(int64_t milliseconds,bool playing);
+    uint64_t seek(int64_t milliseconds,bool playing);
+    uint64_t appliedSeekSerial()const;
+    bool resumePrepared(uint64_t seekSerial);
     void volume(float value,bool muted);
     bool available()const;
     std::string error()const;

@@ -227,6 +227,8 @@ struct AudioPlayer::Impl {
     std::condition_variable condition;
     bool quit=false,ready=false,playing=false,seekRequested=false;
     int64_t requested=0;
+    uint64_t requestedSerial=0;
+    std::atomic<uint64_t> appliedSerial=0;
     float volume=1;
     bool muted=false;
     std::atomic<bool> available=false;
@@ -249,8 +251,8 @@ struct AudioPlayer::Impl {
             {std::lock_guard lock(mutex);available=true;ready=true;condition.notify_all();}
             size_t bufferIndex=0;bool active=false;int64_t base=0;
             while(true){
-                bool wanted,seek;int64_t target;float gain;
-                {std::unique_lock lock(mutex);if(quit)break;wanted=playing;seek=std::exchange(seekRequested,false);target=requested;gain=muted?0.f:volume;
+                bool wanted,seek;int64_t target;float gain;uint64_t serial;
+                {std::unique_lock lock(mutex);if(quit)break;wanted=playing;seek=std::exchange(seekRequested,false);target=requested;serial=requestedSerial;gain=muted?0.f:volume;
                     if(!wanted&&!seek){if(active){voice->Stop();active=false;}condition.wait_for(lock,std::chrono::milliseconds(10));continue;}}
                 voice->SetVolume(gain);
                 if(seek){
@@ -258,7 +260,9 @@ struct AudioPlayer::Impl {
                     // Re-creation also supplies a fresh, unambiguous sample clock.
                     voice->DestroyVoice();voice=nullptr;create();voice->SetVolume(gain);
                     track->seek(target);base=target;bufferIndex=0;active=false;position=target;
+                    appliedSerial=serial;
                 }
+                {std::lock_guard lock(mutex);if(requestedSerial!=serial||!playing)wanted=false;}
                 if(wanted&&!active){voice->Start();active=true;}
                 if(!wanted)continue;
                 XAUDIO2_VOICE_STATE state{};voice->GetState(&state);
@@ -284,8 +288,10 @@ AudioPlayer::~AudioPlayer(){if(!impl_)return;{std::lock_guard lock(impl_->mutex)
 void AudioPlayer::play(int64_t milliseconds){seek(milliseconds,true);}
 void AudioPlayer::pause(){std::lock_guard lock(impl_->mutex);impl_->playing=false;impl_->condition.notify_all();}
 void AudioPlayer::resume(int64_t milliseconds){seek(milliseconds,true);}
-void AudioPlayer::stop(){std::lock_guard lock(impl_->mutex);impl_->playing=false;impl_->seekRequested=true;impl_->requested=0;impl_->condition.notify_all();}
-void AudioPlayer::seek(int64_t milliseconds,bool playing){std::lock_guard lock(impl_->mutex);impl_->requested=std::max<int64_t>(0,milliseconds);impl_->playing=playing;impl_->seekRequested=true;impl_->condition.notify_all();}
+void AudioPlayer::stop(){seek(0,false);}
+uint64_t AudioPlayer::seek(int64_t milliseconds,bool playing){std::lock_guard lock(impl_->mutex);impl_->requested=std::max<int64_t>(0,milliseconds);impl_->playing=playing;impl_->seekRequested=true;auto serial=++impl_->requestedSerial;impl_->condition.notify_all();return serial;}
+uint64_t AudioPlayer::appliedSeekSerial()const{return impl_->appliedSerial;}
+bool AudioPlayer::resumePrepared(uint64_t serial){std::lock_guard lock(impl_->mutex);if(impl_->requestedSerial!=serial||impl_->appliedSerial.load()<serial)return false;impl_->playing=true;impl_->condition.notify_all();return true;}
 void AudioPlayer::volume(float value,bool muted){std::lock_guard lock(impl_->mutex);impl_->volume=std::clamp(value,0.f,1.f);impl_->muted=muted;impl_->condition.notify_all();}
 bool AudioPlayer::available()const{return impl_->available;}
 std::string AudioPlayer::error()const{std::lock_guard lock(impl_->mutex);return impl_->failure;}

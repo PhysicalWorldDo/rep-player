@@ -11,7 +11,7 @@
 
 namespace rep::ui {
 using Clock = std::chrono::steady_clock;
-enum class Phase { Empty, Loading, Playing, Paused, Ended, Stopped, Error };
+enum class Phase { Empty, Loading, Playing, Paused, Ended, Stopped, Error, Seeking };
 struct PlayerStatus {
     Phase phase=Phase::Empty;
     std::wstring message,path;
@@ -32,6 +32,10 @@ struct PlayerStatus {
     uint32_t finalCrc=0,frameCrc=0;
     std::vector<ImgCall> currentImages,allImages;
     std::unordered_set<std::string> hiddenImages;
+    ImageVisibilityPolicy imageVisibility;
+    bool scrubbing=false;
+    uint64_t navigationSerial=0,completedNavigationSerial=0,navigationProgressOrdinal=0;
+    int64_t navigationTarget=0;
 };
 
 // UI commands cross this boundary; all immediate-context and replay access stays
@@ -53,13 +57,25 @@ class PlaybackController {
     bool audioSettingsRequested_=false,audioMuted_=false;
     bool negativeImgOffsetsRequested_=false,negativeImgOffsetsEnabled_=false;
     float audioVolume_=1;
-    std::vector<int> stepsRequested_;
+    struct NavigationRequest {
+        uint64_t serial=0,ordinal=0;
+        int64_t time=0;
+        bool byOrdinal=false,last=false,resume=false,forceRebuild=false,preserveState=false;
+        Phase originalPhase=Phase::Paused;
+    };
+    std::optional<NavigationRequest> navigationRequested_,activeNavigation_;
+    std::atomic<uint64_t> navigationSerial_=0;
+    bool scrubChanged_=false,scrubbing_=false,scrubResume_=false;
+    Phase scrubOriginalPhase_=Phase::Paused;
     std::unordered_set<std::string> hidden_;
+    ImageVisibilityPolicy imageVisibility_;
     Assets::IndexPtr imageIndex_;
     bool patchesEnabled_=true;
     bool refreshImagesRequested_=false;
     PlayerStatus status_;
     void run();
+    void queueRefreshLocked();
+    void queueNavigationLocked(NavigationRequest request);
 public:
     PlaybackController(HWND canvas,std::filesystem::path root,std::filesystem::path client,bool test,Clock::time_point processStart,ClientProtocolSelection protocol={},CanvasSettings settings={},bool patchesEnabled=true);
     ~PlaybackController();
@@ -67,12 +83,16 @@ public:
     void replay();
     void stop();
     void togglePause();
-    void stepFrame(int direction);
+    void stepFrame(int direction,bool repeated=false);
+    void beginScrub();
+    void endScrub(std::optional<int64_t> target={},bool endpointLast=false);
+    void seekTime(int64_t target,bool endpointLast=false);
     void configureClient(const std::filesystem::path& client);
     void refreshImages(std::optional<bool> patchesEnabled={});
     Assets::IndexPtr imageIndex();
     std::optional<bool> appliedPatchesEnabled();
     void setHiddenImages(std::unordered_set<std::string> hidden);
+    void setImageVisibility(const ImageVisibilityPolicy& policy);
     void setCanvasSettings(const CanvasSettings& settings);
     void setNegativeImgOffsetsEnabled(bool enabled);
     void setAudioVolume(float volume);

@@ -101,11 +101,27 @@ static void contextState(Executor::State& state,const Instruction& i){
 }
 Executor::Executor(Gpu& gpu,Assets& assets,const std::filesystem::path& cache,const std::filesystem::path& clientRoot):gpu_(gpu),assets_(assets),binder_(gpu,assets),fonts_((clientRoot.empty()?assets.root().parent_path():clientRoot)/L"Fonts"),movies_(std::make_unique<Movies>(clientRoot.empty()?assets.root().parent_path():clientRoot,cache/L"movies")){}
 Executor::~Executor()=default;
-bool Executor::hidden(const std::string& path)const{return hiddenImages_.contains(imagePath(path));}
+bool Executor::hidden(const std::string& path)const{
+    auto normalized=normalizeImagePath(path);
+    if(auto override=imageVisibility_.overrides.find(normalized);override!=imageVisibility_.overrides.end())return !override->second;
+    return hiddenImages_.contains(normalized)||imageVisibility_.hidden(normalized);
+}
 bool Executor::negativeImgFrameSuppressed(const Frame& frame)const{
     return !negativeImgOffsetsEnabled_&&!frame.actualPath.empty()&&(frame.x<0||frame.y<0);
 }
 void Executor::setHiddenImages(std::unordered_set<std::string> paths){hiddenImages_.clear();for(auto& path:paths){auto normalized=imagePath(path);if(!normalized.empty())hiddenImages_.insert(std::move(normalized));}for(auto& call:currentImages_)call.hidden=hidden(call.path);for(auto& call:allImages_)call.hidden=hidden(call.path);}
+void Executor::setImageVisibility(const ImageVisibilityPolicy& policy){
+    imageVisibility_=policy;
+    for(auto& call:currentImages_)call.hidden=hidden(call.path);
+    for(auto& call:allImages_)call.hidden=hidden(call.path);
+}
+std::unordered_set<std::string> Executor::hiddenImages()const{
+    std::unordered_set<std::string> result;
+    for(const auto& path:hiddenImages_)if(hidden(path))result.insert(path);
+    for(const auto& call:allImages_)if(hidden(call.path))result.insert(call.path);
+    for(const auto& [path,visible]:imageVisibility_.overrides)if(!visible)result.insert(path);
+    return result;
+}
 size_t Executor::recordImage(std::string path,int frame,uint32_t layerId,std::string role,bool dependency,bool drawn){
     path=imagePath(std::move(path));if(path.empty())return SIZE_MAX;ImgCall value;value.path=std::move(path);value.frame=frame;value.layer=layerId;value.role=std::move(role);value.dependency=dependency;value.drawn=drawn;value.count=value.runtimeCount=1;value.hidden=hidden(value.path);
     auto it=std::find_if(currentImages_.begin(),currentImages_.end(),[&](const ImgCall& call){return call.path==value.path&&call.frame==value.frame&&call.layer==value.layer&&call.role==value.role;});size_t index;
@@ -427,9 +443,40 @@ bool Playback::setNegativeImgOffsetsEnabled(bool enabled){
     selected=oldSelected;skipped=oldSkipped;
     return changed;
 }
-bool Playback::seek(int64_t elapsed){if(!replay_)return false;bool wasPaused=paused_,wasStopped=stopped_;replay_->rewind();executor_->resetPlaybackState();hasScene_=ended_=false;stopped_=false;paused_=false;sequentialState_=true;elapsed=std::max<int64_t>(0,elapsed);Scene next;bool changed=false;
-    while(!hasScene_||scene_.timestamp<elapsed){if(!replay_->next(next)){ended_=true;break;}scene_=std::move(next);hasScene_=true;executor_->execute(scene_);selected++;changed=true;}
-    elapsed_=ended_?scene_.timestamp:elapsed;start_=std::chrono::steady_clock::now()-std::chrono::milliseconds(elapsed_);paused_=wasPaused;stopped_=wasStopped;return changed;}
+void Playback::setElapsedMilliseconds(int64_t elapsed){elapsed_=std::max<int64_t>(0,elapsed);start_=std::chrono::steady_clock::now()-std::chrono::milliseconds(elapsed_);}
+void Playback::finishNavigation(int64_t elapsed,bool playing,bool ended,bool stopped){setElapsedMilliseconds(elapsed);ended_=ended;stopped_=stopped;paused_=!playing&&!ended&&!stopped;}
+bool Playback::seek(int64_t elapsed,bool endpointLast,const std::function<bool()>& cancelled,const std::function<void(uint64_t)>& progress){
+    if(!replay_||!executor_)return false;
+    elapsed=std::max<int64_t>(0,elapsed);bool changed=false;
+    // Only fully executed sequential state can advance without replaying history.
+    if(!hasScene_||!sequentialState_||(!endpointLast&&scene_.timestamp>=elapsed)){
+        replay_->rewind();executor_->resetPlaybackState();hasScene_=false;sequentialState_=true;
+    }
+    ended_=false;Scene next;
+    auto aborted=[&]{if(cancelled&&cancelled()){sequentialState_=false;return true;}return false;};
+    if(aborted())return false;
+    while(endpointLast||!hasScene_||scene_.timestamp<elapsed){
+        if(!replay_->next(next)){ended_=true;break;}
+        scene_=std::move(next);hasScene_=true;executor_->execute(scene_);selected++;changed=true;
+        if(progress)progress(scene_.ordinal);if(aborted())return false;
+    }
+    if(!hasScene_)scene_={};setElapsedMilliseconds(ended_?scene_.timestamp:elapsed);return changed;
+}
+bool Playback::seekOrdinal(uint64_t ordinal,const std::function<bool()>& cancelled,const std::function<void(uint64_t)>& progress,bool forceRebuild){
+    if(!replay_||!executor_)return false;bool changed=false;
+    if(forceRebuild||!hasScene_||!sequentialState_||scene_.ordinal>ordinal){
+        replay_->rewind();executor_->resetPlaybackState();hasScene_=false;sequentialState_=true;
+    }
+    ended_=false;Scene next;
+    auto aborted=[&]{if(cancelled&&cancelled()){sequentialState_=false;return true;}return false;};
+    if(aborted())return false;
+    while(!hasScene_||scene_.ordinal<ordinal){
+        if(!replay_->next(next)){ended_=true;break;}
+        scene_=std::move(next);hasScene_=true;executor_->execute(scene_);selected++;changed=true;
+        if(progress)progress(scene_.ordinal);if(aborted())return false;
+    }
+    if(!hasScene_)scene_={};setElapsedMilliseconds(hasScene_?scene_.timestamp:0);return changed;
+}
 bool Playback::rebuildToOrdinal(uint64_t ordinal){
     replay_->rewind();executor_->resetPlaybackState();hasScene_=ended_=false;sequentialState_=true;Scene next;
     while(replay_->next(next)){scene_=std::move(next);hasScene_=true;executor_->execute(scene_);selected++;if(scene_.ordinal>=ordinal)return true;}

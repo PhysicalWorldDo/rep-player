@@ -15,8 +15,8 @@ template<class T> concept ControllerNavigation = requires(T& p) {
     p.seekTime(11, false); p.stepFrame(1, true);
     p.status().completedNavigationSerial;
 };
-template<class T> auto waitFor(T& player, const auto& predicate) {
-    auto deadline=Clock::now()+std::chrono::seconds(20);
+template<class T> auto waitFor(T& player, const auto& predicate,int seconds=20) {
+    auto deadline=Clock::now()+std::chrono::seconds(seconds);
     while(Clock::now()<deadline) {auto s=player.status();if(predicate(s))return s;std::this_thread::sleep_for(std::chrono::milliseconds(2));}
     throw Error("navigation wait timed out");
 }
@@ -46,7 +46,38 @@ template<class P> void controllerCase(HWND window,const std::filesystem::path& r
     else {
         P player(window,root,client,true,Clock::now());player.setAudioMuted(true);player.open(path);
         auto opened=waitFor(player,[](const auto& s){return s.phase==Phase::Playing&&s.frameCount>0;});
-        if(mode==L"scrub") {
+        if(mode==L"real") {
+            player.togglePause();waitFor(player,[](const auto& s){return s.phase==Phase::Paused;});
+            auto duration=opened.duration;auto secondsSince=[](auto at){return std::chrono::duration<double>(Clock::now()-at).count();};
+            auto at=Clock::now();player.seekTime(duration,true);
+            auto ended=waitFor(player,[](const auto& s){return s.phase==Phase::Ended&&s.completedNavigationSerial>0;},90);auto endSeconds=secondsSince(at);
+            at=Clock::now();player.stepFrame(-1);auto previous=waitFor(player,[&](const auto& s){return s.phase==Phase::Paused&&s.completedNavigationSerial>ended.completedNavigationSerial;},90);auto previousSeconds=secondsSince(at);
+            at=Clock::now();player.stepFrame(1);auto next=waitFor(player,[&](const auto& s){return s.phase==Phase::Paused&&s.completedNavigationSerial>previous.completedNavigationSerial;},90);auto forwardSeconds=secondsSince(at);
+            bool same=next.frameCrc==ended.frameCrc;
+            player.seekTime(duration-1000);auto stale=waitFor(player,[](const auto& s){return s.phase==decltype(s.phase)::Seeking;});
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));player.seekTime(200);
+            auto latest=waitFor(player,[&](const auto& s){return s.phase==Phase::Paused&&s.completedNavigationSerial>stale.navigationSerial;},90);
+            std::this_thread::sleep_for(std::chrono::milliseconds(80));auto stable=player.status();bool latestStable=stable.completedNavigationSerial==latest.completedNavigationSerial&&stable.elapsed==200;
+            player.seekTime(duration);waitFor(player,[&](const auto& s){return s.phase==decltype(s.phase)::Seeking&&s.navigationProgressOrdinal>latest.ordinal+20;},90);
+            at=Clock::now();player.stop();auto stopped=waitFor(player,[](const auto& s){return s.phase==Phase::Stopped&&!s.audioAvailable;},90);auto stopSeconds=secondsSince(at);
+            std::this_thread::sleep_for(std::chrono::milliseconds(80));bool noStale=player.status().phase==Phase::Stopped;
+            std::cout<<"{\"implemented\":true,\"frames\":"<<ended.frameCount<<",\"end_ordinal\":"<<ended.ordinal<<",\"previous_ordinal\":"<<previous.ordinal<<",\"next_ordinal\":"<<next.ordinal
+                     <<",\"end_seek_seconds\":"<<endSeconds<<",\"previous_seconds\":"<<previousSeconds<<",\"forward_reuse_seconds\":"<<forwardSeconds
+                     <<",\"same_crc\":"<<(same?"true":"false")<<",\"end_crc\":"<<ended.frameCrc<<",\"next_crc\":"<<next.frameCrc
+                     <<",\"previous_audio_confirmed\":"<<(previous.audioPosition==previous.elapsed?"true":"false")<<",\"latest_stable\":"<<(latestStable?"true":"false")
+                     <<",\"stop_seconds\":"<<stopSeconds<<",\"stop_wins\":"<<(noStale?"true":"false")<<"}\n";
+        } else if(mode==L"refresh-resume") {
+            player.togglePause();waitFor(player,[](const auto& s){return s.phase==Phase::Paused;});
+            player.seekTime(800);auto paused=waitFor(player,[](const auto& s){return s.phase==Phase::Paused&&s.completedNavigationSerial>0&&s.elapsed==800;});
+            CanvasSettings settings;settings.mode=CanvasMode::Multiple;settings.factor=2;player.setCanvasSettings(settings);
+            waitFor(player,[&](const auto& s){return s.phase==decltype(s.phase)::Seeking&&s.navigationProgressOrdinal>paused.ordinal/4;});
+            player.togglePause();auto resumed=waitFor(player,[&](const auto& s){return s.phase==Phase::Playing&&s.completedNavigationSerial>paused.completedNavigationSerial;});
+            std::this_thread::sleep_for(std::chrono::milliseconds(80));auto later=player.status();
+            bool audioAdvance=later.audioPosition>=resumed.audioPosition+25;
+            bool sync=std::abs(later.audioPosition-later.elapsed)<=35;
+            std::cout<<"{\"implemented\":true,\"audio_advances\":"<<(audioAdvance?"true":"false")<<",\"sync\":"<<(sync?"true":"false")
+                     <<",\"resumed_audio\":"<<resumed.audioPosition<<",\"later_audio\":"<<later.audioPosition<<",\"later_elapsed\":"<<later.elapsed<<"}\n";
+        } else if(mode==L"scrub") {
             player.beginScrub();auto frozen=waitFor(player,[](const auto& s){return s.scrubbing;});
             std::this_thread::sleep_for(std::chrono::milliseconds(60));auto later=player.status();
             bool frozenClock=later.elapsed==frozen.elapsed;
@@ -59,19 +90,26 @@ template<class P> void controllerCase(HWND window,const std::filesystem::path& r
             std::this_thread::sleep_for(std::chrono::milliseconds(80));auto settled=player.status();
             bool repeatBounded=settled.ordinal<=paused.ordinal+2;
             player.seekTime(50,true);auto ended=waitFor(player,[&](const auto& s){return s.completedNavigationSerial>stepped.completedNavigationSerial&&s.phase==Phase::Ended;});
+            player.beginScrub();waitFor(player,[](const auto& s){return s.scrubbing;});player.endScrub();
+            auto cancelled=waitFor(player,[&](const auto& s){return s.completedNavigationSerial>ended.completedNavigationSerial;});
+            bool cancelPreservesEnd=cancelled.phase==Phase::Ended&&cancelled.ordinal==ended.ordinal&&cancelled.elapsed==ended.elapsed;
             std::cout<<"{\"implemented\":true,\"frozen\":"<<(frozenClock?"true":"false")<<",\"sync\":"<<(synced?"true":"false")
                      <<",\"paused_ordinal\":"<<paused.ordinal<<",\"repeat_bounded\":"<<(repeatBounded?"true":"false")
-                     <<",\"endpoint_ordinal\":"<<ended.ordinal<<",\"audio_confirmed\":"<<(ended.audioPosition==ended.elapsed?"true":"false")<<"}\n";
+                     <<",\"endpoint_ordinal\":"<<ended.ordinal<<",\"audio_confirmed\":"<<(ended.audioPosition==ended.elapsed?"true":"false")
+                     <<",\"cancel_preserves_end\":"<<(cancelPreservesEnd?"true":"false")<<"}\n";
         } else {
             player.togglePause();auto paused=waitFor(player,[](const auto& s){return s.phase==Phase::Paused;});
             player.seekTime(900);auto seeking=waitFor(player,[](const auto& s){return s.phase==decltype(s.phase)::Seeking;});
             for(int n=0;n<30;n++)player.stepFrame(1,true);
             player.seekTime(20);auto applied=waitFor(player,[&](const auto& s){return s.phase==Phase::Paused&&s.completedNavigationSerial>seeking.navigationSerial;});
             bool latest=applied.elapsed==20;
-            player.seekTime(1000);waitFor(player,[](const auto& s){return s.phase==decltype(s.phase)::Seeking;});player.stop();
+            player.seekTime(1000);waitFor(player,[&](const auto& s){return s.phase==decltype(s.phase)::Seeking&&s.navigationProgressOrdinal>applied.ordinal+3;});player.stop();
             auto stopped=waitFor(player,[](const auto& s){return s.phase==Phase::Stopped&&!s.audioAvailable;});
             std::this_thread::sleep_for(std::chrono::milliseconds(80));bool noStale=player.status().phase==Phase::Stopped;
-            std::cout<<"{\"implemented\":true,\"latest\":"<<(latest?"true":"false")<<",\"stop_wins\":"<<(noStale?"true":"false")<<"}\n";
+            player.captureFrame();auto captured=waitFor(player,[&](const auto& s){return s.captureSerial>applied.captureSerial;});
+            bool stoppedPicture=captured.frameCrc==applied.frameCrc;
+            std::cout<<"{\"implemented\":true,\"latest\":"<<(latest?"true":"false")<<",\"stop_wins\":"<<(noStale?"true":"false")
+                     <<",\"stopped_picture_preserved\":"<<(stoppedPicture?"true":"false")<<"}\n";
         }
     }
 }

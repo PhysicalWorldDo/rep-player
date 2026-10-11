@@ -46,8 +46,13 @@ class NavigationTests(unittest.TestCase):
             [(t, (0, 1) if n == 0 else (1,), struct.pack('<2h', n, 3)) for n, t in enumerate((0, 10, 10, 30, 50, 50))],
             ['TONE', 'sprite/test/frame.img'], header=header))
         cls.heavy = cls.folder / 'heavy.rep'
-        cls.heavy.write_bytes(pack_replay(1.7, {0: sound, 1: draw},
-            [(t, ((0,) if t == 0 else ()) + (1,) * 4000, struct.pack('<2h', 2, 3) * 4000) for t in range(0, 1001, 10)],
+        heavy_commands = {0: sound}
+        for n in range(101):
+            tinted = params.copy()
+            struct.pack_into('<I', tinted, 8, 0xff000000 | ((n + 1) << 16))
+            heavy_commands[n + 1] = struct.pack('<II', 3, 64) + tinted
+        cls.heavy.write_bytes(pack_replay(1.7, heavy_commands,
+            [(t, ((0,) if t == 0 else ()) + (t // 10 + 1,) * 4000, struct.pack('<2h', 2, 3) * 4000) for t in range(0, 1001, 10)],
             ['TONE', 'sprite/test/frame.img'], header=header))
         shutil.copy2(ROOT / 'build/ffmpeg.exe', cls.folder / 'ffmpeg.exe')
         subprocess.run(['powershell', '-NoProfile', '-Command',
@@ -92,13 +97,33 @@ class NavigationTests(unittest.TestCase):
         report = self.result('scrub')
         self.assertEqual(report['paused_ordinal'], 3)
         self.assertEqual(report['endpoint_ordinal'], 5)
-        for name in ('frozen', 'sync', 'repeat_bounded', 'audio_confirmed'):
+        for name in ('frozen', 'sync', 'repeat_bounded', 'audio_confirmed', 'cancel_preserves_end'):
             self.assertTrue(report[name], str(report))
 
     def test_latest_seek_and_stop_interrupt_a_real_rebuild(self):
         report = self.result('cancel', True)
         self.assertTrue(report['latest'], str(report))
         self.assertTrue(report['stop_wins'], str(report))
+        self.assertTrue(report['stopped_picture_preserved'], str(report))
+
+    def test_resume_requested_during_paused_visual_refresh_resumes_audio(self):
+        report = self.result('refresh-resume', True)
+        self.assertTrue(report['audio_advances'], str(report))
+        self.assertTrue(report['sync'], str(report))
+
+    @unittest.skipUnless(os.environ.get('REP_PLAYER_REAL_NAVIGATION') == '1', 'real client navigation is explicitly opt-in')
+    def test_real_3909_recording_exact_tail_and_cancellation(self):
+        client = Path(r'E:\WeGameApps\地下城与勇士：创新世纪')
+        replay = Path(r'C:\Users\CAO\Downloads\202610040227.rep')
+        self.assertTrue(client.is_dir() and replay.is_file(), 'authorized real inputs are unavailable')
+        result = subprocess.run([str(self.exe), 'real', str(self.folder), str(client), str(replay)],
+            capture_output=True, text=True, encoding='utf8', timeout=240)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = json.loads(result.stdout)
+        (self.folder / 'real.json').write_text(json.dumps(report, indent=2), encoding='utf8')
+        self.assertEqual((report['frames'], report['end_ordinal'], report['previous_ordinal'], report['next_ordinal']), (3909, 3908, 3907, 3908))
+        for name in ('same_crc', 'previous_audio_confirmed', 'latest_stable', 'stop_wins'):
+            self.assertTrue(report[name], str(report))
 
 
 if __name__ == '__main__':
