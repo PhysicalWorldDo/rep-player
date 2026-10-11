@@ -6,8 +6,9 @@
 #include <utility>
 
 namespace rep::ui {
-PlaybackController::PlaybackController(HWND canvas,std::filesystem::path root,std::filesystem::path client,bool test,Clock::time_point processStart,ClientProtocolSelection protocol,CanvasSettings settings)
-    :canvas_(canvas),root_(std::move(root)),client_(std::move(client)),protocol_(std::move(protocol)),canvasSettings_(std::move(settings)),test_(test),processStart_(processStart) {
+PlaybackController::PlaybackController(HWND canvas,std::filesystem::path root,std::filesystem::path client,bool test,Clock::time_point processStart,ClientProtocolSelection protocol,CanvasSettings settings,bool patchesEnabled)
+    :canvas_(canvas),root_(std::move(root)),client_(std::move(client)),protocol_(std::move(protocol)),canvasSettings_(std::move(settings)),test_(test),processStart_(processStart),patchesEnabled_(patchesEnabled) {
+    status_.patchesEnabled=patchesEnabled;
     thread_=std::thread([this]{run();});
 }
 PlaybackController::~PlaybackController(){quitting_=true;generation_++;condition_.notify_all();if(thread_.joinable())thread_.join();}
@@ -16,9 +17,10 @@ void PlaybackController::replay(){auto s=status();if(s.path.empty())return;std::
 void PlaybackController::stop(){std::lock_guard lock(mutex_);stopRequested_=true;stepsRequested_.clear();generation_++;condition_.notify_all();}
 void PlaybackController::togglePause(){std::lock_guard lock(mutex_);if(status_.path.empty())return;toggleRequested_=true;condition_.notify_all();}
 void PlaybackController::stepFrame(int direction){if(!direction)return;std::lock_guard lock(mutex_);if(status_.path.empty()||status_.phase==Phase::Loading||status_.phase==Phase::Error)return;stepsRequested_.push_back(direction<0?-1:1);condition_.notify_all();}
-void PlaybackController::configureClient(const std::filesystem::path& client){std::lock_guard lock(mutex_);client_=client;requested_.clear();hidden_.clear();stepsRequested_.clear();stopRequested_=true;toggleRequested_=filterRequested_=captureRequested_=false;refreshImagesRequested_=true;imageIndex_.reset();status_=PlayerStatus{};status_.client=client_;status_.audioVolume=audioVolume_;status_.audioMuted=audioMuted_;status_.negativeImgOffsetsEnabled=negativeImgOffsetsEnabled_;generation_++;condition_.notify_all();}
-void PlaybackController::refreshImages(){std::lock_guard lock(mutex_);if(client_.empty())return;requested_=status_.path;requestedAt_=Clock::now();stopRequested_=requested_.empty();stepsRequested_.clear();refreshImagesRequested_=true;imageIndex_.reset();status_.phase=Phase::Loading;status_.frameCount=0;status_.currentImages.clear();status_.allImages.clear();status_.message.clear();generation_++;condition_.notify_all();}
+void PlaybackController::configureClient(const std::filesystem::path& client){std::lock_guard lock(mutex_);client_=client;requested_.clear();hidden_.clear();stepsRequested_.clear();stopRequested_=true;toggleRequested_=filterRequested_=captureRequested_=false;refreshImagesRequested_=true;imageIndex_.reset();status_=PlayerStatus{};status_.client=client_;status_.audioVolume=audioVolume_;status_.audioMuted=audioMuted_;status_.negativeImgOffsetsEnabled=negativeImgOffsetsEnabled_;status_.patchesEnabled=patchesEnabled_;generation_++;condition_.notify_all();}
+void PlaybackController::refreshImages(std::optional<bool> patchesEnabled){std::lock_guard lock(mutex_);if(client_.empty())return;if(patchesEnabled)patchesEnabled_=*patchesEnabled;requested_=status_.path;requestedAt_=Clock::now();stopRequested_=requested_.empty();stepsRequested_.clear();refreshImagesRequested_=true;imageIndex_.reset();status_.phase=Phase::Loading;status_.frameCount=0;status_.currentImages.clear();status_.allImages.clear();status_.message.clear();generation_++;condition_.notify_all();}
 Assets::IndexPtr PlaybackController::imageIndex(){std::lock_guard lock(mutex_);return imageIndex_;}
+std::optional<bool> PlaybackController::appliedPatchesEnabled(){std::lock_guard lock(mutex_);if(!imageIndex_)return {};return status_.patchesEnabled;}
 void PlaybackController::setHiddenImages(std::unordered_set<std::string> hidden){std::lock_guard lock(mutex_);hidden_=std::move(hidden);status_.hiddenImages=hidden_;if(status_.path.empty())return;filterRequested_=true;condition_.notify_all();}
 void PlaybackController::setCanvasSettings(const CanvasSettings& settings){std::lock_guard lock(mutex_);canvasSettings_=settings;canvasRequested_=true;condition_.notify_all();}
 void PlaybackController::setNegativeImgOffsetsEnabled(bool enabled){std::lock_guard lock(mutex_);if(negativeImgOffsetsEnabled_==enabled)return;negativeImgOffsetsEnabled_=enabled;status_.negativeImgOffsetsEnabled=enabled;negativeImgOffsetsRequested_=true;condition_.notify_all();}
@@ -67,14 +69,14 @@ void PlaybackController::run(){try{
     while(!quitting_){
         uint64_t generation=generation_;
         if(generation!=consumed_){
-            std::filesystem::path path,client;Clock::time_point requestedAt;bool stop,refresh,negativeImgOffsets;std::unordered_set<std::string> hidden;CanvasSettings settings;
-            {std::lock_guard lock(mutex_);generation=generation_;path=requested_;client=client_;requestedAt=requestedAt_;stop=stopRequested_;hidden=hidden_;settings=canvasSettings_;negativeImgOffsets=negativeImgOffsetsEnabled_;refresh=std::exchange(refreshImagesRequested_,false);toggleRequested_=false;filterRequested_=false;}
+            std::filesystem::path path,client;Clock::time_point requestedAt;bool stop,refresh,negativeImgOffsets,patchesEnabled;std::unordered_set<std::string> hidden;CanvasSettings settings;
+            {std::lock_guard lock(mutex_);generation=generation_;path=requested_;client=client_;requestedAt=requestedAt_;stop=stopRequested_;hidden=hidden_;settings=canvasSettings_;negativeImgOffsets=negativeImgOffsetsEnabled_;patchesEnabled=patchesEnabled_;refresh=std::exchange(refreshImagesRequested_,false);toggleRequested_=false;filterRequested_=false;}
             consumed_=generation;playback.stop();if(audio)audio->stop();
             try{if(refresh||client!=activeClient||!assets){
-                releaseReplay();assets.reset();if(!client.empty())assets=std::make_unique<Assets>(client/L"ImagePacks2");
+                releaseReplay();assets.reset();if(!client.empty())assets=std::make_unique<Assets>(client/L"ImagePacks2",patchesEnabled);
                 activeClient=client;
-            }}catch(const std::exception& e){std::lock_guard lock(mutex_);status_.phase=Phase::Error;status_.message=wide(e.what());updateAudio();continue;}
-            {std::lock_guard lock(mutex_);if(quitting_||generation_!=generation)continue;imageIndex_=assets?assets->index():Assets::IndexPtr{};}
+            }}catch(const std::exception& e){std::lock_guard lock(mutex_);if(generation_==generation){patchesEnabled_=status_.patchesEnabled;status_.phase=Phase::Error;status_.message=wide(e.what());updateAudio();}continue;}
+            {std::lock_guard lock(mutex_);if(quitting_||generation_!=generation)continue;imageIndex_=assets?assets->index():Assets::IndexPtr{};if(assets)status_.patchesEnabled=assets->patchesEnabled();}
             if(stop){releaseAudio();std::lock_guard lock(mutex_);status_.phase=path.empty()?Phase::Empty:Phase::Stopped;status_.client=activeClient;updateAudio();}
             else try{
                 if(inspection.valid())inspection.wait();

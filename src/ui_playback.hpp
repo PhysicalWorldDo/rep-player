@@ -7,6 +7,7 @@
 #include <condition_variable>
 #include <thread>
 #include <atomic>
+#include <optional>
 
 namespace rep::ui {
 using Clock = std::chrono::steady_clock;
@@ -22,6 +23,7 @@ struct PlayerStatus {
     double readySeconds=0,maxFrameMilliseconds=0,processReadySeconds=0,p50Frame=0,p95Frame=0,p99Frame=0,playbackSeconds=0;
     bool frozen=false,compatibilityIgnored=false;
     bool negativeImgOffsetsEnabled=false;
+    bool patchesEnabled=true;
     bool audioAvailable=false,audioMuted=false;
     float audioVolume=1;
     std::wstring audioMessage;
@@ -54,11 +56,12 @@ class PlaybackController {
     std::vector<int> stepsRequested_;
     std::unordered_set<std::string> hidden_;
     Assets::IndexPtr imageIndex_;
+    bool patchesEnabled_=true;
     bool refreshImagesRequested_=false;
     PlayerStatus status_;
     void run();
 public:
-    PlaybackController(HWND canvas,std::filesystem::path root,std::filesystem::path client,bool test,Clock::time_point processStart,ClientProtocolSelection protocol={},CanvasSettings settings={});
+    PlaybackController(HWND canvas,std::filesystem::path root,std::filesystem::path client,bool test,Clock::time_point processStart,ClientProtocolSelection protocol={},CanvasSettings settings={},bool patchesEnabled=true);
     ~PlaybackController();
     void open(const std::filesystem::path& path);
     void replay();
@@ -66,8 +69,9 @@ public:
     void togglePause();
     void stepFrame(int direction);
     void configureClient(const std::filesystem::path& client);
-    void refreshImages();
+    void refreshImages(std::optional<bool> patchesEnabled={});
     Assets::IndexPtr imageIndex();
+    std::optional<bool> appliedPatchesEnabled();
     void setHiddenImages(std::unordered_set<std::string> hidden);
     void setCanvasSettings(const CanvasSettings& settings);
     void setNegativeImgOffsetsEnabled(bool enabled);

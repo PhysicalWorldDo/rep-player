@@ -118,16 +118,19 @@ std::shared_ptr<Frame> Img::frame(int index,int palette){std::unordered_set<int>
 static std::string normalize(std::string name) {name=canonical(name);while(!name.empty()&&name[0]=='/')name.erase(0,1);if(name.rfind("sprite/",0)!=0)name="sprite/"+name;return name;}
 struct Assets::Index {
     std::filesystem::path root;
+    bool patchesEnabled=true;
     std::unordered_map<std::string,Entry> entries;
     std::unordered_set<std::string> packages;
 };
-Assets::Assets(std::filesystem::path root):Assets(buildIndex(std::move(root))){}
+Assets::Assets(std::filesystem::path root,bool patchesEnabled):Assets(buildIndex(std::move(root),patchesEnabled)){}
 Assets::Assets(IndexPtr index):index_(std::move(index)){
     if(!index_)throw Error("resource index is absent");
     root_=index_->root;
 }
-Assets::IndexPtr Assets::buildIndex(std::filesystem::path root){
-    auto index=std::make_shared<Index>();index->root=std::move(root);
+bool Assets::patchesEnabled()const{return index_->patchesEnabled;}
+Assets::IndexPtr Assets::buildIndex(std::filesystem::path root,bool patchesEnabled){
+    auto index=std::make_shared<Index>();index->root=std::move(root);index->patchesEnabled=patchesEnabled;
+    if(!patchesEnabled){indexNative(*index);return index;}
     std::vector<std::wstring> names;
     if(std::filesystem::is_directory(index->root))for(const auto& file:std::filesystem::directory_iterator(index->root)){
         if(!file.is_regular_file())continue;

@@ -32,11 +32,15 @@ int wmain(int argc,wchar_t** argv){try{
     if(std::wstring_view(argv[1])==L"snapshot"){
         snapshot<rep::Assets>(root,logical);return 0;
     }
-    rep::Assets assets(root);
-    auto frame=assets.frame(logical,argc>4?std::stoi(argv[4]):0);
+    auto makeAssets=[]<class T>(const std::filesystem::path& path,bool enabled){
+        if constexpr(std::is_constructible_v<T,std::filesystem::path,bool>)return std::make_unique<T>(path,enabled);
+        else {if(!enabled)throw rep::Error("patch enable/disable is not supported");return std::make_unique<T>(path);}
+    };
+    auto assets=makeAssets.template operator()<rep::Assets>(root,argc>5?std::stoi(argv[5])!=0:true);
+    auto frame=assets->frame(logical,argc>4?std::stoi(argv[4]):0);
     const auto pixels=frame->cropped();
     std::cout<<"{\"pixel\":["<<unsigned(pixels.at(0))<<','<<unsigned(pixels.at(1))<<','
-             <<unsigned(pixels.at(2))<<','<<unsigned(pixels.at(3))<<"],\"fallbacks\":"<<assets.fallbacks
+             <<unsigned(pixels.at(2))<<','<<unsigned(pixels.at(3))<<"],\"fallbacks\":"<<assets->fallbacks
              <<",\"actual_path\":\""<<frame->actualPath<<"\",\"actual_frame\":"<<frame->actualFrame<<"}\n";
     return 0;
 }catch(const std::exception& error){std::cerr<<error.what()<<'\n';return 1;}}

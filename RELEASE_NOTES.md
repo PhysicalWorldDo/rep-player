@@ -1,5 +1,10 @@
 # 更新记录
 
+## 未发布
+
+- 顶部增加“启用补丁”复选框，默认启用。切换后点击“刷新 NPK”才应用，禁用时沿用原索引和原包定位。
+- 预览、逐帧与导出共用已生效索引；已应用选择自动保存，未刷新的选择不会保存。加载和导出期间禁用开关与刷新。
+
 ## v1.1.2
 
 发布日期：2026-10-10。下载 [Windows x64 运行包](https://github.com/PhysicalWorldDo/rep-player/releases/download/v1.1.2/rep-player-v1.1.2-windows-x64.zip)。完整解压后直接运行 `rep_player.exe`。

@@ -92,8 +92,8 @@ class NpkPriorityTests(unittest.TestCase):
             entries.update(extra)
         return write_package(packs / ORIGINAL, entries)
 
-    def run_frame(self, packs, logical=LOGICAL, frame=0, *, success=True):
-        result = subprocess.run([str(self.exe), 'frame', str(packs), logical, str(frame)],
+    def run_frame(self, packs, logical=LOGICAL, frame=0, *, success=True, patches=True):
+        result = subprocess.run([str(self.exe), 'frame', str(packs), logical, str(frame), str(int(patches))],
                                 capture_output=True, text=True, encoding='utf-8', timeout=20)
         record = {'exit_code': result.returncode, 'stdout': result.stdout, 'stderr': result.stderr}
         self.reports.setdefault(self._testMethodName, []).append(record)
@@ -184,6 +184,23 @@ class NpkPriorityTests(unittest.TestCase):
     def test_no_patch_keeps_original_behavior(self):
         packs = self.packs(); self.original(packs)
         self.assertEqual(self.run_frame(packs)['pixel'], list(RED))
+
+    def test_disabled_patches_keep_guessed_original(self):
+        packs = self.packs(); self.original(packs)
+        write_package(packs / '!patch.npk', {LOGICAL: image(GREEN)})
+        self.assertEqual(self.run_frame(packs, patches=False)['pixel'], list(RED))
+        self.assertEqual(self.run_frame(packs)['pixel'], list(GREEN))
+
+    def test_disabled_patches_keep_native_index(self):
+        packs = self.packs(); locations = self.original(packs)
+        write_native_index(packs / 'NpkIndex.etc', ORIGINAL, locations)
+        write_package(packs / '!patch.npk', {LOGICAL: image(GREEN)})
+        self.assertEqual(self.run_frame(packs, patches=False)['pixel'], list(RED))
+
+    def test_disabled_patches_do_not_read_broken_early_package(self):
+        packs = self.packs(); self.original(packs)
+        (packs / '!broken.npk').write_bytes(b'broken patch')
+        self.assertEqual(self.run_frame(packs, patches=False)['pixel'], list(RED))
 
     def test_no_sprite_boundary_keeps_existing_native_index_only(self):
         packs = self.packs()

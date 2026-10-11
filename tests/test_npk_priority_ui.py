@@ -100,6 +100,10 @@ class NpkPriorityUiTests(unittest.TestCase):
         self.assertTrue(report['toolbar'])
         self.assertTrue(report['empty_client_disabled'])
 
+    def test_close_before_next_status_poll_saves_applied_patch_choice(self):
+        report = self.run_mode('persist')
+        self.assertTrue(report['applied_choice_saved_on_close'])
+
     def test_refresh_command_preview_step_and_export_share_published_snapshot(self):
         report = self.run_mode('refresh')
         for name in ['refresh_command', 'pending_export_disabled', 'settings_preserved', 'img_panel', 'frame_step']:

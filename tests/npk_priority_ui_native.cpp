@@ -59,6 +59,18 @@ int wmain(int argc,wchar_t** argv){
         checkToolbar(*app,directory);
         if(std::wstring_view(argv[1])==L"empty"){
             require(!IsWindowEnabled(GetDlgItem(window,RefreshId)),"Refresh NPK must be disabled without a selected client");std::cout<<"{\"toolbar\":true,\"empty_client_disabled\":true}\n";
+        }else if(std::wstring_view(argv[1])==L"persist"){
+            std::filesystem::copy_file(argv[4],client/L"ImagePacks2"/L"0_patch.NPK");
+            app->openSpecified(client/L"Replay"/L"refresh.rep");
+            waitFor(*app,[](const auto& s){return s.phase==Phase::Ended;},"Initial replay did not end");
+            pump();KillTimer(window,1);pump();
+            app->patchesEnabled=false;app->updatePatchesControl();command(*app,RefreshId);
+            waitFor(*app,[](const auto& s){return s.phase==Phase::Ended&&!s.patchesEnabled;},"Disabled resource index was not applied");
+            require(bool(app->worker->imageIndex()),"No successful disabled index was published");
+            SendMessageW(window,WM_CLOSE,0,0);window=nullptr;
+            int saved=-1;std::ifstream(directory/L"runtime"/L"npk_patches.txt")>>saved;
+            require(saved==0,"Closing before the next UI poll lost the successfully applied patch setting");
+            std::cout<<"{\"applied_choice_saved_on_close\":true}\n";
         }else{
             auto replay=client/L"Replay"/L"refresh.rep";app->openSpecified(replay);waitFor(*app,[](const auto& s){return s.phase==Phase::Ended;},"Initial replay did not end");
             rep::CanvasSettings settings;settings.factor=1.5;app->applyCanvasSettings(settings);app->hiddenImages={"sprite/not_used.img"};app->worker->setHiddenImages(app->hiddenImages);app->setAudioVolume(37);app->toggleAudioMute();
