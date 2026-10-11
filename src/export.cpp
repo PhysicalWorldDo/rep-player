@@ -135,9 +135,9 @@ ExportResult exportReplay(Gpu& gpu,Assets& assets,const std::filesystem::path& c
     if(!sceneCount)throw Error("REP has no scenes to export");replay.rewind();
     ExportResult result;result.outputPath=output;
     result.fps=options.fps;result.durationMilliseconds=duration;result.frames=(uint64_t(duration)*options.fps+999)/1000+1;
-    result.alpha=options.alpha&&options.format!=ExportFormat::Mp4;result.hiddenImageCount=options.hiddenImages.size();
+    result.alpha=options.alpha&&options.format!=ExportFormat::Mp4;
     update.totalFrames=result.frames;if(progress)progress(update);
-    Executor executor(gpu,assets,cache,client);executor.setTransparent(result.alpha);executor.setHiddenImages(options.hiddenImages);
+    Executor executor(gpu,assets,cache,client);executor.setTransparent(result.alpha);executor.setHiddenImages(options.hiddenImages);executor.setImageVisibility(options.imageVisibility);
     executor.setNegativeImgOffsetsEnabled(options.negativeImgOffsetsEnabled);
     executor.setCanvasSettings(options.canvas);executor.attach(replay);
     result.width=executor.output().image.width;result.height=executor.output().image.height;
@@ -188,6 +188,7 @@ ExportResult exportReplay(Gpu& gpu,Assets& assets,const std::filesystem::path& c
     }
     update.stage=L"Encoding";if(progress)progress(update);encoder.finish(cancelled);checkCancelled();
     std::filesystem::rename(staging,output);result.executedScenes=executor.statistics.scenes;
+    result.hiddenImageCount=executor.hiddenImages().size();
     result.compatibilityIgnoredInstructions=executor.statistics.compatibilityIgnoredInstructions;
     update.stage=L"Complete";if(progress)progress(update);return result;
 }

@@ -1,6 +1,7 @@
 #pragma once
 #include "engine.hpp"
 #include "client_protocol.hpp"
+#include "image_categories.hpp"
 #include <unordered_set>
 
 namespace rep {
@@ -14,6 +15,7 @@ struct ExportOptions {
     std::filesystem::path outputDirectory;
     std::wstring fileName;
     std::unordered_set<std::string> hiddenImages;
+    ImageVisibilityPolicy imageVisibility;
     ClientProtocolSelection protocol;
     CanvasSettings canvas;
 };
