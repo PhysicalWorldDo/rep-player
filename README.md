@@ -2,11 +2,9 @@
 
 离线播放 DNF 客户端中的 REP 录像，支持声音预览、中英搜索、逐帧查看、IMG 显示控制和画布扩展，可导出 MOV、MP4 和 PNG 序列。适用于 Windows 10 / 11 x64。
 
-当前源码新增进度条定位、持久分类开关和待刷新生效的补丁开关，尚未制作新 Release；公开 v1.1.2 运行包不包含这些源码修改。以下说明包含当前源码行为。
-
 ## 下载与运行
 
-从 [v1.1.2 Release](https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.1.2) 下载 `rep-player-v1.1.2-windows-x64.zip`，完整解压到可写目录，直接双击最外层的 **rep_player.exe**。
+从 [v1.1.3 Release](https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.1.3) 下载 `rep-player-v1.1.3-windows-x64.zip`，完整解压到可写目录，直接双击最外层的 **rep_player.exe**。
 
 ```text
 解压目录/
