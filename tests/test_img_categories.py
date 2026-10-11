@@ -28,7 +28,7 @@ class NativeImgRemovalTests(unittest.TestCase):
                     'bulk_background_hidden', 'bulk_monsters_hidden', 'bulk_characters_hidden',
                     'bulk_whole_replay_paths', 'bulk_effects_preserved', 'bulk_preview_changes',
                     'bulk_shared_visibility', 'bulk_manual_checkbox_restore',
-                    'bulk_show_all_restores', 'bulk_new_replay_resets', 'pass'):
+                    'bulk_show_all_restores', 'bulk_new_replay_filters_retained', 'pass'):
             with self.subTest(check=key):
                 self.assertIs(result.get(key), True, key)
 

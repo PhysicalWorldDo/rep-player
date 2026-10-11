@@ -116,6 +116,18 @@ class NativeImageFilterSwitchUiTests(OwnedPlayerUi):
             self.assertTrue(self.user.SendMessageW(self.image_list(), 0x102B, index, remote))  # LVM_SETITEMSTATE -> LVN_ITEMCHANGED
         self.wait(lambda: self.checked(path) == visible, 'manual checkbox visibility')
 
+    def click_selected_replay(self):
+        tree = self.control(self.control(self.main, 1010), 4)
+        leaf = self.user.SendMessageW(tree, 0x110A, 9, 0)  # TVGN_CARET
+        self.assertTrue(leaf)
+        with self.list_buffer(struct.pack('<Q', leaf)) as (kernel, process, remote):
+            self.assertTrue(self.user.SendMessageW(tree, 0x1104, 0, remote))  # TVM_GETITEMRECT
+            rectangle = W.RECT()
+            self.assertTrue(kernel.ReadProcessMemory(process, remote, C.byref(rectangle), C.sizeof(rectangle), None))
+        point = 40 | (((rectangle.top + rectangle.bottom) // 2) << 16)
+        self.user.SendMessageW(tree, 0x0201, 1, point)
+        self.user.SendMessageW(tree, 0x0202, 0, point)
+
     def toggle_filter(self, identifier, enabled):
         self.command(self.main, identifier)
         self.wait(lambda: self.text(self.control(self.main, identifier)).endswith(('开', 'On') if enabled else ('关', 'Off')), 'category switch state')
@@ -135,7 +147,13 @@ class NativeImageFilterSwitchUiTests(OwnedPlayerUi):
         self.wait(lambda: not self.user.IsWindowVisible(dialog), 'export accepted')
         self.user.EnableWindow(self.main, False)
         if during:
-            self.assertFalse(self.user.IsWindowEnabled(self.control(self.main, 11)), 'snapshot mutation must occur while export is running')
+            self.wait(lambda: not self.user.IsWindowEnabled(self.control(self.main, 11)), 'running export before snapshot mutation')
+            self.snapshots.append({'export_accepted': name,
+                                   'export_button_enabled': bool(self.user.IsWindowEnabled(self.control(self.main, 11))),
+                                   'status': self.text(self.control(self.main, 6))})
+            self.assertTrue(any(label in self.text(self.control(self.main, 6))
+                                for label in ('正在导出', '正在准备导出', 'Exporting', 'Preparing export')),
+                            'snapshot mutation must occur during an observable running export')
             during()
         target = self.folder / 'exports' / name
         self.wait(lambda: target.is_dir() and self.user.IsWindowEnabled(self.control(self.main, 11)), 'PNG export completion', timeout=30)
@@ -156,6 +174,14 @@ class NativeImageFilterSwitchUiTests(OwnedPlayerUi):
             expected[0] = background_color
         self.assertTrue(all(frame == expected for frame in pixels), 'actual exported pixels must follow category switches and manual exceptions')
 
+    def assert_preview_visibility(self, name, visible):
+        def matches():
+            image = self.capture_control(self.control(self.main, 5), name)
+            rendered = {color for count, color in image.getcolors(image.width * image.height) if count > 10}
+            return all((color[:3] in rendered) == shown
+                       for (path, color, position), shown in zip(self.samples, visible))
+        self.wait(matches, 'preview pixels follow category switches and manual exceptions')
+
     def test_category_controls_default_to_off(self):
         self.start_player()
         for identifier, expected in ((18, '移除背景：关'), (19, '移除怪物：关'), (20, '移除人物：关')):
@@ -164,12 +190,14 @@ class NativeImageFilterSwitchUiTests(OwnedPlayerUi):
 
     def test_categories_preserve_effects_and_manual_exceptions_until_show_all(self):
         self.start_player()
-        self.assert_export_visibility(self.export_pixels('default_all'), (True,) * 5)
+        self.assert_preview_visibility('default_all', (True,) * 5)
         before = self.frame_number()
         for identifier in (18, 19, 20):
             self.toggle_filter(identifier, True)
+        self.assert_preview_visibility('bodies_hidden', (False, False, False, True, True))
+        self.wait_phase('Ended')
         self.assertEqual(self.frame_number(), before)
-        self.assertTrue(self.phase('Ended'))
+        self.snapshots.append({'after_filter_toggles': self.text(self.control(self.main, 6))})
         self.assert_export_visibility(self.export_pixels('bodies_hidden'), (False, False, False, True, True))
         background = self.samples[0][0]
         effect = self.samples[3][0]
@@ -181,6 +209,7 @@ class NativeImageFilterSwitchUiTests(OwnedPlayerUi):
         self.toggle_filter(19, True)
         self.assertTrue(self.checked(background), 'category toggles must preserve a manual visible exception')
         self.assertFalse(self.checked(effect), 'unrelated toggles must preserve a manual hidden exception')
+        self.assert_preview_visibility('manual_wins', (True, False, False, False, True))
         self.assert_export_visibility(self.export_pixels('manual_wins'), (True, False, False, False, True))
         self.command(self.main, 26)
         self.wait(lambda: self.text(self.control(self.main, 26)).endswith('开'), 'negative offsets enabled')
@@ -188,17 +217,21 @@ class NativeImageFilterSwitchUiTests(OwnedPlayerUi):
         self.wait(lambda: self.settings.read_text().split() == ['0', '0', '0'], 'Show all clears global category switches')
         self.assertTrue(all(self.checked(path) for path, color, position in self.samples))
         self.assertTrue(self.text(self.control(self.main, 26)).endswith('开'))
+        self.assert_preview_visibility('show_all', (True,) * 5)
         self.assert_export_visibility(self.export_pixels('show_all'), (True,) * 5)
 
     def test_switches_persist_across_refresh_restart_and_rep_switch_but_manual_choices_do_not(self):
+        self.write_category_replay(duration=1000)
+        self.other_replay.write_bytes(self.replay.read_bytes())
         self.start_player()
         background = self.samples[0][0]
         self.toggle_filter(18, True)
         self.manual(background, True)
-        self.command(self.main, 2)
+        self.click_selected_replay()
+        self.wait_phase('Playing')
         self.wait_phase('Ended')
         self.assertTrue(self.checked(background), 'same-REP replay must keep manual exceptions')
-        self.command(self.main, 25)
+        self.user.SendMessageW(self.main, 0x0111, 25, 0)
         self.wait(lambda: self.user.IsWindowEnabled(self.control(self.main, 25)) and self.phase('Ended'), 'NPK refresh complete')
         self.assertTrue(self.checked(background), 'refresh must preserve manual exceptions')
         self.edit(self.main, 8, 'other.rep')
@@ -206,6 +239,7 @@ class NativeImageFilterSwitchUiTests(OwnedPlayerUi):
         leaf = self.user.SendMessageW(tree, 0x110A, 0, 0)
         self.assertTrue(leaf)
         self.user.SendMessageW(tree, 0x110B, 9, leaf)
+        self.wait_phase('Playing')
         self.wait(lambda: 'other' in self.text(self.main) and self.phase('Ended'), 'different REP selected')
         self.assertTrue(self.text(self.control(self.main, 18)).endswith('开'))
         self.assertFalse(self.checked(background), 'true REP switch clears only manual exceptions')
@@ -229,30 +263,69 @@ class NativeImageFilterSwitchUiTests(OwnedPlayerUi):
         self.assert_export_visibility(pixels, (False, True, True, True, True))
         self.assert_export_visibility(self.export_pixels('pending_patch_still_applied'), (True,) * 5, blue)
         self.assertEqual((self.folder / 'runtime' / 'npk_patches.txt').read_text().strip(), '1')
-        self.command(self.main, 25)
+        self.user.SendMessageW(self.main, 0x0111, 25, 0)
         self.wait(lambda: (self.folder / 'runtime' / 'npk_patches.txt').read_text().strip() == '0'
                   and self.user.IsWindowEnabled(self.control(self.main, 25)) and self.phase('Ended'), 'disabled patch index published')
         self.assert_export_visibility(self.export_pixels('refresh_uses_original'), (True,) * 5)
 
-    def test_three_full_width_rows_fit_both_languages_at_minimum_size(self):
+    def test_three_parallel_switches_fit_both_languages_at_minimum_size(self):
+        runtime = self.folder / 'runtime'
+        runtime.mkdir()
+        (runtime / 'layout.txt').write_text('300 0.9', encoding='utf8')
         self.start_player()
         self.user.SetWindowPos(self.main, None, 0, 0, 1040, 720, 0x0002 | 0x0004)
         for locale, labels in ((9, ('移除背景：关', '移除怪物：关', '移除人物：关')),
-                               (10, ('Remove background: Off', 'Remove monsters: Off', 'Remove characters: Off'))):
+                               (10, ('Hide BG: Off', 'Hide monsters: Off', 'Hide people: Off'))):
             self.command(self.main, locale)
             self.wait(lambda: self.text(self.control(self.main, 18)) == labels[0], 'category translations')
+            self.capture_control(self.main, 'category_minimum_' + str(locale))
             rectangles = [self.rect(self.control(self.main, identifier)) for identifier in (18, 19, 20)]
-            for identifier, label in zip((18, 19, 20), labels):
+            for identifier, label, rectangle in zip((18, 19, 20), labels, rectangles):
                 self.assertEqual(self.text(self.control(self.main, identifier)), label)
+                self.assertGreaterEqual(rectangle.bottom - rectangle.top, 36)
+                self.assert_button_text_fits(self.control(self.main, identifier), label, rectangle.right - rectangle.left)
             for previous, following in zip(rectangles, rectangles[1:]):
-                self.assertLessEqual(previous.bottom, following.top)
-                self.assertEqual(previous.left, following.left)
-                self.assertEqual(previous.right, following.right)
-            self.assertGreaterEqual(rectangles[0].right - rectangles[0].left, 250)
+                self.assertLessEqual(previous.right, following.left)
+                self.assertEqual(previous.top, following.top)
+                self.assertEqual(previous.bottom, following.bottom)
             self.assertLessEqual(rectangles[-1].bottom, self.rect(self.control(self.main, 26)).top)
             host = self.rect(self.control(self.main, 1011))
             self.assertGreaterEqual(host.bottom - host.top, 36)
-            self.capture_control(self.main, 'category_minimum_' + str(locale))
+
+    def assert_button_text_fits(self, button, label, width):
+        # HFONT belongs to the player process. It cannot be selected into a DC
+        # owned by this Python process; measure the real rendered pixels instead.
+        self.user.GetDC.argtypes = [W.HWND]
+        self.user.GetDC.restype = W.HDC
+        self.user.ReleaseDC.argtypes = [W.HWND, W.HDC]
+        gdi = C.WinDLL('gdi32', use_last_error=True)
+        gdi.SelectObject.argtypes = [W.HDC, C.c_void_p]
+        gdi.SelectObject.restype = C.c_void_p
+        dc = self.user.GetDC(button)
+        self.assertTrue(dc)
+        font = self.user.SendMessageW(button, 0x0031, 0, 0)  # WM_GETFONT
+        previous = gdi.SelectObject(dc, font)
+        try:
+            self.snapshots.append({'font_probe': label, 'foreign_hfont': int(font),
+                                   'foreign_select_succeeded': bool(previous)})
+        finally:
+            if previous:
+                gdi.SelectObject(dc, previous)
+            self.user.ReleaseDC(button, dc)
+        name = 'category_button_' + str(button) + ('_en' if label.isascii() else '_zh')
+        image = self.capture_control(button, name)
+        self.assertEqual(image.width, width)
+        for row, line in enumerate(label.replace('：', ':').split(':')):
+            first = row * (image.height // 2)
+            last = image.height if row else image.height // 2
+            xs = [x for y in range(first, last) for x in range(image.width)
+                  if sum(image.getpixel((x, y))) > 420]
+            self.assertTrue(xs, 'both category name and switch state must be visibly rendered')
+            left, right = min(xs), image.width - max(xs) - 1
+            self.snapshots.append({'button_line': line.strip(), 'rendered_ink_width': max(xs) - min(xs) + 1,
+                                   'left_margin_pixels': left, 'right_margin_pixels': right})
+            self.assertGreaterEqual(left, 3, repr(line.strip()) + ' needs a visible left margin')
+            self.assertGreaterEqual(right, 3, repr(line.strip()) + ' needs a visible right margin')
 
     def test_invalid_saved_switches_default_off(self):
         runtime = self.folder / 'runtime'

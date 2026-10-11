@@ -3,6 +3,7 @@ import ctypes as C
 from contextlib import contextmanager
 from ctypes import wintypes as W
 import os
+import json
 from pathlib import Path
 import re
 import shutil
@@ -79,6 +80,17 @@ class OwnedPlayerUi(canvas_ui.NativeCanvasUiTests):
     def start_player(self, ended=False):
         super().start_player(ended)
         self.user.EnableWindow(self.main, False)
+
+    def wait(self, predicate, message, timeout=12):
+        try:
+            return super().wait(predicate, message, timeout)
+        except AssertionError:
+            if self.main:
+                evidence = {'wait_failed': message, 'status': self.text(self.control(self.main, 6)),
+                            'frame': self.frame_number(), 'progress': self.text(self.control(self.main, 28))}
+                self.snapshots.append(evidence)
+                print('OWNED_UI_FAILURE=' + json.dumps(evidence, ensure_ascii=True), flush=True)
+            raise
 
     def frame_number(self):
         for handle, kind in self.windows(self.main):
@@ -162,7 +174,9 @@ class NativeNavigationUiTests(OwnedPlayerUi):
         for fraction, ordinal in ((0, 1), (.5, 3), (1, 5), (0, 1)):
             self.seek_click(fraction)
             self.wait_frame(ordinal)
-            self.assertTrue(self.phase('Paused'))
+            self.snapshots.append({'click_fraction': fraction, 'frame': self.frame_number(),
+                                   'phase_after_frame': self.text(self.control(self.main, 6))})
+            self.wait_phase('Ended' if fraction == 1 else 'Paused')
         self.snapshots.append({'clicks': [0, .5, 1, 0], 'last_duplicate_ordinal': 5})
 
     def test_drag_changes_target_without_rebuilding_until_release(self):
@@ -188,7 +202,8 @@ class NativeNavigationUiTests(OwnedPlayerUi):
 
     def test_seek_resumes_playing_and_turns_stopped_or_ended_into_paused(self):
         self.start_player()
-        self.seek_click(.25)
+        self.seek_click(.75)
+        self.wait_frame(4)
         self.wait_phase('Playing')
         self.command(self.main, 3)
         self.wait_phase('Stopped')
@@ -210,6 +225,7 @@ class NativeNavigationUiTests(OwnedPlayerUi):
         controls += [self.control(self.main, identifier) for identifier in (7, 18, 26, 27, 28)]
         for handle in controls:
             self.assertTrue(handle, 'all authorized nontext panes must exist')
+            self.snapshots.append({'arrow_focus_handle': int(handle), 'before': self.frame_number()})
             with self.focused(handle):
                 self.key(handle, 0x25)
                 self.wait_frame(4)
@@ -239,6 +255,29 @@ class NativeNavigationUiTests(OwnedPlayerUi):
             time.sleep(.5)
             self.assertEqual(self.frame_number(), settled, 'keyup must leave no deferred repeat backlog')
         self.snapshots.append({'after_repeat_keyup': settled})
+
+    def test_escape_cancels_drag_and_restores_each_original_playback_state(self):
+        for phase in ('Playing', 'Paused', 'Stopped', 'Ended'):
+            timestamps = (0, 100, 100, 200, 200) if phase == 'Ended' else (0, 20000, 30000, 60000, 60000)
+            self.write_navigation_replay(timestamps)
+            self.start_player(ended=phase == 'Ended')
+            if phase == 'Paused':
+                self.command(self.main, 7)
+                self.wait_phase('Paused')
+            elif phase == 'Stopped':
+                self.command(self.main, 3)
+                self.wait_phase('Stopped')
+            before = self.frame_number()
+            progress, point = self.progress_point(.5)
+            with self.focused(progress):
+                self.user.SendMessageW(progress, 0x0201, 1, point)
+                self.wait(lambda: self.text(progress).startswith(('目标 ', 'Target ')), 'drag started before Escape')
+                self.key(progress, 0x1B)
+                self.wait(lambda: self.text(progress).startswith(('当前 ', 'Current ')), 'Escape discarded drag target')
+                self.wait_phase(phase)
+                self.assertEqual(self.frame_number(), before, 'cancelled scrub must preserve the previously rendered record')
+            self.snapshots.append({'cancelled_from': phase, 'frame': self.frame_number()})
+            self.close_player()
 
 
 if __name__ == '__main__':

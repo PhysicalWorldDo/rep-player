@@ -18,6 +18,14 @@ PlayerStatus waitFor(Application& app,Predicate predicate,const char* message){
     throw rep::Error(message);
 }
 uint32_t capture(Application& app){auto previous=app.worker->status().captureSerial;app.worker->captureFrame();return waitFor(app,[&](const auto& s){return s.captureSerial>previous;},"GPU frame capture did not finish").frameCrc;}
+template<class App> void hideUnusedImage(App& app){
+    if constexpr(requires{app.imageVisibility;}){app.imageVisibility.setOverride("sprite/not_used.img",false);app.worker->setImageVisibility(app.imageVisibility);}
+    else {app.hiddenImages={"sprite/not_used.img"};app.worker->setHiddenImages(app.hiddenImages);}
+}
+template<class App> bool manualChoicePreserved(const App& app,const PlayerStatus& status){
+    if constexpr(requires{app.imageVisibility;})return status.imageVisibility.overrides==app.imageVisibility.overrides;
+    else return status.hiddenImages==app.hiddenImages;
+}
 RECT rectangle(HWND window){RECT value{};require(GetWindowRect(window,&value),"Cannot read toolbar rectangle");return value;}
 void screenshot(HWND window,const std::filesystem::path& path){
     RECT rect{};GetWindowRect(window,&rect);int width=rect.right-rect.left,height=rect.bottom-rect.top;
@@ -73,7 +81,7 @@ int wmain(int argc,wchar_t** argv){
             std::cout<<"{\"applied_choice_saved_on_close\":true}\n";
         }else{
             auto replay=client/L"Replay"/L"refresh.rep";app->openSpecified(replay);waitFor(*app,[](const auto& s){return s.phase==Phase::Ended;},"Initial replay did not end");
-            rep::CanvasSettings settings;settings.factor=1.5;app->applyCanvasSettings(settings);app->hiddenImages={"sprite/not_used.img"};app->worker->setHiddenImages(app->hiddenImages);app->setAudioVolume(37);app->toggleAudioMute();
+            rep::CanvasSettings settings;settings.factor=1.5;app->applyCanvasSettings(settings);hideUnusedImage(*app);app->setAudioVolume(37);app->toggleAudioMute();
             waitFor(*app,[](const auto& s){return s.canvasWidth==24&&s.canvasHeight==24&&s.hiddenImages.contains("sprite/not_used.img")&&s.audioMuted&&s.audioVolume>.36f&&s.audioVolume<.38f;},"Existing UI settings were not applied");
             auto baseCrc=capture(*app);std::filesystem::copy_file(argv[4],client/L"ImagePacks2"/L"0_patch.NPK");
             // A disk addition alone must not give export a newer rule than preview.
@@ -82,10 +90,10 @@ int wmain(int argc,wchar_t** argv){
             waitFor(*app,[](const auto& s){return s.phase==Phase::Ended;},"Refreshed replay did not finish");
             uint32_t patchCrc=0;auto deadline=Clock::now()+std::chrono::seconds(10);while(Clock::now()<deadline){auto s=app->worker->status();if(s.phase==Phase::Ended){patchCrc=capture(*app);if(patchCrc!=baseCrc)break;}pump();std::this_thread::sleep_for(std::chrono::milliseconds(10));}
             require(patchCrc!=baseCrc,"Real Refresh NPK command did not apply the newly added patch");
-            auto status=app->worker->status();require(status.canvasWidth==24&&status.canvasHeight==24&&status.hiddenImages==app->hiddenImages&&status.audioMuted&&status.audioVolume>.36f&&status.audioVolume<.38f,"Refresh NPK lost canvas, hidden images or preview audio settings");
+            auto status=app->worker->status();require(status.canvasWidth==24&&status.canvasHeight==24&&manualChoicePreserved(*app,status)&&status.audioMuted&&status.audioVolume>.36f&&status.audioVolume<.38f,"Refresh NPK lost canvas, manual image choices or preview audio settings");
             app->current=status;app->updateImages(true);require(std::any_of(app->imageRows.begin(),app->imageRows.end(),[](const auto& row){return row.path=="sprite/test/frame.img"&&row.drawn;}),"Refreshed IMG panel does not describe the rendered image");
-            auto serial=status.captureSerial;command(*app,PreviousFrame);auto previous=waitFor(*app,[&](const auto& s){return s.phase==Phase::Paused&&s.captureSerial>serial;},"Previous frame did not finish");require(previous.frameCrc==patchCrc,"Previous frame used a different NPK winner");
-            serial=previous.captureSerial;command(*app,NextFrame);auto next=waitFor(*app,[&](const auto& s){return s.phase==Phase::Paused&&s.captureSerial>serial;},"Next frame did not finish");require(next.frameCrc==patchCrc,"Next frame used a different NPK winner");
+            auto serial=status.completedNavigationSerial;command(*app,PreviousFrame);auto previous=waitFor(*app,[&](const auto& s){return s.phase==Phase::Paused&&s.completedNavigationSerial>serial;},"Previous frame did not finish");require(capture(*app)==patchCrc,"Previous frame used a different NPK winner");
+            serial=previous.completedNavigationSerial;command(*app,NextFrame);waitFor(*app,[&](const auto& s){return s.phase==Phase::Paused&&s.completedNavigationSerial>serial;},"Next frame did not finish");require(capture(*app)==patchCrc,"Next frame used a different NPK winner");
             exportPng(*app,directory,L"after_refresh");
             std::cout<<"{\"toolbar\":true,\"refresh_command\":true,\"pending_export_disabled\":true,\"settings_preserved\":true,\"img_panel\":true,\"frame_step\":true,\"base_crc\":"<<baseCrc<<",\"patch_crc\":"<<patchCrc<<"}\n";
         }
