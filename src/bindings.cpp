@@ -35,7 +35,9 @@ std::vector<ImageInput> shaderImageInputs(const Effect* e,const Replay& replay){
     default:break;
     }return result;
 }
+void Binder::syncSources(){auto revision=assets_.sourceRevision();if(sourceRevision_!=revision){builtin_.clear();materials_.clear();sourceRevision_=revision;}}
 std::shared_ptr<Frame> Binder::builtin(int frame,int group) {
+    syncSources();
     const char* names[]={"mask","dissolvemask","flametexture","glitchtexture","waterdistortion","delezieeffecttexture"};
     if(group<0||group>=6)throw Error("invalid builtin shader texture group");
     uint64_t key=(uint64_t(group)<<32)|uint32_t(frame);if(auto it=builtin_.find(key);it!=builtin_.end()){auto path=std::string("sprite/shader/")+names[group]+".img";assets_.notifyFrame(path,frame);if(it->second->actualPath!=path&&!it->second->actualPath.empty())assets_.notifyFrame(it->second->actualPath,it->second->actualFrame);return it->second;}
@@ -48,14 +50,24 @@ static std::string staticName(unsigned flags) {
     return "StaticBranch_"+(stem+suffix==""?"Draw":stem+suffix);
 }
 Material Binder::bind(const Effect* e,std::shared_ptr<GpuTexture> source,ShaderContext c) {
+    syncSources();
     auto create=[&](){auto observer=assets_.frameObserver();std::vector<ImageInput> inputs;assets_.setFrameObserver([&](const std::string& path,int frame){inputs.push_back({path,frame});if(observer)observer(path,frame);});
         try{auto material=bindUncached(e,source,c);assets_.setFrameObserver(std::move(observer));material.inputs=std::move(inputs);return material;}
         catch(...){assets_.setFrameObserver(std::move(observer));throw;}};
+    auto stableCreate=[&]{
+        const auto random=randomState_;
+        while(true){syncSources();const auto revision=assets_.sourceRevision();auto material=create();
+            if(revision==assets_.sourceRevision())return material;
+            // A missing patch frame can change the source halfway through a
+            // multi-texture material. Rebuild it wholly from the chosen sources.
+            randomState_=random;
+        }
+    };
     if(e&&(e->type==16||e->type==17||e->type==57)){
         CacheKey key{e,source.get(),c.width,c.height,c.channel,c.direction,c.directSource};auto it=materials_.find(key);if(it!=materials_.end()){for(auto& input:it->second.inputs)assets_.notifyFrame(input.path,input.frame);return it->second;}
-        auto material=create();materials_[key]=material;return material;
+        auto material=stableCreate();materials_[key]=material;return material;
     }
-    return create();
+    return stableCreate();
 }
 Material Binder::bindUncached(const Effect* e,std::shared_ptr<GpuTexture> source,ShaderContext c) {
     Material m;m.program=c.channel?2:4;m.textures[0]=source;m.elapsed=float(c.channel);

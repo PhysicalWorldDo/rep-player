@@ -41,6 +41,7 @@ public:
     uint64_t appliedSeekSerial()const;
     bool resumePrepared(uint64_t seekSerial);
     void volume(float value,bool muted);
+    void setPlaybackRate(double rate);
     bool available()const;
     std::string error()const;
     uint64_t missingResources()const;

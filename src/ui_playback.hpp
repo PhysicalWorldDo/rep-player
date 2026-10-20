@@ -26,6 +26,7 @@ struct PlayerStatus {
     bool patchesEnabled=true;
     bool audioAvailable=false,audioMuted=false;
     float audioVolume=1;
+    double playbackRate=1;
     std::wstring audioMessage;
     uint64_t missingSoundCount=0,audioEvents=0;
     int64_t audioPosition=0;
@@ -57,10 +58,12 @@ class PlaybackController {
     bool audioSettingsRequested_=false,audioMuted_=false;
     bool negativeImgOffsetsRequested_=false,negativeImgOffsetsEnabled_=false;
     float audioVolume_=1;
+    double playbackRate_=1;
+    bool playbackRateRequested_=false;
     struct NavigationRequest {
         uint64_t serial=0,ordinal=0;
         int64_t time=0;
-        bool byOrdinal=false,last=false,resume=false,forceRebuild=false,preserveState=false;
+        bool byOrdinal=false,last=false,resume=false,forceRebuild=false,preserveState=false,resumeOnly=false;
         Phase originalPhase=Phase::Paused;
     };
     std::optional<NavigationRequest> navigationRequested_,activeNavigation_;
@@ -97,6 +100,7 @@ public:
     void setNegativeImgOffsetsEnabled(bool enabled);
     void setAudioVolume(float volume);
     void setAudioMuted(bool muted);
+    void setPlaybackRate(double rate);
     void captureFrame();
     PlayerStatus status();
 };

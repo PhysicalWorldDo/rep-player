@@ -229,7 +229,7 @@ struct AudioPlayer::Impl {
     int64_t requested=0;
     uint64_t requestedSerial=0;
     std::atomic<uint64_t> appliedSerial=0;
-    float volume=1;
+    float volume=1,playbackRate=1;
     bool muted=false;
     std::atomic<bool> available=false;
     std::atomic<int64_t> position=0;
@@ -245,20 +245,20 @@ struct AudioPlayer::Impl {
             if(FAILED(XAudio2Create(&engine,0,XAUDIO2_DEFAULT_PROCESSOR))||FAILED(engine->CreateMasteringVoice(&master)))throw Error("Default audio output device is unavailable");
             WAVEFORMATEX format{};format.wFormatTag=WAVE_FORMAT_IEEE_FLOAT;format.nChannels=2;format.nSamplesPerSec=AudioTrack::SampleRate;
             format.wBitsPerSample=32;format.nBlockAlign=8;format.nAvgBytesPerSec=format.nSamplesPerSec*8;
-            auto create=[&]{if(FAILED(engine->CreateSourceVoice(&voice,&format,0,1,nullptr)))throw Error("Cannot create REP audio output voice");};create();
+            auto create=[&]{if(FAILED(engine->CreateSourceVoice(&voice,&format,0,4,nullptr)))throw Error("Cannot create REP audio output voice");};create();
             // Decoding ahead must never wait on the 30ms device fill queue.
             prefetch=std::async(std::launch::async,[&]{track->prepare(0,track->durationMilliseconds(),[&]{std::lock_guard lock(mutex);return quit||cancelPrefetch.load();});});
             {std::lock_guard lock(mutex);available=true;ready=true;condition.notify_all();}
             size_t bufferIndex=0;bool active=false;int64_t base=0;
             while(true){
-                bool wanted,seek;int64_t target;float gain;uint64_t serial;
-                {std::unique_lock lock(mutex);if(quit)break;wanted=playing;seek=std::exchange(seekRequested,false);target=requested;serial=requestedSerial;gain=muted?0.f:volume;
+                bool wanted,seek;int64_t target;float gain,rate;uint64_t serial;
+                {std::unique_lock lock(mutex);if(quit)break;wanted=playing;seek=std::exchange(seekRequested,false);target=requested;serial=requestedSerial;gain=muted?0.f:volume;rate=playbackRate;
                     if(!wanted&&!seek){if(active){voice->Stop();active=false;}condition.wait_for(lock,std::chrono::milliseconds(10));continue;}}
-                voice->SetVolume(gain);
+                voice->SetVolume(gain);voice->SetFrequencyRatio(rate);
                 if(seek){
                     // DestroyVoice waits until buffers are no longer consumed.
                     // Re-creation also supplies a fresh, unambiguous sample clock.
-                    voice->DestroyVoice();voice=nullptr;create();voice->SetVolume(gain);
+                    voice->DestroyVoice();voice=nullptr;create();voice->SetVolume(gain);voice->SetFrequencyRatio(rate);
                     track->seek(target);base=target;bufferIndex=0;active=false;position=target;
                     appliedSerial=serial;
                 }
@@ -293,6 +293,10 @@ uint64_t AudioPlayer::seek(int64_t milliseconds,bool playing){std::lock_guard lo
 uint64_t AudioPlayer::appliedSeekSerial()const{return impl_->appliedSerial;}
 bool AudioPlayer::resumePrepared(uint64_t serial){std::lock_guard lock(impl_->mutex);if(impl_->requestedSerial!=serial||impl_->appliedSerial.load()<serial)return false;impl_->playing=true;impl_->condition.notify_all();return true;}
 void AudioPlayer::volume(float value,bool muted){std::lock_guard lock(impl_->mutex);impl_->volume=std::clamp(value,0.f,1.f);impl_->muted=muted;impl_->condition.notify_all();}
+void AudioPlayer::setPlaybackRate(double rate){
+    if(!std::isfinite(rate)||rate<.25||rate>4)throw Error("Playback speed must be between 0.25 and 4");
+    std::lock_guard lock(impl_->mutex);impl_->playbackRate=float(rate);impl_->condition.notify_all();
+}
 bool AudioPlayer::available()const{return impl_->available;}
 std::string AudioPlayer::error()const{std::lock_guard lock(impl_->mutex);return impl_->failure;}
 uint64_t AudioPlayer::missingResources()const{return impl_->track->missingResources();}

@@ -89,8 +89,23 @@ class AudioControllerTests(unittest.TestCase):
         if result.returncode:
             raise RuntimeError(result.stderr)
 
-    def result(self, mode, replay=None):
-        result = subprocess.run([str(self.exe), mode, str(self.folder), str(self.client),
+        # Delay the real device seek in a test-only copy to expose stale clocks
+        # deterministically when the controller reuses its audio output.
+        delayed_source = cls.folder / 'delayed_audio.cpp'
+        delayed_source.write_text((ROOT / 'src/audio.cpp').read_text(encoding='utf8').replace(
+            'if(seek){', 'if(seek){std::this_thread::sleep_for(std::chrono::milliseconds(120));'), encoding='utf8')
+        delayed_object = cls.folder / 'delayed_audio.o'
+        subprocess.run([str(compiler), *flags, '-c', str(delayed_source), '-o', str(delayed_object)],
+                       capture_output=True, text=True, check=True, timeout=120, env=environment)
+        cls.delayed_exe = cls.folder / 'audio_delayed_seek_probe.exe'
+        delayed_objects = [delayed_object if path.name == 'audio.o' else path for path in objects]
+        subprocess.run([str(compiler), '-municode', '-static', *map(str, delayed_objects),
+            str(ROOT / 'vendor/freetype/libfreetype.a'), str(ROOT / 'vendor/zlib/libz.a'),
+            '-ld3d11', '-ldxgi', '-ld3dcompiler', '-ldxguid', '-lxaudio2_9', '-lole32', '-o', str(cls.delayed_exe)],
+            capture_output=True, text=True, check=True, timeout=120, env=environment)
+
+    def result(self, mode, replay=None, executable=None):
+        result = subprocess.run([str(executable or self.exe), mode, str(self.folder), str(self.client),
                                  str(replay or self.replay), str(self.silent_client), str(self.silent)],
                                 capture_output=True, text=True, encoding='utf8', timeout=35)
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -99,12 +114,27 @@ class AudioControllerTests(unittest.TestCase):
         self.assertTrue(report['implemented'], 'PlaybackController does not connect REP audio and controls')
         return report
 
+    def test_replay_and_space_restart_ignore_the_previous_device_clock(self):
+        report = self.result('restart', executable=self.delayed_exe)
+        self.assertTrue(report['replay_from_beginning'], str(report))
+        self.assertTrue(report['space_from_beginning'], str(report))
+
     def test_pause_step_resume_refresh_replay_stop_and_client_switch(self):
         report = self.result('transitions')
         for field in ('pause_stable', 'refresh_stable', 'sync', 'settings_survive'):
             self.assertTrue(report[field], str(report))
         self.assertFalse(report['switched_available'])
         self.assertEqual((report['switched_events'], report['switched_missing']), (0, 0))
+
+    def test_speed_changes_clock_audio_and_preserves_pause_seek_step_and_replay(self):
+        report = self.result('speed')
+        self.assertGreater(report['slow_delta'], 35)
+        self.assertLess(report['slow_delta'], 135)
+        self.assertGreater(report['fast_delta'], 235)
+        self.assertLess(report['fast_delta'], 440)
+        self.assertTrue(report['pause_stable'])
+        self.assertTrue(report['sync'])
+        self.assertEqual([report[key] for key in ('seek_rate','step_rate','replay_rate')], [2,2,2])
 
     def test_end_keeps_final_picture_and_stops_the_audio_clock(self):
         report = self.result('end')

@@ -20,6 +20,8 @@ class Binder {
     using CacheKey=std::tuple<const Effect*,const GpuTexture*,int,int,int,int,bool>;
     std::map<CacheKey,Material> materials_;
     uint32_t randomState_=1;
+    uint64_t sourceRevision_=0;
+    void syncSources();
     std::shared_ptr<Frame> builtin(int frame,int group=0);
     Material bindUncached(const Effect* effect,std::shared_ptr<GpuTexture> source,ShaderContext context);
 public:

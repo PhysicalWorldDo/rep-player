@@ -172,7 +172,7 @@ class NpkPriorityTests(unittest.TestCase):
         self.assertEqual(self.run_frame(packs, other)['pixel'], list(BLUE))
 
     def test_missing_patch_frame_uses_placeholder_without_original_frame(self):
-        packs = self.packs(); self.original(packs, colors=(RED, BLUE))
+        packs = self.packs(); self.original(packs, colors=(RED,))
         write_package(packs / 'sprite_interface.NPK', {'sprite/interface/base.img': image(*([YELLOW] * 92))})
         write_package(packs / '!one_frame.npk', {LOGICAL: image(GREEN)})
         result = self.run_frame(packs, frame=1)
@@ -180,6 +180,15 @@ class NpkPriorityTests(unittest.TestCase):
         self.assertEqual(result['actual_path'], 'sprite/interface/base.img')
         self.assertEqual(result['actual_frame'], 91)
         self.assertEqual(result['fallbacks'], 1)
+
+    def test_missing_patch_frame_uses_matching_original_frame(self):
+        packs = self.packs(); self.original(packs, colors=(RED, BLUE))
+        write_package(packs / '!one_frame.npk', {LOGICAL: image(GREEN)})
+        result = self.run_frame(packs, frame=1)
+        self.assertEqual(result['pixel'], list(BLUE))
+        self.assertEqual(result['actual_path'], LOGICAL)
+        self.assertEqual(result['actual_frame'], 1)
+        self.assertEqual(result['fallbacks'], 0)
 
     def test_no_patch_keeps_original_behavior(self):
         packs = self.packs(); self.original(packs)

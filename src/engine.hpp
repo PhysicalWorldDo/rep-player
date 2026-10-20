@@ -102,12 +102,15 @@ class Playback {
     bool hasScene_=false,ended_=false,stopped_=true,paused_=false;
     bool sequentialState_=true,contextDependent_=false;
     std::chrono::steady_clock::time_point start_;
-    int64_t elapsed_=0;
+    int64_t elapsed_=0,clockElapsed_=0;
+    double playbackRate_=1;
     bool rebuildToOrdinal(uint64_t ordinal);
 public:
     uint64_t selected=0,skipped=0;
     void attach(Replay& replay,Executor& executor);
     void start();void stop();void pause();void resume();
+    void setPlaybackRate(double rate);
+    double playbackRate()const{return playbackRate_;}
     bool select(int64_t elapsedMilliseconds);
     bool tick();
     bool seek(int64_t elapsedMilliseconds,bool endpointLast=false,const std::function<bool()>& cancelled={},const std::function<void(uint64_t)>& progress={});

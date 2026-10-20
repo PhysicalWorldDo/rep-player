@@ -1,6 +1,7 @@
 #include "resources.hpp"
 #include <algorithm>
 #include <fstream>
+#include <mutex>
 
 namespace rep {
 std::shared_ptr<Pixels> nativeImageTexture(std::shared_ptr<Pixels> pixels){
@@ -117,12 +118,27 @@ std::shared_ptr<Frame> Img::frameInner(int index,int palette,std::unordered_set<
     return frames_[key]=f;
 }
 std::shared_ptr<Frame> Img::frame(int index,int palette){std::unordered_set<int> visiting;return frameInner(index,palette,visiting);}
+void Img::validateFrames(){
+    for(size_t i=0;i<records_.size();++i){
+        if(records_[i][0]==17){
+            std::unordered_set<int> visiting;int target=int(i);
+            while(true){if(target<0||size_t(target)>=records_.size())throw Error("IMG link target out of range");
+                if(!visiting.insert(target).second)throw Error("linked IMG frame cycle");
+                if(records_[target][0]!=17)break;target=records_[target][1];}
+        }else{frame(int(i));frames_.clear();}
+    }
+    atlasTextures_.clear();
+}
 static std::string normalize(std::string name) {name=canonical(name);while(!name.empty()&&name[0]=='/')name.erase(0,1);if(name.rfind("sprite/",0)!=0)name="sprite/"+name;return name;}
 struct Assets::Index {
     std::filesystem::path root;
     bool patchesEnabled=true;
-    std::unordered_map<std::string,Entry> entries;
+    std::unordered_map<std::string,Entry> entries,originals;
     std::unordered_set<std::string> packages;
+    // Package mappings stay immutable; health decisions follow the applied
+    // index across playback, thumbnails and new export readers.
+    struct RejectedPatches {std::mutex mutex;std::unordered_set<std::string> paths;uint64_t revision=0;};
+    std::shared_ptr<RejectedPatches> rejected=std::make_shared<RejectedPatches>();
 };
 Assets::Assets(std::filesystem::path root,bool patchesEnabled):Assets(buildIndex(std::move(root),patchesEnabled)){}
 Assets::Assets(IndexPtr index):index_(std::move(index)){
@@ -152,7 +168,7 @@ Assets::IndexPtr Assets::buildIndex(std::filesystem::path root,bool patchesEnabl
     // The naming convention limits overlay scans; original packages keep the
     // established ETC/guessed-package lookup and are not eagerly indexed.
     if(boundary!=names.end())for(auto it=names.begin();it!=boundary;++it){
-        auto name=utf8(*it);readPackage(index->root,name,index->entries);index->packages.insert(std::move(name));
+        auto name=utf8(*it);readPackage(index->root,name,index->entries,true);index->packages.insert(std::move(name));
     }
     indexNative(*index);
     return index;
@@ -163,14 +179,14 @@ void Assets::indexNative(Index& index) {
     for(size_t k=0;k<encoded.size();k++)encoded[k]=uint8_t(uint8_t((encoded[k]^0xaa)-k*7)^0xaa);
     auto raw=inflateAll(encoded);if(raw.size()!=rawLength)throw Error("native NPK index length mismatch");Reader d(raw);
     while(d.remaining()){auto count=d.get<uint32_t>();auto n=d.get<uint32_t>();auto b=d.take(n);std::string name(reinterpret_cast<const char*>(b.data()),n);name=canonical(name);name=name.substr(name.find_last_of('/')+1);
-        while(count--){n=d.get<uint32_t>();b=d.take(n);std::string logical(reinterpret_cast<const char*>(b.data()),n);auto offset=d.get<uint32_t>(),length=d.get<uint32_t>();index.entries.try_emplace(normalize(logical),Entry{name,offset,length});}}
+        while(count--){n=d.get<uint32_t>();b=d.take(n);std::string logical(reinterpret_cast<const char*>(b.data()),n);auto offset=d.get<uint32_t>(),length=d.get<uint32_t>();index.originals.try_emplace(normalize(logical),Entry{name,offset,length});index.entries.try_emplace(normalize(logical),Entry{name,offset,length});}}
 }
-void Assets::readPackage(const std::filesystem::path& root,const std::string& name,std::unordered_map<std::string,Entry>& entries) {try{
+void Assets::readPackage(const std::filesystem::path& root,const std::string& name,std::unordered_map<std::string,Entry>& entries,bool patch) {try{
     std::ifstream f(root/wide(name),std::ios::binary);std::array<uint8_t,20> h{};f.read(reinterpret_cast<char*>(h.data()),20);
     if(!f||std::memcmp(h.data(),"NeoplePack_Bill\0",16))throw Error("invalid NPK magic");
     auto n=at<uint32_t>(h,16);Bytes table(size_t(n)*264);f.read(reinterpret_cast<char*>(table.data()),table.size());if(!f)throw Error("truncated NPK table");
     std::string seed="puchikon@neople dungeon and fighter ";while(seed.size()<255)seed+="DNF";seed.resize(255);seed.push_back(0);
-    for(uint32_t k=0;k<n;k++){auto b=std::span(table).subspan(size_t(k)*264,264);std::string logical;for(int j=0;j<256;j++){auto c=char(b[8+j]^uint8_t(seed[j]));if(!c)break;logical.push_back(c);}entries.try_emplace(normalize(logical),Entry{name,at<uint32_t>(b,0),at<uint32_t>(b,4)});}
+    for(uint32_t k=0;k<n;k++){auto b=std::span(table).subspan(size_t(k)*264,264);std::string logical;for(int j=0;j<256;j++){auto c=char(b[8+j]^uint8_t(seed[j]));if(!c)break;logical.push_back(c);}entries.try_emplace(normalize(logical),Entry{name,at<uint32_t>(b,0),at<uint32_t>(b,4),patch});}
 }catch(const std::exception& error){throw Error("NPK "+name+": "+error.what());}}
 void Assets::indexPackage(const std::string& name) {
     if(packages_.contains(name)||index_->packages.contains(name))return;
@@ -179,27 +195,51 @@ void Assets::indexPackage(const std::string& name) {
     packages_.insert(name);
 }
 const Assets::Entry* Assets::resolve(std::string name) {
-    name=normalize(name);if(auto it=index_->entries.find(name);it!=index_->entries.end())return &it->second;
+    name=normalize(name);
+    bool rejected;{std::lock_guard lock(index_->rejected->mutex);rejected=index_->rejected->paths.contains(name);}
+    if(rejected){if(auto it=index_->originals.find(name);it!=index_->originals.end())return &it->second;}
+    else if(auto it=index_->entries.find(name);it!=index_->entries.end())return &it->second;
     if(auto it=entries_.find(name);it!=entries_.end())return &it->second;
     auto parent=name.substr(0,name.find_last_of('/'));
     while(parent.find('/')!=std::string::npos){auto package=parent;std::replace(package.begin(),package.end(),'/','_');indexPackage(package+".NPK");if(auto it=entries_.find(name);it!=entries_.end())return &it->second;parent=parent.substr(0,parent.find_last_of('/'));}
     return nullptr;
 }
+uint64_t Assets::sourceRevision()const{std::lock_guard lock(index_->rejected->mutex);return index_->rejected->revision;}
+void Assets::syncSources(){auto revision=sourceRevision();if(sourceRevision_!=revision){images_.clear();sourceRevision_=revision;}}
+bool Assets::patchSource(const std::string& name){
+    auto entry=resolve(name);return entry&&entry->patch;
+}
+bool Assets::skipPatch(const std::string& name){
+    if(!patchSource(name))return false;
+    {std::lock_guard lock(index_->rejected->mutex);if(index_->rejected->paths.insert(name).second)++index_->rejected->revision;}
+    syncSources();return true;
+}
+std::shared_ptr<Frame> Assets::decodeFrame(const std::string& name,int index,int palette){
+    const bool patch=patchSource(name);auto img=preload(name);if(!img)return {};
+    if(index>=0&&size_t(index)<img->count()){
+        try{return img->frame(index,palette);}
+        catch(const Error&){if(patch){skipPatch(name);return decodeFrame(name,index,palette);}throw;}
+        catch(const std::out_of_range&){if(patch){skipPatch(name);return decodeFrame(name,index,palette);}throw;}
+    }
+    if(index>=0&&patch){skipPatch(name);return decodeFrame(name,index,palette);}
+    return {};
+}
 std::shared_ptr<Img> Assets::preload(std::string logical) {
-    auto name=normalize(logical);if(auto it=images_.find(name);it!=images_.end())return it->second;
-    auto e=resolve(name);if(!e)return {};
+    auto name=normalize(logical);syncSources();if(auto it=images_.find(name);it!=images_.end())return it->second;
+    auto e=resolve(name);if(!e)return {};const bool patch=e->patch;
     try {
         std::ifstream f(root_/wide(e->package),std::ios::binary);if(!f)throw Error("NPK file absent: "+e->package);
         Bytes b(e->length);f.seekg(e->offset);f.read(reinterpret_cast<char*>(b.data()),b.size());if(!f)throw Error("truncated IMG entry");
-        auto img=std::make_shared<Img>(std::move(b));images_[name]=img;return img;
+        auto img=std::make_shared<Img>(std::move(b));if(patch)img->validateFrames();images_[name]=img;return img;
     } catch(const Error& error) {
+        if(patch){skipPatch(name);return preload(name);}
         throw Error("IMG "+name+" in NPK "+e->package+" (offset "+std::to_string(e->offset)
             +", length "+std::to_string(e->length)+"): "+error.what());
     }
 }
 std::shared_ptr<Frame> Assets::frame(std::string logical,int index,int palette,bool fallback) {
-    if(logical.empty())return {};notifyFrame(normalize(logical),index);auto img=preload(logical);
-    if(img&&index>=0&&size_t(index)<img->count()){decodedFrames++;auto frame=img->frame(index,palette);frame->actualPath=normalize(logical);frame->actualFrame=index;return frame;}
+    if(logical.empty())return {};auto name=normalize(logical);notifyFrame(name,index);auto decoded=decodeFrame(name,index,palette);
+    if(decoded){decodedFrames++;auto frame=std::move(decoded);frame->actualPath=normalize(logical);frame->actualFrame=index;return frame;}
     if(!fallback)throw Error("missing resource/frame: "+logical);
     fallbacks++;auto base=preload("interface/base.img");if(!base)throw Error("native missing-resource fallback absent");auto frame=base->frame(91);frame->actualPath=normalize("interface/base.img");frame->actualFrame=91;notifyFrame(frame->actualPath,91);return frame;
 }

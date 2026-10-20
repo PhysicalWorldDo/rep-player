@@ -17,6 +17,41 @@ auto waitFor(Player& player,Predicate predicate){
 }
 template<class Player>
 void exercise(HWND window,int argc,wchar_t** argv){
+    if(std::wstring_view(argv[1])==L"restart"){
+        Player player(window,argv[2],argv[3],false,Clock::now());player.setAudioMuted(true);player.setPlaybackRate(2.);player.open(argv[4]);
+        waitFor(player,[](const auto& s){return s.phase==Phase::Ended;});
+        std::this_thread::sleep_for(std::chrono::milliseconds(180));
+        auto restart=[&](bool space){
+            if(space)player.togglePause();else player.replay();
+            waitFor(player,[](const auto& s){return s.phase==Phase::Playing;});
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));auto pending=player.status();
+            bool startsAtBeginning=pending.phase==Phase::Playing&&pending.elapsed<250;
+            waitFor(player,[](const auto& s){return s.phase==Phase::Ended;});
+            std::this_thread::sleep_for(std::chrono::milliseconds(180));return startsAtBeginning;
+        };
+        bool replay=restart(false),space=restart(true);
+        std::cout<<"{\"implemented\":true,\"replay_from_beginning\":"<<replay<<",\"space_from_beginning\":"<<space<<"}";return;
+    }
+    if(std::wstring_view(argv[1])==L"speed"){
+        if constexpr(!requires(Player& p){p.setPlaybackRate(2.);p.status().playbackRate;})std::cout<<"{\"implemented\":false}\n";
+        else {
+            Player player(window,argv[2],argv[3],false,Clock::now());player.setAudioMuted(true);player.setPlaybackRate(.5);player.open(argv[4]);
+            auto first=waitFor(player,[](const auto& s){return s.phase==Phase::Playing&&s.frameCount&&s.audioAvailable&&s.elapsed>60;});
+            std::this_thread::sleep_for(std::chrono::milliseconds(160));auto slow=player.status();auto slowDelta=slow.elapsed-first.elapsed;
+            player.togglePause();auto paused=waitFor(player,[](const auto& s){return s.phase==Phase::Paused;});
+            player.setPlaybackRate(2.);std::this_thread::sleep_for(std::chrono::milliseconds(80));auto changed=player.status();
+            bool stable=changed.elapsed==paused.elapsed&&changed.ordinal==paused.ordinal&&changed.playbackRate==2.;
+            player.togglePause();auto start=waitFor(player,[](const auto& s){return s.phase==Phase::Playing;});
+            std::this_thread::sleep_for(std::chrono::milliseconds(160));auto fast=player.status();auto fastDelta=fast.elapsed-start.elapsed;
+            bool sync=std::abs(fast.audioPosition-fast.elapsed)<45;
+            player.togglePause();waitFor(player,[](const auto& s){return s.phase==Phase::Paused;});player.seekTime(300);
+            auto seek=waitFor(player,[](const auto& s){return s.phase==Phase::Paused&&s.completedNavigationSerial==s.navigationSerial&&s.elapsed==300;});
+            player.stepFrame(1);auto step=waitFor(player,[&](const auto& s){return s.phase==Phase::Paused&&s.ordinal>seek.ordinal;});
+            player.replay();auto replay=waitFor(player,[](const auto& s){return s.phase==Phase::Playing&&s.elapsed<100;});
+            std::cout<<"{\"implemented\":true,\"slow_delta\":"<<slowDelta<<",\"fast_delta\":"<<fastDelta<<",\"pause_stable\":"<<stable<<",\"sync\":"<<sync<<",\"fast_elapsed\":"<<fast.elapsed<<",\"fast_audio\":"<<fast.audioPosition<<",\"resume_elapsed\":"<<start.elapsed<<",\"seek_rate\":"<<seek.playbackRate<<",\"step_rate\":"<<step.playbackRate<<",\"replay_rate\":"<<replay.playbackRate<<"}";
+        }
+        return;
+    }
     if constexpr(!requires(Player& p){p.setAudioVolume(.25f);p.setAudioMuted(true);p.status().audioAvailable;p.status().audioPosition;p.status().audioEvents;}){
         std::cout<<"{\"implemented\":false}\n";
     }else{

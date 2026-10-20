@@ -405,11 +405,15 @@ void Playback::attach(Replay& replay,Executor& executor){
     for(const auto& [id,command]:replay.dictionary)for(const auto& i:command.instructions)
         if(i.nativeContextState&&(i.opcode==38||i.opcode==39))contextDependent_=true;
 }
-void Playback::start(){if(!replay_)return;replay_->rewind();executor_->resetPlaybackState();hasScene_=ended_=paused_=false;stopped_=false;sequentialState_=true;elapsed_=0;selected=skipped=0;start_=std::chrono::steady_clock::now();}
-int64_t Playback::elapsedMilliseconds()const{if(stopped_||paused_||ended_)return elapsed_;return std::max<int64_t>(0,std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now()-start_).count());}
+void Playback::start(){if(!replay_)return;replay_->rewind();executor_->resetPlaybackState();hasScene_=ended_=paused_=false;stopped_=false;sequentialState_=true;elapsed_=0;selected=skipped=0;clockElapsed_=0;start_=std::chrono::steady_clock::now();}
+int64_t Playback::elapsedMilliseconds()const{if(stopped_||paused_||ended_)return elapsed_;return std::max<int64_t>(0,clockElapsed_+int64_t(std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-start_).count()*playbackRate_));}
+void Playback::setPlaybackRate(double rate){
+    if(!std::isfinite(rate)||rate<.25||rate>4)throw Error("Playback speed must be between 0.25 and 4");
+    auto elapsed=elapsedMilliseconds();setElapsedMilliseconds(elapsed);playbackRate_=rate;
+}
 void Playback::stop(){elapsed_=elapsedMilliseconds();stopped_=true;paused_=false;}
 void Playback::pause(){if(!playing())return;elapsed_=elapsedMilliseconds();paused_=true;}
-void Playback::resume(){if(!replay_||stopped_||ended_||!paused_)return;start_=std::chrono::steady_clock::now()-std::chrono::milliseconds(elapsed_);paused_=false;}
+void Playback::resume(){if(!replay_||stopped_||ended_||!paused_)return;clockElapsed_=elapsed_;start_=std::chrono::steady_clock::now();paused_=false;}
 bool Playback::refresh(){
     if(!hasScene_||!executor_)return false;
     // Context textures may be overwritten later in the same scene. Rebuild
@@ -427,7 +431,7 @@ bool Playback::setCanvasSettings(const CanvasSettings& settings){
     auto oldSelected=selected,oldSkipped=skipped;
     bool changed=rebuildToOrdinal(scene_.ordinal);
     ended_=wasEnded;stopped_=wasStopped;paused_=wasPaused;
-    elapsed_=elapsed;start_=std::chrono::steady_clock::now()-std::chrono::milliseconds(elapsed_);
+    elapsed_=elapsed;clockElapsed_=elapsed_;start_=std::chrono::steady_clock::now();
     selected=oldSelected;skipped=oldSkipped;
     return changed;
 }
@@ -439,11 +443,11 @@ bool Playback::setNegativeImgOffsetsEnabled(bool enabled){
     auto oldSelected=selected,oldSkipped=skipped;
     bool changed=rebuildToOrdinal(scene_.ordinal);
     ended_=wasEnded;stopped_=wasStopped;paused_=wasPaused;
-    elapsed_=elapsed;start_=std::chrono::steady_clock::now()-std::chrono::milliseconds(elapsed_);
+    elapsed_=elapsed;clockElapsed_=elapsed_;start_=std::chrono::steady_clock::now();
     selected=oldSelected;skipped=oldSkipped;
     return changed;
 }
-void Playback::setElapsedMilliseconds(int64_t elapsed){elapsed_=std::max<int64_t>(0,elapsed);start_=std::chrono::steady_clock::now()-std::chrono::milliseconds(elapsed_);}
+void Playback::setElapsedMilliseconds(int64_t elapsed){elapsed_=std::max<int64_t>(0,elapsed);clockElapsed_=elapsed_;start_=std::chrono::steady_clock::now();}
 void Playback::finishNavigation(int64_t elapsed,bool playing,bool ended,bool stopped){setElapsedMilliseconds(elapsed);ended_=ended;stopped_=stopped;paused_=!playing&&!ended&&!stopped;}
 bool Playback::seek(int64_t elapsed,bool endpointLast,const std::function<bool()>& cancelled,const std::function<void(uint64_t)>& progress){
     if(!replay_||!executor_)return false;
@@ -490,7 +494,7 @@ bool Playback::step(int direction){
         if(!sequentialState_)changed=rebuildToOrdinal(next.ordinal);
         else{scene_=std::move(next);executor_->execute(scene_);selected++;ended_=false;changed=true;}
     }else{if(!sequentialState_)rebuildToOrdinal(scene_.ordinal);ended_=true;}}
-    elapsed_=hasScene_?std::max<int64_t>(0,scene_.timestamp):0;start_=std::chrono::steady_clock::now()-std::chrono::milliseconds(elapsed_);return changed;
+    elapsed_=hasScene_?std::max<int64_t>(0,scene_.timestamp):0;clockElapsed_=elapsed_;start_=std::chrono::steady_clock::now();return changed;
 }
 bool Playback::select(int64_t elapsed){
     if(stopped_||ended_||!replay_)return false;if(hasScene_&&scene_.timestamp>=elapsed)return false;
