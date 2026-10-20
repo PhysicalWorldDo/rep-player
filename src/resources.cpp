@@ -17,10 +17,12 @@ static std::shared_ptr<Pixels> rawPixels(std::span<const uint8_t> raw,int fmt,in
         if(raw.size()!=size_t(w)*h)throw Error("invalid palette pixel length");
         for(size_t p=0;p<raw.size();p++){size_t ix=size_t(raw[p])*4;if(ix+4>palette->size())throw Error("palette index out of range");std::memcpy(b.data()+p*4,palette->data()+ix,4);}
     } else if(fmt==16) {
-        if(raw.size()!=b.size())throw Error("invalid BGRA pixel length");
+        // Patch payloads may inflate to more than the declared image needs.
+        // Decode only width*height pixels, as dnflib and KoishiEx do.
+        if(raw.size()<b.size())throw Error("invalid BGRA pixel length");
         for(size_t p=0;p<b.size();p+=4){b[p]=raw[p+2];b[p+1]=raw[p+1];b[p+2]=raw[p];b[p+3]=raw[p+3];}
     } else if(fmt==14||fmt==15) {
-        if(raw.size()!=size_t(w)*h*2)throw Error("invalid 16-bit pixel length");
+        if(raw.size()<size_t(w)*h*2)throw Error("invalid 16-bit pixel length");
         for(size_t p=0;p<size_t(w)*h;p++){auto x=at<uint16_t>(raw,p*2);
             if(fmt==14){for(int c=0;c<3;c++){int n=(x>>(10-c*5))&31;b[p*4+c]=uint8_t((n<<3)|(n>>2));}b[p*4+3]=(x>>15)*255;}
             else {int shifts[]={8,4,0,12};for(int c=0;c<4;c++)b[p*4+c]=uint8_t(((x>>shifts[c])&15)*17);}
