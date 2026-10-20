@@ -1,5 +1,18 @@
 # 更新记录
 
+## v1.1.4
+
+发布日期：2026-10-20。下载 [Windows x64 运行包](https://github.com/PhysicalWorldDo/rep-player/releases/download/v1.1.4/rep-player-v1.1.4-windows-x64.zip)。完整解压后直接运行 `rep_player.exe`。
+
+### 修复
+
+- 修复 LaserRifle、LaserRifleCharge 等录像使用部分 NPK 补丁时，报 `invalid 16-bit pixel length` 或 `invalid BGRA pixel length`、无法打开的问题。
+- 兼容 ARGB1555、ARGB4444、ARGB8888 帧解压后的多余尾随数据，只读取画面尺寸所需的像素；像素不足仍会报错，后续帧偏移、链接帧和坐标保持原有语义。
+
+验证：真实 LaserRifle 144 帧、LaserRifleCharge 217 帧完整执行到结束，零资源回退；三个相关 IMG 共 21 帧与技能染色工坊输出一致。新增三项回归及原有 18 项图像资源回归通过。
+
+前置补丁命名、刷新生效方式、逐帧与定位、分类开关、声音及有限兼容模式的范围沿用 [1.1.3](https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.1.3)。客户端资源保持只读。运行需要 Windows 10/11 x64、支持 D3D11 的显卡，以及与录像匹配的完整客户端；使用方法见 [README](https://github.com/PhysicalWorldDo/rep-player/blob/main/README.md)。
+
 ## v1.1.3
 
 发布日期：2026-10-11。下载 [Windows x64 运行包](https://github.com/PhysicalWorldDo/rep-player/releases/download/v1.1.3/rep-player-v1.1.3-windows-x64.zip)。完整解压后直接运行 `rep_player.exe`。

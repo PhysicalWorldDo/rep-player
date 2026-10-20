@@ -1,4 +1,4 @@
-REP 播放器 1.1.3
+REP 播放器 1.1.4
 
 完整解压 Windows x64 运行包后，双击 rep_player.exe。
 点击“选择客户端”，选择包含 Replay 和 ImagePacks2 的客户端根目录。
@@ -32,4 +32,4 @@ NPK 补丁支持：
 加载及导出期间不能切换补丁开关或刷新。
 
 完整使用说明：https://github.com/PhysicalWorldDo/rep-player/blob/main/README.md
-下载：https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.1.3
+下载：https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.1.4

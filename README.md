@@ -4,7 +4,7 @@
 
 ## 下载与运行
 
-从 [v1.1.3 Release](https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.1.3) 下载 `rep-player-v1.1.3-windows-x64.zip`，完整解压到可写目录，直接双击最外层的 **rep_player.exe**。
+从 [v1.1.4 Release](https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.1.4) 下载 `rep-player-v1.1.4-windows-x64.zip`，完整解压到可写目录，直接双击最外层的 **rep_player.exe**。
 
 ```text
 解压目录/
