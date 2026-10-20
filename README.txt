@@ -1,9 +1,12 @@
-REP 播放器 1.1.5
+REP 播放器 1.1.6
 
 完整解压 Windows x64 运行包后，双击 rep_player.exe。
 点击“选择客户端”，选择包含 Replay 和 ImagePacks2 的客户端根目录。
 
 支持分层录像列表、中英技能搜索、打开指定 REP、逐帧查看、IMG 隐藏及 MOV / MP4 / PNG 导出。
+点击 IMG 行可在预览中用黄色轮廓定位素材，同路径的当前实例一起高亮；再点同一行或按 Esc 清除。
+高亮跟随播放、暂停、逐帧和预览尺寸，切换 REP 清除；显隐复选框保持独立，高亮不进入导出。
+描边用于定位源素材轮廓；仅作遮罩、着色器输入或离屏输入的资源可能没有独立轮廓，面板会提示。
 主窗口所有非文本面板支持左右键逐记录并暂停；搜索框仍移动光标，弹窗保留自身输入。
 短按一次一条，长按受控连续逐帧，松键停止后续自动步进。点击进度条定位，拖动只更新目标、松手后精确定位，Esc取消。
 原来播放则定位完成后继续，原来暂停则保持暂停；停止/结束状态定位到中间后暂停。
@@ -36,4 +39,4 @@ NPK 补丁支持：
 同包内其他有效 IMG 继续使用，预览、逐帧与导出的资源选择保持一致。
 
 完整使用说明：https://github.com/PhysicalWorldDo/rep-player/blob/main/README.md
-下载：https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.1.5
+下载：https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.1.6

@@ -4,7 +4,7 @@
 
 ## 下载与运行
 
-从 [v1.1.5 Release](https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.1.5) 下载 `rep-player-v1.1.5-windows-x64.zip`，完整解压到可写目录，直接双击最外层的 **rep_player.exe**。
+从 [v1.1.6 Release](https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.1.6) 下载 `rep-player-v1.1.6-windows-x64.zip`，完整解压到可写目录，直接双击最外层的 **rep_player.exe**。
 
 ```text
 解压目录/
@@ -54,6 +54,10 @@
 ## IMG 显示控制
 
 右侧“当前画面”显示当前调用的 IMG，“全部 IMG”显示整段录像的资源。取消勾选可隐藏对应素材，预览和导出共用隐藏状态。
+
+点击 IMG 行可用黄色轮廓在预览中定位素材，同路径的当前实例一起高亮。再次点击同一行或按 Esc 清除；显隐复选框保持独立。高亮跟随播放、暂停、逐帧和窗口尺寸，切换 REP 清除，不进入素材导出。
+
+描边依据当前源素材像素、混合方式和绘制位置，可能包含后来被遮挡或被着色器裁去的部分。仅作遮罩、着色器输入或离屏输入的资源没有独立轮廓时会显示提示；隐藏素材保持隐藏。
 
 “移除背景”“移除怪物”“移除人物”是横向并排的开关，默认全关，名称和开/关状态分两行显示。切换立即受理当前画面更新，不需要刷新 NPK，保持记录位置和播放状态；复杂录像的画面更新仍可能需要重建。三个选择保存在 `runtime/image_filters.txt`，切换 REP 和重开程序后保留。
 

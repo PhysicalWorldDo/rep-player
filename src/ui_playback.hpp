@@ -19,6 +19,7 @@ struct PlayerStatus {
     int timestamp=0,duration=0,width=800,height=600;
     int canvasWidth=800,canvasHeight=600,canvasLeft=0,canvasTop=0,canvasRight=0,canvasBottom=0;
     int64_t elapsed=0;
+    uint64_t presentationSerial=0;
     uint64_t ordinal=0,frames=0,frameCount=0,skipped=0,captureSerial=0;
     double readySeconds=0,maxFrameMilliseconds=0,processReadySeconds=0,p50Frame=0,p95Frame=0,p99Frame=0,playbackSeconds=0;
     bool frozen=false,compatibilityIgnored=false;
@@ -34,6 +35,8 @@ struct PlayerStatus {
     std::vector<ImgCall> currentImages,allImages;
     std::unordered_set<std::string> hiddenImages;
     ImageVisibilityPolicy imageVisibility;
+    std::string highlightedImage;
+    bool highlightAvailable=false;
     bool scrubbing=false;
     uint64_t navigationSerial=0,completedNavigationSerial=0,navigationProgressOrdinal=0;
     int64_t navigationTarget=0;
@@ -52,6 +55,12 @@ class PlaybackController {
     std::condition_variable condition_;
     std::thread thread_;
     std::atomic<bool> quitting_=false;
+    struct HighlightPresentation {std::string path;bool available=false;};
+    std::mutex highlightMutex_;
+    std::string highlightSelection_;
+    HighlightPresentation highlightPresentation_;
+    std::atomic<bool> presentRequested_=false;
+    std::atomic<uint64_t> presentationSerial_=0;
     std::atomic<uint64_t> generation_=0;
     uint64_t consumed_=0;
     bool stopRequested_=false,toggleRequested_=false,filterRequested_=false,captureRequested_=false,canvasRequested_=false;
@@ -101,6 +110,7 @@ public:
     void setAudioVolume(float volume);
     void setAudioMuted(bool muted);
     void setPlaybackRate(double rate);
+    void setHighlightedImage(std::string path);
     void captureFrame();
     PlayerStatus status();
 };

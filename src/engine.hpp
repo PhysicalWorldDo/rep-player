@@ -51,6 +51,8 @@ private:
     unsigned lastBlend_=0;
     std::unique_ptr<Movies> movies_;
     std::vector<ImgCall> currentImages_,allImages_;
+    bool trackHighlights_=false;
+    std::shared_ptr<HighlightFrame> highlightFrame_;
     std::unordered_set<std::string> hiddenImages_;
     ImageVisibilityPolicy imageVisibility_;
     bool transparent_=false,localHidden_=false,globalHidden_=false;
@@ -75,6 +77,8 @@ public:
     ExecutionStats statistics;
     Executor(Gpu& gpu,Assets& assets,const std::filesystem::path& cache,const std::filesystem::path& clientRoot={});
     ~Executor();
+    void enableImageHighlightTracking(bool enabled){trackHighlights_=enabled;if(!enabled)highlightFrame_.reset();}
+    std::shared_ptr<const HighlightFrame> highlightFrame()const{return highlightFrame_;}
     void attach(Replay& replay);
     void setCanvasSettings(const CanvasSettings& settings);
     const CanvasSettings& canvasSettings()const{return canvasSettings_;}

@@ -29,6 +29,15 @@ struct Material {
     unsigned blend=0;
     std::vector<ImageInput> inputs;
 };
+// One displayed scene's immutable IMG geometry. No interpreter state is retained.
+struct HighlightDraw {
+    std::string path,actualPath;
+    unsigned blend=0;
+    std::vector<Vertex> vertices;
+    std::shared_ptr<GpuTexture> texture;
+    std::array<int,4> clip{};
+};
+struct HighlightFrame {int width=0,height=0;std::vector<HighlightDraw> draws;};
 class Gpu {
     struct Program {
         Com<ID3D11VertexShader> vertex;
@@ -56,7 +65,7 @@ class Gpu {
     std::array<int,4> pendingClip_{};
     unsigned pendingStencil_=0,pendingReference_=0;
     bool pendingColor_=true;
-    Target straightTarget_;
+    Target straightTarget_,highlightTarget_;
     void submit(std::span<const Vertex> vertices,Material& material,std::array<int,4> clip,unsigned stencil,unsigned reference,bool writeColor);
 public:
     std::string adapter;
@@ -77,8 +86,10 @@ public:
     void flush();
     void forgetTexture(const Pixels* pixels);
     void resetTextures(){flush();textures_.clear();}
+    Target* buildHighlightMask(const HighlightFrame& frame,std::string_view selected);
+    void drawHighlight(Target& mask,std::array<float,4> placement,int width,int height);
     Bytes readback(Target& target);
     Bytes screenshot(Target& target,bool straightAlpha=false);
-    void present(Target& target,int width,int height);
+    void present(Target& target,int width,int height,Target* highlight=nullptr);
 };
 }

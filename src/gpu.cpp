@@ -27,7 +27,7 @@ Gpu::Gpu(std::filesystem::path shaders,HWND window):shaderPath_(std::move(shader
 Gpu::Program& Gpu::program(int id) {
     if(auto it=programs_.find(id);it!=programs_.end())return *it->second;
     const ShaderRecord* record=nullptr;for(const auto& r:shaderRecords)if(r.id==id){record=&r;break;}
-    if(id==-1||id==-2)for(const auto& r:shaderRecords)if(r.id==4){record=&r;break;}
+    if(id==-1||id==-2||id==-3||id==-4||id==-5)for(const auto& r:shaderRecords)if(r.id==4){record=&r;break;}
     if(!record)throw Error("original shader program absent: "+std::to_string(id));
     // The registered MaskBlur VS has a generic POSITION output. Its complete
     // instruction body matches the client's common VS; use that original VS
@@ -64,6 +64,38 @@ float4 main(float4 position:SV_POSITION):SV_TARGET {
 })hlsl";
         Com<ID3DBlob> blob,errors;check(D3DCompile(source,std::strlen(source),"rep_straight_alpha",nullptr,nullptr,"main","ps_4_0",D3DCOMPILE_OPTIMIZATION_LEVEL3,0,blob.out(),errors.out()),"CompileStraightAlphaResolve");
         check(device_->CreatePixelShader(blob->GetBufferPointer(),blob->GetBufferSize(),nullptr,p->pixel.out()),"CreateStraightAlphaResolve");
+    }else if(id==-4||id==-5){
+        const char* coverage=R"hlsl(
+cbuffer State:register(b1){float4 globals[32];}
+Texture2D image:register(t0);SamplerState sampleLinear:register(s0);
+float4 main(float4 position:SV_POSITION,float4 color:COLOR0,float2 uv:TEXCOORD0):SV_TARGET {
+    float4 sample=image.Sample(sampleLinear,uv)*color;float alpha=sample.a;
+    float energy=max(sample.r,max(sample.g,sample.b));int blend=(int)globals[0].x;
+    // Additive IMG black padding carries alpha but contributes no light.
+    if(blend==2)alpha*=energy;
+    else if(blend==32)alpha=energy*(1-alpha);
+    else if(blend==1){float3 change=abs(sample.rgb+sample.a-1);alpha=max(change.r,max(change.g,change.b));}
+    else if(blend==64)alpha=0;
+    if(alpha<=.02)discard;return float4(1,1,1,alpha);
+})hlsl";
+        const char* outline=R"hlsl(
+cbuffer State:register(b1){float4 globals[32];}
+Texture2D image:register(t0);SamplerState sampleLinear:register(s0);
+float coverage(float2 uv){if(any(uv<0)||any(uv>1))return 0;return image.SampleLevel(sampleLinear,uv,0).a;}
+float4 main(float4 position:SV_POSITION):SV_TARGET {
+    float2 uv=(position.xy-globals[1].xy)/globals[1].zw;
+    if(any(uv<0)||any(uv>1)||coverage(uv)>.02)discard;
+    float inner=0,outer=0;
+    [unroll]for(int y=-3;y<=3;y++)[unroll]for(int x=-3;x<=3;x++){
+        float a=coverage(uv+float2(x,y)/globals[1].zw);
+        outer=max(outer,a);if(abs(x)<=2&&abs(y)<=2)inner=max(inner,a);
+    }
+    if(inner>.02)return float4(1,.87,.26,1);
+    if(outer>.02)return float4(.04,.05,.07,.9);discard;return 0;
+})hlsl";
+        Com<ID3DBlob> blob,errors;const char* source=id==-4?coverage:outline;
+        check(D3DCompile(source,std::strlen(source),"img_highlight",nullptr,nullptr,"main","ps_4_0",D3DCOMPILE_OPTIMIZATION_LEVEL3,0,blob.out(),errors.out()),"CompileImageHighlight");
+        check(device_->CreatePixelShader(blob->GetBufferPointer(),blob->GetBufferSize(),nullptr,p->pixel.out()),"CreateImageHighlight");
     }else check(device_->CreatePixelShader(ps.data(),ps.size(),nullptr,p->pixel.out()),"CreateOriginalPixelShader");
     Com<ID3D11ShaderReflection> reflection;check(D3DReflect(vs.data(),vs.size(),IID_ID3D11ShaderReflection,reinterpret_cast<void**>(reflection.out())),"ReflectOriginalVertexShader");
     D3D11_SHADER_DESC sd{};reflection->GetDesc(&sd);std::vector<D3D11_INPUT_ELEMENT_DESC> layout;
@@ -156,6 +188,22 @@ void Gpu::submit(std::span<const Vertex> verts,Material& material,std::array<int
 void Gpu::capture(Target& src,Target& dst){flush();ID3D11ShaderResourceView* nulls[16]{};context_->PSSetShaderResources(0,16,nulls);context_->CopyResource(dst.image.texture.get(),src.image.texture.get());}
 std::shared_ptr<GpuTexture> Gpu::view(Target& t){auto image=std::make_shared<GpuTexture>();image->width=t.image.width;image->height=t.image.height;t.image.view->AddRef();*image->view.out()=t.image.view.get();return image;}
 void Gpu::clearStencil(Target& t){flush();if(t.depthView)context_->ClearDepthStencilView(t.depthView.get(),D3D11_CLEAR_STENCIL,1,0);}
+Target* Gpu::buildHighlightMask(const HighlightFrame& frame,std::string_view selected){
+    if(selected.empty()||frame.width<=0||frame.height<=0)return nullptr;
+    auto path=canonical(std::string(selected));while(!path.empty()&&path.front()=='/')path.erase(path.begin());if(!path.starts_with("sprite/"))path="sprite/"+path;
+    bool found=std::any_of(frame.draws.begin(),frame.draws.end(),[&](const HighlightDraw& draw){return draw.path==path||draw.actualPath==path;});
+    if(!found)return nullptr;
+    if(highlightTarget_.image.width!=frame.width||highlightTarget_.image.height!=frame.height)highlightTarget_=target(frame.width,frame.height,false);
+    float clear[4]{};begin(highlightTarget_,clear);
+    for(const auto& item:frame.draws)if(item.path==path||item.actualPath==path){Material material;material.program=-4;material.textures[0]=item.texture;material.constants[0]=float(item.blend);draw(item.vertices,material,item.clip);}
+    flush();return &highlightTarget_;
+}
+void Gpu::drawHighlight(Target& mask,std::array<float,4> placement,int width,int height){
+    Material material;material.program=-5;material.textures[0]=view(mask);std::copy(placement.begin(),placement.end(),material.constants.begin()+4);
+    std::array<Vertex,6> vertices{};int corners[]={0,1,2,2,1,3};
+    for(int n=0;n<6;n++){vertices[n].position[0]=(corners[n]&1)*width;vertices[n].position[1]=(corners[n]>>1)*height;vertices[n].texcoord[2][0]=1;}
+    draw(vertices,material,{0,0,width,height});
+}
 Bytes Gpu::readback(Target& t) {
     flush();
     D3D11_TEXTURE2D_DESC d{};t.image.texture->GetDesc(&d);d.Usage=D3D11_USAGE_STAGING;d.BindFlags=0;d.CPUAccessFlags=D3D11_CPU_ACCESS_READ;Com<ID3D11Texture2D> staging;
@@ -169,7 +217,7 @@ Bytes Gpu::screenshot(Target& t,bool straightAlpha){
     std::array<Vertex,6> vertices{};int corners[]={0,1,2,2,1,3};for(int n=0;n<6;n++){int c=corners[n];vertices[n].position[0]=(c&1)*w;vertices[n].position[1]=(c>>1)*h;vertices[n].texcoord[2][0]=1;}
     draw(vertices,material,{0,0,w,h});return readback(straightTarget_);
 }
-void Gpu::present(Target& t,int w,int h) {
+void Gpu::present(Target& t,int w,int h,Target* highlight) {
     if(!swapchain_||w<=0||h<=0)return;
     flush();activeTarget_=nullptr;
     DXGI_SWAP_CHAIN_DESC d{};swapchain_->GetDesc(&d);if(int(d.BufferDesc.Width)!=w||int(d.BufferDesc.Height)!=h){context_->OMSetRenderTargets(0,nullptr,nullptr);backbuffer_.reset();check(swapchain_->ResizeBuffers(0,w,h,DXGI_FORMAT_UNKNOWN,0),"ResizeReplaySwapchain");}
@@ -180,6 +228,6 @@ void Gpu::present(Target& t,int w,int h) {
     auto alias=std::make_shared<GpuTexture>();t.image.view->AddRef();*alias->view.out()=t.image.view.get();alias->width=t.image.width;alias->height=t.image.height;
     Material material;material.program=4;material.blend=0x8000;material.textures[0]=alias;material.constants[0]=t.image.width;material.constants[1]=t.image.height;material.constants[2]=material.constants[3]=1;
     std::array<Vertex,6> verts{};int corners[]={0,1,2,2,1,3};for(int i=0;i<6;i++){int c=corners[i];auto& v=verts[i];v.position[0]=x+(c&1)*t.image.width*scale;v.position[1]=y+(c>>1)*t.image.height*scale;v.texcoord[0][0]=c&1;v.texcoord[0][1]=c>>1;v.texcoord[2][0]=1;v.texcoord[7][0]=v.texcoord[7][1]=1;}
-    draw(verts,material,{0,0,w,h});flush();swapchain_->Present(1,0);
+    draw(verts,material,{0,0,w,h});if(highlight)drawHighlight(*highlight,{x,y,t.image.width*scale,t.image.height*scale},w,h);flush();swapchain_->Present(1,0);
 }
 }

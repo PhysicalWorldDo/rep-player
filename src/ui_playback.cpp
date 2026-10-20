@@ -13,7 +13,7 @@ PlaybackController::PlaybackController(HWND canvas,std::filesystem::path root,st
     thread_=std::thread([this]{run();});
 }
 PlaybackController::~PlaybackController(){quitting_=true;generation_++;condition_.notify_all();if(thread_.joinable())thread_.join();}
-void PlaybackController::open(const std::filesystem::path& path){std::lock_guard lock(mutex_);requested_=path;requestedAt_=Clock::now();stopRequested_=false;navigationRequested_.reset();activeNavigation_.reset();navigationSerial_++;scrubbing_=status_.scrubbing=false;hidden_.clear();imageVisibility_.clearManual();status_.imageVisibility=imageVisibility_;status_.frameCount=0;status_.hiddenImages.clear();status_.currentImages.clear();status_.allImages.clear();status_.phase=Phase::Loading;status_.compatibilityIgnored=false;status_.message.clear();status_.path=path.wstring();generation_++;condition_.notify_all();}
+void PlaybackController::open(const std::filesystem::path& path){std::lock_guard lock(mutex_);setHighlightedImage({});requested_=path;requestedAt_=Clock::now();stopRequested_=false;navigationRequested_.reset();activeNavigation_.reset();navigationSerial_++;scrubbing_=status_.scrubbing=false;hidden_.clear();imageVisibility_.clearManual();status_.imageVisibility=imageVisibility_;status_.frameCount=0;status_.hiddenImages.clear();status_.currentImages.clear();status_.allImages.clear();status_.phase=Phase::Loading;status_.compatibilityIgnored=false;status_.message.clear();status_.path=path.wstring();generation_++;condition_.notify_all();}
 void PlaybackController::replay(){auto s=status();if(s.path.empty())return;std::lock_guard lock(mutex_);requested_=s.path;requestedAt_=Clock::now();stopRequested_=false;navigationRequested_.reset();activeNavigation_.reset();navigationSerial_++;scrubbing_=status_.scrubbing=false;status_.phase=Phase::Loading;generation_++;condition_.notify_all();}
 void PlaybackController::stop(){std::lock_guard lock(mutex_);stopRequested_=true;navigationRequested_.reset();activeNavigation_.reset();navigationSerial_++;scrubbing_=status_.scrubbing=false;generation_++;condition_.notify_all();}
 void PlaybackController::togglePause(){
@@ -72,7 +72,7 @@ void PlaybackController::seekTime(int64_t target,bool endpointLast){
     request.resume=status_.phase==Phase::Playing||(navigationRequested_&&navigationRequested_->resume)||(activeNavigation_&&activeNavigation_->resume);
     queueNavigationLocked(request);
 }
-void PlaybackController::configureClient(const std::filesystem::path& client){std::lock_guard lock(mutex_);client_=client;requested_.clear();hidden_.clear();imageVisibility_.clearManual();navigationRequested_.reset();activeNavigation_.reset();navigationSerial_++;scrubbing_=false;stopRequested_=true;toggleRequested_=filterRequested_=captureRequested_=false;refreshImagesRequested_=true;imageIndex_.reset();status_=PlayerStatus{};status_.playbackRate=playbackRate_;status_.client=client_;status_.audioVolume=audioVolume_;status_.audioMuted=audioMuted_;status_.negativeImgOffsetsEnabled=negativeImgOffsetsEnabled_;status_.patchesEnabled=patchesEnabled_;status_.imageVisibility=imageVisibility_;generation_++;condition_.notify_all();}
+void PlaybackController::configureClient(const std::filesystem::path& client){std::lock_guard lock(mutex_);setHighlightedImage({});client_=client;requested_.clear();hidden_.clear();imageVisibility_.clearManual();navigationRequested_.reset();activeNavigation_.reset();navigationSerial_++;scrubbing_=false;stopRequested_=true;toggleRequested_=filterRequested_=captureRequested_=false;refreshImagesRequested_=true;imageIndex_.reset();status_=PlayerStatus{};status_.playbackRate=playbackRate_;status_.client=client_;status_.audioVolume=audioVolume_;status_.audioMuted=audioMuted_;status_.negativeImgOffsetsEnabled=negativeImgOffsetsEnabled_;status_.patchesEnabled=patchesEnabled_;status_.imageVisibility=imageVisibility_;generation_++;condition_.notify_all();}
 void PlaybackController::refreshImages(std::optional<bool> patchesEnabled){std::lock_guard lock(mutex_);if(client_.empty())return;if(patchesEnabled)patchesEnabled_=*patchesEnabled;requested_=status_.path;requestedAt_=Clock::now();stopRequested_=requested_.empty();navigationRequested_.reset();activeNavigation_.reset();navigationSerial_++;scrubbing_=status_.scrubbing=false;refreshImagesRequested_=true;imageIndex_.reset();status_.phase=Phase::Loading;status_.frameCount=0;status_.currentImages.clear();status_.allImages.clear();status_.message.clear();generation_++;condition_.notify_all();}
 Assets::IndexPtr PlaybackController::imageIndex(){std::lock_guard lock(mutex_);return imageIndex_;}
 std::optional<bool> PlaybackController::appliedPatchesEnabled(){std::lock_guard lock(mutex_);if(!imageIndex_)return {};return status_.patchesEnabled;}
@@ -86,8 +86,12 @@ void PlaybackController::setPlaybackRate(double rate){
     if(!std::isfinite(rate)||rate<.25||rate>4)throw Error("Playback speed must be between 0.25 and 4");
     std::lock_guard lock(mutex_);playbackRate_=status_.playbackRate=rate;playbackRateRequested_=true;condition_.notify_all();
 }
+void PlaybackController::setHighlightedImage(std::string path){
+    {std::lock_guard lock(highlightMutex_);highlightSelection_=path.empty()?std::string{}:normalizeImagePath(std::move(path));}
+    presentRequested_=true;condition_.notify_all();
+}
 void PlaybackController::captureFrame(){std::lock_guard lock(mutex_);if(status_.path.empty())return;captureRequested_=true;condition_.notify_all();}
-PlayerStatus PlaybackController::status(){std::lock_guard lock(mutex_);return status_;}
+PlayerStatus PlaybackController::status(){std::lock_guard lock(mutex_);auto result=status_;result.presentationSerial=presentationSerial_.load();{std::lock_guard highlightLock(highlightMutex_);result.highlightedImage=highlightSelection_;result.highlightAvailable=highlightPresentation_.path==result.highlightedImage&&highlightPresentation_.available;}return result;}
 
 void PlaybackController::run(){try{
     Gpu gpu(root_/L"assets"/L"shaders",canvas_);gpu.createAllPrograms();
@@ -100,12 +104,13 @@ void PlaybackController::run(){try{
     // One displayed picture survives partial rebuilds. It stores no execution
     // state and is never used to accelerate a seek.
     std::optional<Target> frozenPicture;
+    std::shared_ptr<const HighlightFrame> frozenHighlights,frozenOriginalHighlights;
     struct PendingNavigation {NavigationRequest request;uint64_t generation=0,audioSerial=0;bool ended=false;double milliseconds=0;uint32_t crc=0;};
     std::optional<PendingNavigation> pendingNavigation;
     uint64_t audioClockSerial=0;int64_t audioClockTarget=0;
     auto startAudio=[&](int64_t elapsed){audioClockTarget=elapsed;audioClockSerial=audio?audio->seek(elapsed,true):0;};
     auto releaseAudio=[&]{if(audio)audio->stop();audio.reset();audioEpoch.reset();audioMessage.clear();audioClockSerial=0;};
-    auto releaseReplay=[&]{pendingNavigation.reset();frozenPicture.reset();releaseAudio();gpu.flush();playback=Playback{};replay.reset();executor.reset();gpu.resetTextures();if(assets)assets->clearDecodedImages();activeReplay.clear();};
+    auto releaseReplay=[&]{pendingNavigation.reset();frozenHighlights.reset();frozenOriginalHighlights.reset();frozenPicture.reset();releaseAudio();gpu.flush();playback=Playback{};replay.reset();executor.reset();gpu.resetTextures();if(assets)assets->clearDecodedImages();activeReplay.clear();};
     auto updateAudio=[&]{
         status_.audioAvailable=audio&&audio->available();status_.audioMessage=audioMessage;
         status_.missingSoundCount=audio?audio->missingResources():0;status_.audioEvents=audio?audio->eventCount():0;
@@ -132,7 +137,14 @@ void PlaybackController::run(){try{
     };
     auto updateImages=[&]{if(!executor)return;status_.currentImages=executor->currentImages();status_.allImages=executor->allImages();status_.hiddenImages=executor->hiddenImages();};
     auto updateCanvas=[&]{if(!executor)return;const auto& layout=executor->canvasLayout();status_.canvasWidth=layout.width;status_.canvasHeight=layout.height;status_.canvasLeft=layout.left;status_.canvasTop=layout.top;status_.canvasRight=layout.right;status_.canvasBottom=layout.bottom;};
-    auto present=[&](bool commit=false){if(commit)frozenPicture.reset();RECT r;GetClientRect(canvas_,&r);gpu.present(frozenPicture?*frozenPicture:executor->output(),std::max(1L,r.right),std::max(1L,r.bottom));oldWidth=r.right;oldHeight=r.bottom;};
+    auto present=[&](bool commit=false){
+        presentRequested_=false;if(commit){frozenPicture.reset();frozenHighlights.reset();}
+        std::string selection;{std::lock_guard lock(highlightMutex_);selection=highlightSelection_;}auto frame=frozenPicture?frozenHighlights:executor->highlightFrame();
+        auto mask=frame?gpu.buildHighlightMask(*frame,selection):nullptr;
+        RECT r;GetClientRect(canvas_,&r);gpu.present(frozenPicture?*frozenPicture:executor->output(),std::max(1L,r.right),std::max(1L,r.bottom),mask);
+        {std::lock_guard lock(highlightMutex_);highlightPresentation_={selection,mask!=nullptr};}
+        oldWidth=r.right;oldHeight=r.bottom;presentationSerial_++;
+    };
     while(!quitting_){
         uint64_t generation=generation_;
         if(generation!=consumed_){
@@ -150,7 +162,7 @@ void PlaybackController::run(){try{
                 if(path!=activeReplay){releaseReplay();executor=std::make_unique<Executor>(gpu,*assets,root_/L"runtime"/L"cache",client);}
                 else if(!executor)executor=std::make_unique<Executor>(gpu,*assets,root_/L"runtime"/L"cache",client);
                 auto options=clientReplayOptions(client,protocol_);
-                auto opened=std::make_unique<Replay>(path,options);executor->setCanvasSettings(settings);executor->setNegativeImgOffsetsEnabled(negativeImgOffsets);executor->attach(*opened);executor->setHiddenImages(hidden);executor->setImageVisibility(visibility);executor->setTransparent(true);replay=std::move(opened);
+                auto opened=std::make_unique<Replay>(path,options);executor->enableImageHighlightTracking(true);executor->setCanvasSettings(settings);executor->setNegativeImgOffsetsEnabled(negativeImgOffsets);executor->attach(*opened);executor->setHiddenImages(hidden);executor->setImageVisibility(visibility);executor->setTransparent(true);replay=std::move(opened);
                 activeReplay=path;
                 playback.attach(*replay,*executor);executor->prepare([&]{return quitting_||generation_!=generation;});
                 if(quitting_||generation_!=generation)continue;
@@ -171,6 +183,7 @@ void PlaybackController::run(){try{
         }
         if(audioSettings&&audio)audio->volume(volume,muted);
         if(rateChanged){playback.setPlaybackRate(rate);if(audio)audio->setPlaybackRate(rate);}
+        if(!replay||!executor)presentRequested_=false;
         if(replay&&executor)try{
             if(toggle){
                 if(playback.playing()){playback.pause();if(audio)audio->pause();}
@@ -183,7 +196,7 @@ void PlaybackController::run(){try{
             if(navigation){
                 pendingNavigation.reset();auto request=*navigation;auto before=Clock::now();
                 playback.finishNavigation(playback.elapsedMilliseconds(),false);if(audio)audio->pause();
-                if(!frozenPicture){auto& output=executor->output();gpu.flush();frozenPicture=gpu.target(output.image.width,output.image.height,false);gpu.context()->CopyResource(frozenPicture->image.texture.get(),output.image.texture.get());}
+                if(!frozenPicture){auto& output=executor->output();gpu.flush();frozenPicture=gpu.target(output.image.width,output.image.height,false);gpu.context()->CopyResource(frozenPicture->image.texture.get(),output.image.texture.get());frozenHighlights=executor->highlightFrame();}
                 if(canvasChanged)executor->setCanvasSettings(settings);
                 if(negativeImgOffsetsChanged)executor->setNegativeImgOffsetsEnabled(negativeImgOffsets);
                 if(filter){executor->setHiddenImages(hidden);executor->setImageVisibility(visibility);}
@@ -238,14 +251,15 @@ void PlaybackController::run(){try{
                 }
             }
             bool seeking;{std::lock_guard lock(mutex_);seeking=status_.phase==Phase::Seeking;}
-            if(seeking){std::unique_lock lock(mutex_);condition_.wait_for(lock,std::chrono::milliseconds(2),[&]{return quitting_||generation_!=consumed_||navigationRequested_||scrubChanged_||filterRequested_||canvasRequested_||negativeImgOffsetsRequested_;});continue;}
+            if(seeking&&presentRequested_.load())present();
+            if(seeking){std::unique_lock lock(mutex_);condition_.wait_for(lock,std::chrono::milliseconds(2),[&]{return quitting_||generation_!=consumed_||navigationRequested_||presentRequested_.load()||scrubChanged_||filterRequested_||canvasRequested_||negativeImgOffsetsRequested_;});continue;}
             // The device sample clock includes seek/start buffering and the
             // selected frequency ratio, so pictures follow the actual sound.
             // A reused device still holds the previous replay's clock until
             // the new start seek is applied. Keep its requested start meanwhile.
             if(playback.playing()&&audio&&audio->available())playback.setElapsedMilliseconds(audio->appliedSeekSerial()>=audioClockSerial?audio->positionMilliseconds():audioClockTarget);
             auto before=Clock::now();bool changed=playback.tick();RECT r;GetClientRect(canvas_,&r);bool resized=r.right!=oldWidth||r.bottom!=oldHeight;
-            if(changed||resized)present();
+            if(changed||resized||presentRequested_.load())present();
             if(changed){double ms=std::chrono::duration<double,std::milli>(Clock::now()-before).count();frameTimes.push_back(ms);std::lock_guard lock(mutex_);status_.frames++;status_.skipped=playback.skipped;status_.timestamp=playback.timestamp();status_.ordinal=playback.ordinal();status_.maxFrameMilliseconds=std::max(status_.maxFrameMilliseconds,ms);updateImages();}
             {std::lock_guard lock(mutex_);status_.elapsed=playback.elapsedMilliseconds();if(status_.duration)status_.elapsed=std::min<int64_t>(status_.elapsed,status_.duration);updateAudio();}
             if(capture){auto pixels=gpu.readback(frozenPicture?*frozenPicture:executor->output());std::lock_guard lock(mutex_);status_.frameCrc=crc(pixels);status_.captureSerial++;}
@@ -255,7 +269,7 @@ void PlaybackController::run(){try{
                 if(test_&&!frozenChecked&&Clock::now()-endedAt>std::chrono::milliseconds(800)){bool same=crc(gpu.readback(executor->output()))==finalCrc;std::lock_guard lock(mutex_);status_.frozen=same;status_.finalCrc=finalCrc;frozenChecked=true;}
             }
         }catch(const std::exception& e){releaseReplay();std::lock_guard lock(mutex_);status_.phase=Phase::Error;status_.message=wide(e.what());updateAudio();}
-        std::unique_lock lock(mutex_);condition_.wait_for(lock,std::chrono::milliseconds(playback.playing()||pendingNavigation?1:20),[&]{return quitting_||generation_!=consumed_||toggleRequested_||filterRequested_||captureRequested_||canvasRequested_||audioSettingsRequested_||playbackRateRequested_||negativeImgOffsetsRequested_||scrubChanged_||navigationRequested_;});
+        std::unique_lock lock(mutex_);condition_.wait_for(lock,std::chrono::milliseconds(playback.playing()||pendingNavigation?1:20),[&]{return quitting_||generation_!=consumed_||presentRequested_.load()||toggleRequested_||filterRequested_||captureRequested_||canvasRequested_||audioSettingsRequested_||playbackRateRequested_||negativeImgOffsetsRequested_||scrubChanged_||navigationRequested_;});
     }
     if(inspection.valid())inspection.wait();gpu.flush();
 }catch(const std::exception& e){std::lock_guard lock(mutex_);status_.phase=Phase::Error;status_.message=wide(e.what());status_.audioAvailable=false;status_.audioEvents=status_.missingSoundCount=0;status_.audioPosition=0;status_.audioMessage.clear();}}

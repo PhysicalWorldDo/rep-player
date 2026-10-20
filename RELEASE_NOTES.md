@@ -1,5 +1,15 @@
 # 更新记录
 
+## v1.1.6
+
+发布日期：2026-10-21。下载 [Windows x64 运行包](https://github.com/PhysicalWorldDo/rep-player/releases/download/v1.1.6/rep-player-v1.1.6-windows-x64.zip)。完整解压后直接运行 `rep_player.exe`。
+
+- 点击 IMG 素材行，预览中对应素材显示黄色轮廓；再次点击同一行或按 Esc 清除。
+- 高亮随播放、暂停、逐帧和定位更新；同一 IMG 的多个实例一起描边，勾选框仍独立控制素材显隐。
+- 高亮仅用于预览定位素材，不改变配色、显隐或导出结果。未在当前帧显示的资源会给出状态提示。
+
+描边依据源素材轮廓，复杂遮挡或着色器裁剪下可能包含被遮挡部分。运行要求和使用方法见 [README](https://github.com/PhysicalWorldDo/rep-player/blob/main/README.md)。
+
 ## v1.1.5
 
 发布日期：2026-10-20。下载 [Windows x64 运行包](https://github.com/PhysicalWorldDo/rep-player/releases/download/v1.1.5/rep-player-v1.1.5-windows-x64.zip)。完整解压后直接运行 `rep_player.exe`。

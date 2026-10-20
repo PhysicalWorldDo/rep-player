@@ -130,7 +130,7 @@ size_t Executor::recordImage(std::string path,int frame,uint32_t layerId,std::st
 }
 void Executor::markDrawn(size_t call){if(call==SIZE_MAX)return;currentImages_[call].drawn=true;auto& path=currentImages_[call].path;for(auto& image:allImages_)if(image.path==path){image.drawn=true;break;}}
 void Executor::setInspection(ReplayInspection inspection){durationMilliseconds_=inspection.durationMilliseconds;for(auto& image:inspection.images){image.hidden=hidden(image.path);mergeImage(allImages_,std::move(image),false);}}
-void Executor::resetPlaybackState(){gpu_.flush();for(auto& pixels:movies_->pixels())gpu_.forgetTexture(pixels.get());cameras_.clear();samplerOffsets_.clear();lastBlend_=0;movies_->reset();localCapture_=globalCapture_=localHidden_=globalHidden_=false;binder_.setReplay(replay_);selectedContext_=219;contextBound_.fill(false);sceneEntryValid_=false;}
+void Executor::resetPlaybackState(){highlightFrame_.reset();gpu_.flush();for(auto& pixels:movies_->pixels())gpu_.forgetTexture(pixels.get());cameras_.clear();samplerOffsets_.clear();lastBlend_=0;movies_->reset();localCapture_=globalCapture_=localHidden_=globalHidden_=false;binder_.setReplay(replay_);selectedContext_=219;contextBound_.fill(false);sceneEntryValid_=false;}
 Target& Executor::renderTarget(int context){if(context>=219&&context<=230&&contexts_[context-219])return *contexts_[context-219];return output_;}
 // Keep camera transforms and recorded clips in REP screen coordinates. Apply
 // the canvas offset only to final vertices, scissor rectangles and RT sampling.
@@ -295,7 +295,7 @@ void Executor::draw(Sprite s,State& state){
     float insetX=inset&&(scaled(at<float>(s.params,20))||rotated||cameraZoom!=1)?.5f:0;
     float insetY=inset&&(scaled(at<float>(s.params,24))||rotated||cameraZoom!=1)?.5f:0;
     if(frame.rotated&&!s.specialUv)std::swap(insetX,insetY);
-    std::vector<Vertex> vertices;auto add=[&](double left,double top,double right,double bottom,std::array<float,4> uv){int corners[]={0,1,2,2,1,3};for(int corner:corners){Vertex v;auto xy=m.apply(corner&1?right:left,corner>>1?bottom:top);v.position[0]=xy[0]+canvasLayout_.left;v.position[1]=xy[1]+canvasLayout_.top;auto col=vertexColor;if(s.gradient&&corner>>1){auto lower=color(s.lower);std::copy_n(lower.data(),3,col.data());}std::copy(col.begin(),col.end(),v.color);
+    std::vector<Vertex> vertices,highlightVertices;auto add=[&](double left,double top,double right,double bottom,std::array<float,4> uv){int corners[]={0,1,2,2,1,3};for(int corner:corners){Vertex v;auto xy=m.apply(corner&1?right:left,corner>>1?bottom:top);v.position[0]=xy[0]+canvasLayout_.left;v.position[1]=xy[1]+canvasLayout_.top;auto col=vertexColor;if(s.gradient&&corner>>1){auto lower=color(s.lower);std::copy_n(lower.data(),3,col.data());}std::copy(col.begin(),col.end(),v.color);
             float xx=corner&1?uv[2]:uv[0],yy=corner>>1?uv[3]:uv[1];auto& rect=frame.rect;double u,vv;
             if(frame.rotated){u=(s.specialUv?rect[0]+uv[corner>>1?0:2]:rect[2]-yy)/frame.texture->width;vv=(rect[1]+(s.specialUv?uv[corner&1?3:1]:xx))/frame.texture->height;}else{u=(rect[0]+xx*(rect[2]<rect[0]?-1:1))/frame.texture->width;vv=(rect[1]+yy*(rect[3]<rect[1]?-1:1))/frame.texture->height;}
             if(directUv){
@@ -309,7 +309,13 @@ void Executor::draw(Sprite s,State& state){
                 v.texcoord[7][0]=(rect[2]-rect[0]-2*insetX)/frame.texture->width;v.texcoord[7][1]=(rect[3]-rect[1]-2*insetY)/frame.texture->height;
             }
             v.texcoord[1][0]=s.font?float(s.channel):material.elapsed;v.texcoord[1][1]=material.row;v.texcoord[2][0]=1;
-            for(int k=0;k<6;k++)v.texcoord[3+k/2][k%2]=material.parameters[k];vertices.push_back(v);}};
+            for(int k=0;k<6;k++)v.texcoord[3+k/2][k%2]=material.parameters[k];vertices.push_back(v);
+            if(trackHighlights_&&!s.font&&s.call!=SIZE_MAX&&&destination==&output_){
+                float du=(corner&1?-1:1)*(frame.rotated?insetY:insetX)/frame.texture->width;
+                float dv=(corner>>1?-1:1)*(frame.rotated?insetX:insetY)/frame.texture->height;
+                if(frame.rotated){du=(corner>>1?1:-1)*insetX/frame.texture->width;dv=(corner&1?-1:1)*insetY/frame.texture->height;}
+                v.texcoord[0][0]=float(u+du);v.texcoord[0][1]=float(vv+dv);highlightVertices.push_back(v);
+            }}};
     add(0,0,frame.width,frame.height,source);
     bool stencil=state.phase!=0;
     unsigned stencilMode=state.phase==1?(state.invert?0:1):state.phase==2?(state.invert?3:2):0;bool writeColor=state.phase!=1||(state.channel!=0&&state.channel!=2);
@@ -319,6 +325,11 @@ void Executor::draw(Sprite s,State& state){
     clip=physicalClip(clip);
     if(std::max(0,clip[0])>=std::min(output_.image.width,clip[2])||std::max(0,clip[1])>=std::min(output_.image.height,clip[3]))return;
     if(writeColor)markDrawn(s.actualCall==SIZE_MAX?s.call:s.actualCall);
+    if(writeColor&&highlightFrame_&&!highlightVertices.empty()){
+        HighlightDraw item;item.path=currentImages_[s.call].path;
+        if(s.actualCall!=SIZE_MAX)item.actualPath=currentImages_[s.actualCall].path;
+        item.vertices=std::move(highlightVertices);item.texture=sourceTexture;item.clip=clip;item.blend=material.blend;highlightFrame_->draws.push_back(std::move(item));
+    }
     if(captureActive||stencil){float clear[4]{};gpu_.begin(working_,clear);auto unblended=material;unblended.blend=0x8000;gpu_.draw(vertices,unblended,clip);
         if(captureActive&&(flags==1||flags==2)){gpu_.begin(raw_,clear);auto raw=material;raw.program=s.font?2:4;raw.blend=0x8000;auto rawVerts=vertices;for(auto& v:rawVerts){v.color[0]=v.color[1]=v.color[2]=v.color[3]=1;v.texcoord[3][0]=1;}gpu_.draw(rawVerts,raw,clip);}
         gpu_.begin(destination);Material composite;composite.program=-1;composite.blend=flags;composite.textures[0]=gpu_.view(working_);composite.constants[0]=output_.image.width;composite.constants[1]=output_.image.height;
@@ -342,6 +353,7 @@ void Executor::capture(const Instruction& i,std::span<const uint8_t> payload,boo
     float clear[4]{};gpu_.begin(target,clear);gpu_.draw(vertices,material,{0,0,output_.image.width,output_.image.height});gpu_.begin(renderTarget(state.context));active=true;
 }
 void Executor::execute(const Scene& scene){
+    if(trackHighlights_){highlightFrame_=std::make_shared<HighlightFrame>();highlightFrame_->width=output_.image.width;highlightFrame_->height=output_.image.height;}else highlightFrame_.reset();
     if(!replay_)throw Error("executor has no replay");sceneEntryCameras_=cameras_;sceneEntryOffsets_=samplerOffsets_;sceneEntryBlend_=lastBlend_;sceneEntryRandom_=binder_.randomState();sceneEntryValid_=true;currentImages_.clear();durationMilliseconds_=std::max(durationMilliseconds_,scene.timestamp);State state;state.clip=canvasClip();auto initialize=[&](State& s){s.context=replay_->header.renderMode==2?(replay_->version>=17||replay_->version<=11?82:10):(replay_->version>=17?81:10);};initialize(state);
     std::map<size_t,std::vector<GlyphQuad>> textQuads;size_t cursor=0;Reader aux(scene.aux);
     for(auto id:scene.ids)if(auto command=replay_->command(id))for(const auto& i:command->instructions){auto payload=std::span(command->raw).subspan(i.offset,i.payloadBytes);float x=0,y=0;if(i.auxBytes){x=aux.get<int16_t>();y=aux.get<int16_t>();}
