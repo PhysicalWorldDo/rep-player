@@ -113,7 +113,7 @@ int wmain(int argc,wchar_t** argv){try{
     else if((argc==10||argc==11)&&std::wstring_view(argv[1])==L"--font") {
         int id=std::stoi(argv[2]),height=std::stoi(argv[3]),weight=std::stoi(argv[4]),slant=std::stoi(argv[5]),outline=std::stoi(argv[6]),padding=std::stoi(argv[7]),scale=std::stoi(argv[8]);
         rep::Rasterizer rasterizer(argc==11?std::filesystem::path(argv[10]):std::filesystem::path(L"D:\\115us\\client\\Fonts"));rep::Atlas atlas;std::cout<<"{\"metrics\":[";bool first=true;
-        for(auto ch:std::wstring(argv[9])){auto normal=rasterizer.glyph(id,height,weight,slant,0,ch),border=rasterizer.glyph(id,height,weight,slant,outline,ch);atlas.registerGlyph(std::to_string(ch),*normal,*border,padding,scale);
+        for(auto ch:std::wstring(argv[9])){auto normal=rasterizer.glyph(id,height,weight,slant,0,ch,outline),border=rasterizer.glyph(id,height,weight,slant,outline,ch,outline);atlas.registerGlyph(std::to_string(ch),*normal,*border,padding,scale);
             if(!first)std::cout<<',';first=false;std::cout<<'['<<normal->left<<','<<normal->top<<','<<normal->advance<<']';}
         atlas.refresh();std::cout<<"],\"atlas_crc32\":"<<rep::crc(atlas.pixels->rgba)<<"}\n";
     }

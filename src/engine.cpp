@@ -80,6 +80,8 @@ struct Executor::Sprite {
     std::optional<State::Grid> grid;
     std::optional<std::array<int,2>> sourceSize;
     std::optional<std::array<int,4>> screenClip;
+    struct CapturePlacement {double x=0,y=0,scaleX=1,scaleY=1;bool projected=false;};
+    std::optional<CapturePlacement> capturePlacement;
     size_t call=SIZE_MAX;
     size_t actualCall=SIZE_MAX;
 };
@@ -172,14 +174,15 @@ void Executor::prepare(const std::function<bool()>& cancelled){
     for(const auto& [path,index]:requested){if(cancelled&&cancelled())return;if(path.empty())continue;auto f=assets_.frame(path,index);if(f&&!f->empty)gpu_.texture(f->texture);}
 }
 static Matrix affine(const Executor::Sprite& s,const Frame& frame){
-    const auto& p=s.params;double px=at<float>(p,28),py=at<float>(p,32);if(px>=4.29e9&&py>=4.29e9){px=frame.fullWidth/2;py=frame.fullHeight/2;}
+    const auto& p=s.params;const double geometry=frame.geometryScale;double px=at<float>(p,28),py=at<float>(p,32);if(px>=4.29e9&&py>=4.29e9){px=(frame.fullWidth/2)*geometry;py=(frame.fullHeight/2)*geometry;}
     // Both client matrix backends (1487E0640 / 1487D42E0) negate the
     // recorded angle before generating rotation, including the scale axes.
     double sx=at<float>(p,20),sy=at<float>(p,24),angle=-at<float>(p,16),c=std::cos(angle),sn=std::sin(angle),direction=p[6]==1?-1:1;
     Matrix m;if(s.opcode==4){m.a=direction*c*sx;m.b=-direction*sn*sy;m.c=sn*sx;m.d=c*sy;}
     else {m.a=direction*sx*c;m.b=-direction*sx*sn;m.c=sy*sn;m.d=sy*c;}
     double extra=-at<float>(p,48),ex=at<float>(p,52),ey=at<float>(p,56);c=std::cos(extra);sn=std::sin(extra);m.multiply(ex*c*c+ey*sn*sn,(ex-ey)*c*sn,(ex-ey)*c*sn,ex*sn*sn+ey*c*c);
-    m.x=s.x+px+m.a*(frame.x-px)+m.b*(frame.y-py);m.y=s.y+py+m.c*(frame.x-px)+m.d*(frame.y-py);return m;
+    m.x=s.x+px+m.a*(frame.x*geometry-px)+m.b*(frame.y*geometry-py);m.y=s.y+py+m.c*(frame.x*geometry-px)+m.d*(frame.y*geometry-py);
+    m.a*=geometry;m.b*=geometry;m.c*=geometry;m.d*=geometry;return m;
 }
 static std::array<float,4> color(uint32_t argb){return {float((argb>>16)&255)/255,float((argb>>8)&255)/255,float(argb&255)/255,float(argb>>24)/255};}
 static double mapAxis(double position,double full,double target,const std::vector<int>& intervals){
@@ -212,7 +215,9 @@ void Executor::draw(Sprite s,State& state){
     auto frame=*s.frame;
     if(!s.skipGrid){auto it=state.grids.find({s.resource,s.frameIndex});auto grid=s.grid?s.grid:(it!=state.grids.end()?std::optional{it->second}:std::nullopt);
         if(grid){
-            double targetX=s.directGridExtent?at<float>(s.params,20):frame.fullWidth-frame.width+frame.width*at<float>(s.params,20),targetY=s.directGridExtent?at<float>(s.params,24):frame.fullHeight-frame.height+frame.height*at<float>(s.params,24),sx=at<float>(s.params,52),sy=at<float>(s.params,56);
+            if(frame.geometryScale!=1){for(auto& x:grid->xs)x=int(x/frame.geometryScale);for(auto& y:grid->ys)y=int(y/frame.geometryScale);}
+            if(s.offscreen&&!s.capturePlacement){auto origin=s.matrix.value_or(affine(s,frame));s.capturePlacement=Sprite::CapturePlacement{origin.x,origin.y};}
+            double targetX=s.directGridExtent?at<float>(s.params,20)/frame.geometryScale:frame.fullWidth-frame.width+frame.width*at<float>(s.params,20),targetY=s.directGridExtent?at<float>(s.params,24)/frame.geometryScale:frame.fullHeight-frame.height+frame.height*at<float>(s.params,24),sx=at<float>(s.params,52),sy=at<float>(s.params,56);
             std::vector<double> xs{double(frame.x),double(frame.x+frame.width)},ys{double(frame.y),double(frame.y+frame.height)};
             for(size_t i=0;i<grid->xs.size()/2*2;i++)xs.push_back(std::clamp<double>(grid->xs[i],frame.x,frame.x+frame.width));for(size_t i=0;i<grid->ys.size()/2*2;i++)ys.push_back(std::clamp<double>(grid->ys[i],frame.y,frame.y+frame.height));
             auto unique=[](auto& v){std::sort(v.begin(),v.end());v.erase(std::unique(v.begin(),v.end()),v.end());};unique(xs);unique(ys);
@@ -220,22 +225,25 @@ void Executor::draw(Sprite s,State& state){
                 double left=mapAxis(xs[x-1],frame.fullWidth,targetX,grid->xs),right=mapAxis(xs[x],frame.fullWidth,targetX,grid->xs),top=mapAxis(ys[y-1],frame.fullHeight,targetY,grid->ys),bottom=mapAxis(ys[y],frame.fullHeight,targetY,grid->ys);
                 if(right<=left||bottom<=top)continue;auto cell=s;cell.opcode=3;cell.skipGrid=true;cell.grid.reset();put(cell.params,20,float(sx*(right-left)/(xs[x]-xs[x-1])));put(cell.params,24,float(sy*(bottom-top)/(ys[y]-ys[y-1])));put(cell.params,28,0.f);put(cell.params,32,0.f);put(cell.params,52,1.f);put(cell.params,56,1.f);
                 cell.frame=std::make_shared<Frame>(frame);cell.frame->width=xs[x]-xs[x-1];cell.frame->height=ys[y]-ys[y-1];cell.frame->x=0;cell.frame->y=0;cell.sourceRect=std::array<float,4>{float(xs[x-1]-frame.x),float(ys[y-1]-frame.y),float(xs[x]-frame.x),float(ys[y]-frame.y)};
-                auto m=affine(cell,*cell.frame);m.x+=sx*left;m.y+=sy*top;cell.matrix=m;draw(std::move(cell),state);statistics.gridCells++;}
+                auto m=affine(cell,*cell.frame);m.x+=sx*left*frame.geometryScale;m.y+=sy*top*frame.geometryScale;cell.matrix=m;draw(std::move(cell),state);statistics.gridCells++;}
             return;
         }
     }
-    int originalWidth=s.sourceSize?s.sourceSize->at(0):frame.width,originalHeight=s.sourceSize?s.sourceSize->at(1):frame.height;std::array<float,4> source{s.sourceRect.value_or(std::array<float,4>{0,0,float(frame.width),float(frame.height)})};
+    int originalWidth=int((s.sourceSize?s.sourceSize->at(0):frame.width)*frame.geometryScale),originalHeight=int((s.sourceSize?s.sourceSize->at(1):frame.height)*frame.geometryScale);std::array<float,4> source{s.sourceRect.value_or(std::array<float,4>{0,0,float(frame.width),float(frame.height)})};
     bool quad2=s.instruction&&s.instruction->opcode>=42&&s.instruction->opcode<=47&&(s.instruction->opcode-42)%3==2;
     if(quad2){const auto& n=s.instruction->native;source={0,0,float(frame.width),float(frame.height)};
-        if(n[16])for(int i=0;i<4;i++)source[i]=float(int(at<float>(n,20+i*4)));else if(n[72]){source[2]+=frame.x;source[3]+=frame.y;}
-        if(n[36]){put(s.params,20,(at<float>(n,48)-at<float>(n,40))/frame.fullWidth);put(s.params,24,(at<float>(n,52)-at<float>(n,44))/frame.fullHeight);}
-        frame.x=frame.y=0;put(s.params,28,0.f);put(s.params,32,0.f);s.params[6]=0;s.opcode=4;
+        if(n[16])for(int i=0;i<4;i++)source[i]=float(int(at<float>(n,20+i*4)))/frame.geometryScale;else if(n[72]){source[2]+=frame.x;source[3]+=frame.y;}
+        if(n[36]){put(s.params,20,(at<float>(n,48)-at<float>(n,40))/(frame.fullWidth*frame.geometryScale));put(s.params,24,(at<float>(n,52)-at<float>(n,44))/(frame.fullHeight*frame.geometryScale));}
+        // Quad2's source rectangle is relative to the cropped pixels. Its
+        // IMG placement offset still belongs to the destination geometry.
+        put(s.params,28,0.f);put(s.params,32,0.f);s.params[6]=0;s.opcode=4;
     }
-    if(s.params[36]){for(int i=0;i<4;i++)source[i]=at<int16_t>(s.params,38+i*2);if(source[2]<=source[0]||source[3]<=source[1])return;put(s.params,20,at<float>(s.params,20)*(source[2]-source[0])/frame.width);put(s.params,24,at<float>(s.params,24)*(source[3]-source[1])/frame.height);}
+    if(s.params[36]){for(int i=0;i<4;i++)source[i]=at<int16_t>(s.params,38+i*2)/frame.geometryScale;if(source[2]<=source[0]||source[3]<=source[1])return;put(s.params,20,at<float>(s.params,20)*(source[2]-source[0])/frame.width);put(s.params,24,at<float>(s.params,24)*(source[3]-source[1])/frame.height);}
     if(s.specialUv?(source[2]==source[0]||source[3]==source[1]):(source[2]<=source[0]||source[3]<=source[1]))return;
     Matrix m=s.matrix.value_or(affine(s,frame));
+    const auto unprojectedOrigin=std::array{m.x,m.y};double placementScaleX=1,placementScaleY=1;
     if(!s.matrix||s.skipGrid){int context=s.context>=81&&s.context<=84?int(s.layer):s.context;bool eligible=state.samplerEnabled&&state.sampler&&state.sampler->number==1&&(context==10||context==11||context==28||context==29||context==30||context==33);
-        if(eligible){auto& sampler=*state.sampler;if(sampler.flag==1)samplerOffsets_[context]={sampler.x,sampler.y};auto offset=samplerOffsets_[context];m.a*=sampler.sx;m.b*=sampler.sx;m.c*=sampler.sy;m.d*=sampler.sy;m.x=sampler.sx*(m.x-sampler.ox)+offset[0];m.y=sampler.sy*(m.y-sampler.oy)+offset[1];statistics.samplerDraws++;}else samplerOffsets_.erase(context);
+        if(eligible){auto& sampler=*state.sampler;if(sampler.flag==1)samplerOffsets_[context]={sampler.x,sampler.y};auto offset=samplerOffsets_[context];m.a*=sampler.sx;m.b*=sampler.sx;m.c*=sampler.sy;m.d*=sampler.sy;m.x=sampler.sx*(m.x-sampler.ox)+offset[0];m.y=sampler.sy*(m.y-sampler.oy)+offset[1];placementScaleX=sampler.sx;placementScaleY=sampler.sy;statistics.samplerDraws++;}else samplerOffsets_.erase(context);
     }
     auto clip=s.screenClip.value_or(state.clip);
     double cameraZoom=1,cameraScaleX=1,cameraScaleY=1;
@@ -261,11 +269,17 @@ void Executor::draw(Sprite s,State& state){
         m.a*=cameraScaleX;m.b*=cameraScaleX;m.c*=cameraScaleY;m.d*=cameraScaleY;
     }
     if(std::abs(m.a*m.d-m.b*m.c)<1e-12)return;
-    if(s.params[12]>=1&&s.params[12]<=3&&!s.matrix){double px=at<float>(s.params,28),py=at<float>(s.params,32);if(px>=4.29e9&&py>=4.29e9){px=frame.fullWidth/2;py=frame.fullHeight/2;}
+    if(s.offscreen){
+        if(!s.capturePlacement)s.capturePlacement=Sprite::CapturePlacement{m.x,m.y,cameraScaleX,cameraScaleY,true};
+        else if(!s.capturePlacement->projected){auto& p=*s.capturePlacement;
+            p.x=m.x+(p.x-unprojectedOrigin[0])*placementScaleX*cameraScaleX;p.y=m.y+(p.y-unprojectedOrigin[1])*placementScaleY*cameraScaleY;
+            p.scaleX=cameraScaleX;p.scaleY=cameraScaleY;p.projected=true;}
+    }
+    if(s.params[12]>=1&&s.params[12]<=3&&!s.matrix){double px=at<float>(s.params,28),py=at<float>(s.params,32);if(px>=4.29e9&&py>=4.29e9){px=frame.fullWidth/2;py=frame.fullHeight/2;}else{px/=frame.geometryScale;py/=frame.geometryScale;}
         if(frame.rotated&&!s.params[36]&&!s.sourceRect)source={0,0,float(frame.height),float(frame.width)};
         int ax=int(px)-frame.x,ay=int(py)-frame.y,mode=s.params[12],sourceWidth=int(source[2]-source[0]),sourceHeight=int(source[3]-source[1]);if(frame.rotated)std::swap(sourceWidth,sourceHeight);
         int w=mode==1||mode==3?std::min(ax,sourceWidth):sourceWidth,h=mode==2||mode==3?std::min(ay,sourceHeight):sourceHeight;if(w==0||h==0)return;
-        for(int my=0;my<((mode==2||mode==3)?2:1);my++)for(int mx=0;mx<((mode==1||mode==3)?2:1);mx++){auto part=s;part.params[12]=part.params[36]=0;part.specialUv=true;part.sourceSize=std::array{originalWidth,originalHeight};part.screenClip=clip;part.frame=std::make_shared<Frame>(frame);part.frame->width=w;part.frame->height=h;part.sourceRect=std::array<float,4>{source[0],source[1],source[0]+(frame.rotated?h:w),source[1]+(frame.rotated?w:h)};if(frame.rotated&&(mode==2||mode==3)){part.sourceRect->at(0)=source[2]-h;part.sourceRect->at(2)=source[2];}auto reflected=m;reflected.x+=mx?2*ax*m.a:0;reflected.y+=mx?2*ax*m.c:0;reflected.x+=my?2*ay*m.b:0;reflected.y+=my?2*ay*m.d:0;reflected.a*=mx?-1:1;reflected.c*=mx?-1:1;reflected.b*=my?-1:1;reflected.d*=my?-1:1;part.matrix=reflected;part.explicitCamera=false;draw(std::move(part),state);}return;
+        for(int my=0;my<((mode==2||mode==3)?2:1);my++)for(int mx=0;mx<((mode==1||mode==3)?2:1);mx++){auto part=s;part.params[12]=part.params[36]=0;part.specialUv=true;part.sourceSize=s.sourceSize.value_or(std::array{frame.width,frame.height});part.screenClip=clip;part.frame=std::make_shared<Frame>(frame);part.frame->width=w;part.frame->height=h;part.sourceRect=std::array<float,4>{source[0],source[1],source[0]+(frame.rotated?h:w),source[1]+(frame.rotated?w:h)};if(frame.rotated&&(mode==2||mode==3)){part.sourceRect->at(0)=source[2]-h;part.sourceRect->at(2)=source[2];}auto reflected=m;reflected.x+=mx?2*ax*m.a:0;reflected.y+=mx?2*ax*m.c:0;reflected.x+=my?2*ay*m.b:0;reflected.y+=my?2*ay*m.d:0;reflected.a*=mx?-1:1;reflected.c*=mx?-1:1;reflected.b*=my?-1:1;reflected.d*=my?-1:1;part.matrix=reflected;part.explicitCamera=false;draw(std::move(part),state);}return;
     }
     auto sourceTexture=gpu_.texture(frame.texture,s.update);ShaderContext c;c.version=replay_->version;c.minor=replay_->header.minor;c.width=originalWidth;c.height=originalHeight;c.channel=s.channel;c.imagePresent=true;c.directSource=s.font||s.sourceRect.has_value()||s.params[36]||(quad2&&s.instruction->native[16]);c.x=m.x;c.y=m.y;c.scaleX=at<float>(s.params,20);c.scaleY=at<float>(s.params,24);c.direction=s.params[6]==1?0:1;
     auto& destination=renderTarget(s.context);
@@ -292,8 +306,8 @@ void Executor::draw(Sprite s,State& state){
     auto scaled=[](float scale){return std::abs(std::abs(scale)-1.f)>std::abs(scale)*0x1p-23f;};
     bool rotated=at<float>(s.params,16)!=0;
     bool inset=!s.font&&(frame.atlas||directUv||(frame.texture->logicalWidth&&frame.texture->logicalWidth<=512&&frame.texture->logicalHeight<=512));
-    float insetX=inset&&(scaled(at<float>(s.params,20))||rotated||cameraZoom!=1)?.5f:0;
-    float insetY=inset&&(scaled(at<float>(s.params,24))||rotated||cameraZoom!=1)?.5f:0;
+    float insetX=inset&&(scaled(at<float>(s.params,20)*frame.geometryScale)||rotated||cameraZoom!=1||scaled(float(cameraScaleX)))?.5f:0;
+    float insetY=inset&&(scaled(at<float>(s.params,24)*frame.geometryScale)||rotated||cameraZoom!=1||scaled(float(cameraScaleY)))?.5f:0;
     if(frame.rotated&&!s.specialUv)std::swap(insetX,insetY);
     std::vector<Vertex> vertices,highlightVertices;auto add=[&](double left,double top,double right,double bottom,std::array<float,4> uv){int corners[]={0,1,2,2,1,3};for(int corner:corners){Vertex v;auto xy=m.apply(corner&1?right:left,corner>>1?bottom:top);v.position[0]=xy[0]+canvasLayout_.left;v.position[1]=xy[1]+canvasLayout_.top;auto col=vertexColor;if(s.gradient&&corner>>1){auto lower=color(s.lower);std::copy_n(lower.data(),3,col.data());}std::copy(col.begin(),col.end(),v.color);
             float xx=corner&1?uv[2]:uv[0],yy=corner>>1?uv[3]:uv[1];auto& rect=frame.rect;double u,vv;
@@ -334,6 +348,16 @@ void Executor::draw(Sprite s,State& state){
         if(captureActive&&(flags==1||flags==2)){gpu_.begin(raw_,clear);auto raw=material;raw.program=s.font?2:4;raw.blend=0x8000;auto rawVerts=vertices;for(auto& v:rawVerts){v.color[0]=v.color[1]=v.color[2]=v.color[3]=1;v.texcoord[3][0]=1;}gpu_.draw(rawVerts,raw,clip);}
         gpu_.begin(destination);Material composite;composite.program=-1;composite.blend=flags;composite.textures[0]=gpu_.view(working_);composite.constants[0]=output_.image.width;composite.constants[1]=output_.image.height;
         if(captureActive){composite.textures[1]=gpu_.view(s.offscreen?localMask_:globalMask_);composite.textures[2]=gpu_.view(raw_);composite.constants[32]=flags==1||flags==2?1:(s.offscreen?localTarget_:globalTarget_)==2?2:3;std::copy(vertexColor.begin(),vertexColor.end(),composite.constants.begin()+36);}
+        if(captureActive&&s.offscreen){
+            // op58 captures in the individual cropped sprite's local RT.
+            // op45-47 place that result at the source quad origin; the mask
+            // has its own scale/rotation and then follows the layer camera.
+            composite.constants[33]=1;
+            const auto& placement=*s.capturePlacement;
+            composite.constants[40]=float(placement.x+canvasLayout_.left);composite.constants[41]=float(placement.y+canvasLayout_.top);
+            composite.constants[42]=float(placement.scaleX);composite.constants[43]=float(placement.scaleY);
+            composite.constants[44]=float(canvasLayout_.left);composite.constants[45]=float(canvasLayout_.top);
+        }
         std::array<Vertex,6> full{};int corners[]={0,1,2,2,1,3};for(int n=0;n<6;n++){int corner=corners[n];full[n].position[0]=(corner&1)*output_.image.width;full[n].position[1]=(corner>>1)*output_.image.height;full[n].texcoord[2][0]=1;}
         gpu_.draw(full,composite,clip,stencilMode,state.reference,writeColor);if(stencil)statistics.stencilDraws++;
     }else {gpu_.begin(destination);gpu_.draw(vertices,material,clip);}
@@ -368,7 +392,11 @@ void Executor::execute(const Scene& scene){
     std::set<const Pixels*> updatedFonts;
     for(auto id:scene.ids){statistics.references++;auto command=replay_->command(id);if(!command)continue;
         for(const auto& i:command->instructions){auto payload=std::span(command->raw).subspan(i.offset,i.payloadBytes);float x=0,y=0;if(i.auxBytes){x=data.get<int16_t>();y=data.get<int16_t>();}statistics.opcodes[i.opcode]++;
-            auto sprite=[&](){Sprite s;s.instruction=&i;s.opcode=i.opcode;s.resource=i.resource;s.frameIndex=i.frame;s.params=i.params;s.x=x;s.y=y;s.layer=state.layer;s.context=state.context;if(i.opcode>=42&&i.opcode<=47){s.layer=i.layer;s.explicitCamera=true;s.offscreen=i.opcode>=45;int mode=(i.opcode-42)%3;if(mode<2){s.opcode=i.native[40]?3:4;s.params[6]=i.native[41];s.params[12]=i.native[42];s.bypassZoom=i.native[mode==1?56:44]!=0;if(mode==1){put(s.params,48,at<float>(i.native,44));put(s.params,52,at<float>(i.native,48));put(s.params,56,at<float>(i.native,52));}}}return s;};
+            auto sprite=[&](){Sprite s;s.instruction=&i;s.opcode=i.opcode;s.resource=i.resource;s.frameIndex=i.frame;s.params=i.params;s.x=x;s.y=y;s.layer=state.layer;s.context=state.context;if(i.opcode>=42&&i.opcode<=47){s.layer=i.layer;s.explicitCamera=true;s.offscreen=i.opcode>=45;
+                // Modern sprite jobs call native color setter +48, which
+                // swaps ABGR to ARGB (14874DFD0); legacy draws/text use +32.
+                auto abgr=at<uint32_t>(s.params,8);put(s.params,8,(abgr&0xff00ff00u)|((abgr&255)<<16)|((abgr>>16)&255));
+                int mode=(i.opcode-42)%3;if(mode<2){s.opcode=i.native[40]?3:4;s.params[6]=i.native[41];s.params[12]=i.native[42];s.bypassZoom=i.native[mode==1?56:44]!=0;if(mode==1){put(s.params,48,at<float>(i.native,44));put(s.params,52,at<float>(i.native,48));put(s.params,56,at<float>(i.native,52));}}}return s;};
             switch(i.opcode){
             case 0:{auto type=at<uint32_t>(payload,0)&255;if(type!=7)state.blends.push_back({type,at<uint32_t>(payload,4)});break;}
             case 1:if(!state.blends.empty())state.blends.pop_back();break;

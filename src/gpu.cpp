@@ -43,7 +43,10 @@ SamplerState sampleLinear:register(s0);
 float4 main(float4 position:SV_POSITION):SV_TARGET {
     float2 uv=position.xy/globals[0].xy;float4 color=drawImage.Sample(sampleLinear,uv);
     int mode=(int)globals[8].x;
-    if(mode){float4 mask=captureImage.Sample(sampleLinear,uv);
+    if(mode){float2 maskUv=uv;
+        if(globals[8].y){maskUv=((position.xy-globals[10].xy)/globals[10].zw+globals[11].xy)/globals[0].xy;}
+        float4 mask=captureImage.Sample(sampleLinear,maskUv);
+        if(globals[8].y&&(any(maskUv<0)||any(maskUv>1)))mask=0;
         if(mode==1){color.rgb=mask.rgb*globals[9].rgb;color.a=rawImage.Sample(sampleLinear,uv).a*mask.a;}
         else if(mode==2){float alpha=color.a;color=mask;color.a*=alpha>0&&globals[9].a>0;}
         else color.a*=mask.a;}

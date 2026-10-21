@@ -153,7 +153,18 @@ class CanvasPixelTests(unittest.TestCase):
         draw = op(46) + draw[4:]
         raw = camera(0) + capture + draw + op(59)
         pixels, _ = self.render([(raw, aux)], ['--canvas-padding', '4,3,5,6'], (25, 25))
-        self.assert_rectangles(pixels, (25, 25), [(2, 2, 6, 6)])
+        # The mask is local to the cropped sprite. Its visible intersection
+        # [0,2] x [0,3] moves with the source origin, which padding places at 0,0.
+        self.assert_rectangles(pixels, (25, 25), [(0, 0, 2, 3)])
+
+    def test_local_capture_padding_does_not_change_visible_source_pixels(self):
+        capture = op(58, struct.pack('<Ii7f4B', 0, 0, 1, 1, -2, -1, 0, 0, 0, 0, 0, 0, 0))
+        draw, aux = draw43(3, 5, 0, scale=(3, 3))
+        raw = camera(0) + capture + op(46) + draw[4:] + op(59)
+        original, _ = self.render([(raw, aux)])
+        expanded, _ = self.render([(raw, aux)], ['--canvas-padding', '4,3,5,6'], (25, 25))
+        self.assert_rectangles(original, (16, 16), [(3, 5, 5, 8)])
+        self.assert_rectangles(expanded, (25, 25), [(7, 8, 9, 11)])
 
     def test_type54_context_mask_uses_expanded_texture_coordinates(self):
         mask, first = legacy(-2, -1)

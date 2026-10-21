@@ -208,6 +208,68 @@ class NativeSceneBranchTests(unittest.TestCase):
         off=bytearray(40);struct.pack_into('<2f',off,16,3,3);struct.pack_into('<I',off,28,0xffffffff)
         pixel=self.render([(pixel_camera()+capture+op(45,struct.pack('<2I',40,0)+off)+op(59),aux)])
         self.assertEqual(pixel(3,3),(255,0,0));self.assertEqual(pixel(0,0),(0,0,0))
+    def test_local_capture_follows_each_cropped_sprite_origin(self):
+        # Both native op45 paths bind the op58 RT to the individual source
+        # quad. The recorded HP mask moves left to expose a partial bar.
+        for x,y,offset in ((6,7,0),(10,2,-2),(1,10,-3)):
+            with self.subTest(position=(x,y),mask_offset=offset):
+                capture=op(58,struct.pack('<Ii7f4B',0,0,1,1,offset,0,0,0,0,0,0,0,0))
+                draw,aux=extended(x,y,opcode=45)
+                pixel=self.render([(pixel_camera()+capture+draw+op(59),aux)])
+                self.assert_red_rectangle(pixel,(x,y,x+4+offset,y+4))
+
+    def test_local_capture_preserves_mask_scale_independent_of_source_scale(self):
+        capture=op(58,struct.pack('<Ii7f4B',0,0,1,1,2,1,0,0,0,0,0,0,0))
+        draw,aux=extended(6,7,scale=(2,2),opcode=45)
+        pixel=self.render([(pixel_camera()+capture+draw+op(59),aux)])
+        self.assert_red_rectangle(pixel,(8,8,12,12))
+
+    def test_local_capture_uses_camera_projection(self):
+        capture=op(58,struct.pack('<Ii7f4B',0,0,1,1,0,0,0,0,0,0,0,0,0))
+        draw,aux=extended(6,6,opcode=45)
+        zoom=op(50,struct.pack('<2fI3f',0,0,0,16,16,2))
+        pixel=self.render([(zoom+capture+draw+op(59),aux)])
+        for y in range(16):
+            for x in range(16):
+                expected=round(255*(.75 if x==11 else 1)*(.75 if y==11 else 1)) if 4<=x<12 and 4<=y<12 else 0
+                self.assertLessEqual(abs(pixel(x,y)[0]-expected),1,(x,y,expected))
+                self.assertEqual(pixel(x,y)[1:],(0,0))
+
+    def test_local_capture_grid_cells_share_the_whole_sprite_mask(self):
+        capture=op(58,struct.pack('<Ii7f4B',0,0,.5,1,0,0,0,0,0,0,0,0,0))
+        draw,aux=extended(4,4,opcode=45)
+        raw=pixel_camera()+capture+draw+op(59)
+        pixel=self.render([(raw,aux)])
+        self.assert_red_rectangle(pixel,(4,4,6,8))
+        expected=self.pixels
+        grid=op(32,struct.pack('<hhB2hB2hIi',0,0,2,1,3,2,1,3,0,0))
+        self.render([(grid+raw,aux)])
+        self.assertGreater(self.report['grid_cells'],1)
+        self.assertEqual(self.pixels,expected)
+
+    def test_local_capture_reflected_parts_share_origin_and_camera(self):
+        capture=op(58,struct.pack('<Ii7f4B',0,0,1,1,0,0,0,0,0,0,0,0,0))
+        for zoom in (1,2):
+            with self.subTest(zoom=zoom):
+                draw,aux=extended(6,6,pivot=(2,0),opcode=45)
+                camera=op(50,struct.pack('<2fI3f',0,0,0,16,16,zoom))
+                raw=camera+capture
+                self.render([(raw+draw+op(59),aux)])
+                expected=self.pixels
+                reflected=bytearray(draw);reflected[12+13]=1
+                self.render([(raw+reflected+op(59),aux)])
+                masked=self.pixels
+                if zoom==1:self.assertEqual(masked,expected)
+                # Reflection already has different source-edge filtering at
+                # zoom2. Compare the same geometry without its mask, so this
+                # verifies mask placement without changing source sampling.
+                unmasked=op(42)+reflected[4:]
+                self.render([(camera+unmasked,aux)])
+                for y in range(16):
+                    for x in range(16):
+                        n=(y*16+x)*4
+                        coverage=(.75 if x==11 else 1)*(.75 if y==11 else 1) if zoom==2 else 1
+                        for c in range(3):self.assertLessEqual(abs(masked[n+c]-round(self.pixels[n+c]*coverage)),1,(zoom,x,y,c))
     def test_actor207_uses_own_transparent_targets(self):
         draw,aux=legacy(2,2)
         pixel=self.render([(draw+op(50,struct.pack('<2fI3f',0,0,207,16,16,1)),aux)])

@@ -214,8 +214,38 @@ bool Assets::skipPatch(const std::string& name){
     {std::lock_guard lock(index_->rejected->mutex);if(index_->rejected->paths.insert(name).second)++index_->rejected->revision;}
     syncSources();return true;
 }
+static std::optional<std::pair<std::string,int>> paletteImagePath(std::string name){
+    // CN 148BECF00 retries an absent pack through 148BEBD10. The last
+    // four-character numeric run encodes a two-digit palette in its tail:
+    // katana0111b.img -> katana0100b.img, palette 11. Exact packs win.
+    size_t run=0;
+    for(size_t end=name.size();end>0;){
+        auto c=static_cast<unsigned char>(name[--end]);
+        if(c<'0'||c>';'){run=0;continue;}
+        if(++run==4){
+            auto pos=end+2;int palette=0;
+            for(size_t i=pos;i<pos+2&&name[i]>='0'&&name[i]<='9';++i)palette=palette*10+name[i]-'0';
+            auto original=name;name.replace(pos,2,"00");
+            if(palette>0&&name!=original)return std::pair{std::move(name),palette};
+            return {};
+        }
+    }
+    return {};
+}
 std::shared_ptr<Frame> Assets::decodeFrame(const std::string& name,int index,int palette){
-    const bool patch=patchSource(name);auto img=preload(name);if(!img)return {};
+    const bool patch=patchSource(name);auto img=preload(name);
+    if(!img){
+        if(auto alias=paletteImagePath(name);alias&&resolve(alias->first))return decodeFrame(alias->first,index,alias->second);
+        // Newer CN UI packs may retain only the (2x) entry. Keep its pixels
+        // at full resolution while drawing its geometry in logical UI units.
+        // This is a compatibility lookup, independent of July palette aliases.
+        if(name.starts_with("sprite/interface/")){
+            auto base=name.find_last_of('/')+1;
+            if(name.compare(base,4,"(2x)")!=0){auto hd=name;hd.insert(base,"(2x)");auto source=decodeFrame(hd,index,palette);
+                if(!source)return {};auto logical=std::make_shared<Frame>(*source);logical->geometryScale=.5f;return logical;}
+        }
+        return {};
+    }
     if(index>=0&&size_t(index)<img->count()){
         try{return img->frame(index,palette);}
         catch(const Error&){if(patch){skipPatch(name);return decodeFrame(name,index,palette);}throw;}

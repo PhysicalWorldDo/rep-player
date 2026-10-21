@@ -10,6 +10,7 @@ struct Frame {
     std::string actualPath;
     int actualFrame=-1;
     int x=0,y=0,width=0,height=0,fullWidth=0,fullHeight=0;
+    float geometryScale=1; // logical REP units per source pixel; 0.5 for a 2x UI alias
     bool empty=false,rotated=false,atlas=false;
     std::array<int,4> rect{};
     std::shared_ptr<Pixels> texture;

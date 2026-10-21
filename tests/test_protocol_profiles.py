@@ -12,10 +12,10 @@ ROOT = Path(__file__).resolve().parents[1]
 EXE = Path(os.environ.get("REP_VALIDATE_EXE", ROOT / "build" / "rep_validate.exe"))
 
 
-def pack_rep(version=1.7, commands=None, resources=(), scenes=(), minor=6, version_bits=None):
+def pack_rep(version=1.7, commands=None, resources=(), scenes=(), minor=6, version_bits=None, country=0):
     version_data = struct.pack("<I", version_bits) if version_bits is not None else struct.pack("<f", version)
     if version >= 1.4:
-        header = b"\x0c" + struct.pack("<H", minor) + bytes(126)
+        header = b"\x0c" + struct.pack("<HB", minor,country) + bytes(125)
     else:
         header = b""
     commands = commands or {}
@@ -86,6 +86,19 @@ class ProtocolProfileTests(unittest.TestCase):
         self.assertEqual(row["profile"], "dfo")
         self.assertEqual(row["resource_codepage"], 949)
         self.assertEqual(row["dictionary"][0]["instructions"][0]["payload_bytes"], 0)
+
+    def test_recorded_chinese_country_selects_gbk_with_either_client(self):
+        raw="冰镇菠萝zzZ".encode("gbk")
+        for profile in ("dfo","dnf-compatible"):
+            row=self.parsed(pack_rep(resources=[raw],country=4),"--profile",profile)
+            self.assertEqual(row["resource_codepage"],936)
+            self.assertEqual(row["resources"],{"0":"冰镇菠萝zzZ"})
+            self.assertEqual(row["resource_bytes_hex"],[raw.hex()])
+
+    def test_explicit_codepage_overrides_recorded_country(self):
+        raw="한글".encode("cp949")
+        row=self.parsed(pack_rep(resources=[raw],country=4),"--codepage","949")
+        self.assertEqual(row["resources"],{"0":"한글"})
 
     def test_cn22_fixed_word_is_preserved_instead_of_becoming_legal_opcode1(self):
         row = self.parsed(pack_rep(1.4, {7: struct.pack("<II", 22, 1)}, scenes=[(0, [7], b"")]), "--profile", "dnf-july")

@@ -11,15 +11,20 @@ namespace rep {
 struct Glyph {Bytes coverage;int width=0,height=0,left=0,top=0,advance=0;};
 class Rasterizer {
     std::filesystem::path root_;
+    bool usRegistry_=true;
     FT_Library library_=nullptr;
     std::map<std::string,Bytes> fontFiles_;
     std::map<std::pair<std::string,int>,FT_Face> faces_;
-    std::map<std::tuple<int,int,int,int,int,uint32_t>,std::shared_ptr<Glyph>> glyphs_;
+    std::map<std::tuple<int,int,int,int,int,int,uint32_t>,std::shared_ptr<Glyph>> glyphs_;
     FT_Face face(int id,int height,int weight);
+    FT_Face loadFace(const std::filesystem::path& file,int height);
 public:
     explicit Rasterizer(std::filesystem::path root={});~Rasterizer();
-    std::shared_ptr<Glyph> glyph(int id,int height,int weight,int slant,int outline,uint32_t codepoint);
-    std::pair<int,int> linePositions(int height);
+    int familyKind(int handle) const;
+    int registeredTracking(int handle) const;
+    std::pair<int,int> registeredConfiguration(int handle) const;
+    std::shared_ptr<Glyph> glyph(int id,int height,int weight,int slant,int outline,uint32_t codepoint,int metricOutline=0);
+    std::pair<int,int> linePositions(int id,int height,int weight);
 };
 struct GlyphRegistration {std::array<int,4> normal{},outline{};int format=5,scale=1;};
 class Atlas {

@@ -12,6 +12,25 @@ CHINESE_CLIENT = Path('E:/WeGameApps/地下城与勇士：创新世纪')
 
 
 class NativeClientFontTests(unittest.TestCase):
+    def test_tahoma_registered_cjk_face_precedes_other_families(self):
+        folder=self.fixture('registered_cjk')
+        shutil.copyfile(ORIGINAL_FONTS/'NotoSansCJKsc-Regular.otf',folder/'tahoma.ttf')
+        command=[str(ROOT/'build/rep_gpu.exe'),'--font','0','12','400','0','2','1','1','中文']
+        expected=subprocess.run([*command,str(folder)],capture_output=True,text=True,timeout=15)
+        actual=subprocess.run([*command,str(ORIGINAL_FONTS)],capture_output=True,text=True,timeout=15)
+        self.assertEqual(expected.returncode,0,expected.stderr)
+        self.assertEqual(actual.returncode,0,actual.stderr)
+        self.assertEqual(json.loads(actual.stdout)['atlas_crc32'],json.loads(expected.stdout)['atlas_crc32'])
+
+    def test_missing_registered_glyph_uses_clients_existing_chinese_font(self):
+        command=[str(ROOT/'build/rep_gpu.exe'),'--font','0','12','400','0','2','1','1']
+        results=[]
+        for text in ('镇','萝'):
+            result=subprocess.run([*command,text,str(ORIGINAL_FONTS)],capture_output=True,text=True,timeout=15)
+            self.assertEqual(result.returncode,0,result.stderr)
+            results.append(json.loads(result.stdout)['atlas_crc32'])
+        self.assertNotEqual(*results,'Different Chinese characters must not share the missing-glyph box')
+
     def font(self, root=None):
         command = [str(ROOT / 'build' / 'rep_gpu.exe'), '--font',
                    '2', '18', '400', '0', '2', '1', '1', 'Skill 01']

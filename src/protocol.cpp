@@ -42,7 +42,7 @@ const char* profileName(ProtocolProfile profile) {
     return dnfProfile(profile)?"dnf-july":"dfo";
 }
 unsigned Replay::effectiveCodePage() const {
-    return options.resourceCodePage.value_or(dnfProfile(options.profile)?CP_ACP:949);
+    return options.resourceCodePage.value_or(header.country==4?936:dnfProfile(options.profile)?CP_ACP:949);
 }
 static std::string hexBytes(std::span<const uint8_t> bytes) {
     constexpr char digits[]="0123456789abcdef";std::string out;out.reserve(bytes.size()*2);
