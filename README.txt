@@ -1,4 +1,4 @@
-REP 播放器 1.1.6
+REP 播放器 1.1.7
 
 完整解压 Windows x64 运行包后，双击 rep_player.exe。
 点击“选择客户端”，选择包含 Replay 和 ImagePacks2 的客户端根目录。
@@ -23,6 +23,8 @@ MOV/MP4 可选择包含音频，默认开启；预览静音和音量不影响导
 右侧“负坐标生效”默认关闭，IMG 帧自身 X 或 Y 为负时不绘制；开启恢复有符号偏移。
 选择自动保存并用于预览、逐帧与新导出，切换 REP/刷新 NPK 后保留，不扩大画布。
 同时存在 DNF.exe 和 DFO.exe 时优先使用 DNF 兼容模式。
+中国区录像自动使用 GBK / CP936；国服客户端采用独立字体注册和中文缺字回退。
+旧武器路径缺失时支持调色板编号回退；界面仅有 (2x) 资源时，按一半尺寸及 IMG 偏移绘制，录像坐标不变。
 声音仅还原已记录且资源可用的内容，不保证与原客户端逐采样一致。
 切换不同录像时释放旧素材缓存，视频临时文件使用后自动回收。
 DNF 默认启用有限兼容模式；出现“兼容播放”提示时，部分未识别指令已跳过，画面可能与客户端不同。
@@ -39,4 +41,4 @@ NPK 补丁支持：
 同包内其他有效 IMG 继续使用，预览、逐帧与导出的资源选择保持一致。
 
 完整使用说明：https://github.com/PhysicalWorldDo/rep-player/blob/main/README.md
-下载：https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.1.6
+下载：https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.1.7

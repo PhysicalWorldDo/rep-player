@@ -4,7 +4,7 @@
 
 ## 下载与运行
 
-从 [v1.1.6 Release](https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.1.6) 下载 `rep-player-v1.1.6-windows-x64.zip`，完整解压到可写目录，直接双击最外层的 **rep_player.exe**。
+从 [v1.1.7 Release](https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.1.7) 下载 `rep-player-v1.1.7-windows-x64.zip`，完整解压到可写目录，直接双击最外层的 **rep_player.exe**。
 
 ```text
 解压目录/
@@ -122,13 +122,14 @@ $CLIENT = Read-Host '输入完整客户端根目录'
 
 DNF 兼容模式仅对 REP 1.8 / minor 6 中完整、独立的 `4200000000` 字典命令进行跳过，窗口会提示“兼容播放”。该 opcode 66 的原生渲染作用尚未确认，画面可能与客户端不同。其他未知指令、非零载荷、嵌入命令及不同版本仍会报错。使用 `--profile dnf-july` 可恢复严格的 7.09 读取合同，保留对 66 的拒绝。
 
-文字显示或解码异常时，可按录像来源指定 `--codepage 949`、`--codepage 936` 或 `--codepage 65001`。
+录像头标记为中国区（country 4）时，文字自动使用 GBK / CP936，与所选资源客户端无关。仍可按录像来源指定 `--codepage 949`、`--codepage 936` 或 `--codepage 65001`，显式设置优先。
 
 ## 常见问题
 
 - **提示客户端目录不正确：** 选择同时包含 `Replay` 和 `ImagePacks2` 的上一级目录。
 - **缺少 FFmpeg：** 完整解压发布包，保留 `resources/ffmpeg.exe`。
-- **画面出现占位图、字体或视频缺失：** 确认客户端资源齐全，并与录像版本匹配。客户端中的中文 Noto 字体可作为部分韩版字体的替代。
+- **画面出现占位图、字体或视频缺失：** 确认客户端资源齐全，并与录像版本匹配。国服资源采用独立字体注册，默认使用客户端或 Windows 宋体、Noto SerifSC 和 Noto Sans SC；缺字时优先尝试该字族的回退字体。原字体已有的字形保持优先。
+- **旧录像的武器或界面 IMG：** 原路径缺失时支持武器名称中的调色板编号回退；界面资源可查找同目录的 `(2x)` 版本。2x 回退保留高清像素，按一半尺寸及 IMG 偏移绘制，录像坐标保持不变。
 - **没有声音或提示缺失声音：** 检查静音和音量，确认录像确实有声音记录，并使用同版本客户端的 `audio.xml`、`SoundPacks`、`Music`；影片本身的音轨不播放。
 - **导出有背景或效果不完整：** 检查 IMG 勾选、透明选项和格式，可手动恢复误隐藏的素材。
 - **导出提示目录范围错误：** 使用程序目录内的 `exports` 或其他子目录。
