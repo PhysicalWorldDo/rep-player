@@ -11,9 +11,10 @@ CLIENT = Path(os.environ.get("REP_CN_CLIENT", r"E:\WeGameApps\地下城与勇士
 MOVIES = ("Video/Character/Cutscene_rage/00rage_BG_red.bk2",
           "Video/Character/Cutscene_rage/01_rage_ghost_M_bsk.bk2")
 # Independently decoded from July's native Stream reader and corroborated with
-# the user-provided neople_video_codec_tool; first/middle/last Bink RGBA frames.
-EXPECTED = ((771884, 1377552363, 978611780, 1927767261, 2522649966),
-            (769096, 3509860669, 4125987420, 3146778419, 3813243335))
+# the user-provided neople_video_codec_tool. RGBA frames 1/37/74 use the native
+# BinkOpen flags 0x105000; the earlier flags=0 reference discarded Alpha.
+EXPECTED = ((771884, 1377552363, 3720868814, 1019181383, 1483597536),
+            (769096, 3509860669, 1483977669, 2160798185, 1966269280))
 
 PROBE = r'''
 #include "movies.hpp"
@@ -43,9 +44,9 @@ int wmain(int argc,wchar_t** argv) {
                 auto bytes=rep::readFile(entry.path());payloadSize=bytes.size();payloadCrc=rep::crc(bytes);
             }
             repeat=frameCrc(movies.frame(logical,1,0));
-            auto later=std::max(1u,uint32_t(std::floor(double(std::max(1,info.frames-1))*500./info.rate)));
+            auto later=uint32_t((info.frames+1)/2);
             seek=frameCrc(movies.frame(logical,1,later));
-            last=frameCrc(movies.frame(logical,1,uint32_t(std::ceil((info.frames-1)*1000./info.rate))));
+            last=frameCrc(movies.frame(logical,1,uint32_t(info.frames)));
             rewind=frameCrc(movies.frame(logical,1,0));
             frameCrc(movies.frame(logical,2,0));shared=countFiles(cache);
             movies.stop(1);afterStop=countFiles(cache);

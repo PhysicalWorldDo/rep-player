@@ -4,7 +4,7 @@ import subprocess
 import unittest
 ROOT=Path(__file__).resolve().parents[1]
 class NativeMovieTests(unittest.TestCase):
-    def test_real_avi_and_bink_decode_timestamp_without_python_runtime(self):
+    def test_real_avi_and_bink_decode_position_without_python_runtime(self):
         for name,width,height,count in [('Video/Adventurer/fighter_m.avi',800,450,210),('Video/CharacterCutScene/03mghost_buf_bsk.bk2',970,668,61)]:
             with self.subTest(name=name):
                 result=subprocess.run([str(ROOT/'build'/'rep_gpu.exe'),'--movie',name],capture_output=True,text=True)

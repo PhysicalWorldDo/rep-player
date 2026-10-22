@@ -76,19 +76,24 @@ static MovieInfo aviInfo(const Bytes& data){
     if(!result.width||!result.height||!result.frames||!result.rate)throw Error("invalid AVI stream header");return result;
 }
 static std::wstring quote(std::wstring v){std::wstring out=L"\"";size_t slash=0;for(wchar_t c:v){if(c==L'\\'){slash++;continue;}if(c==L'\"')out.append(slash*2+1,L'\\');else out.append(slash,L'\\');slash=0;out+=c;}out.append(slash*2,L'\\');out+=L'\"';return out;}
-std::shared_ptr<Frame> Movies::frame(std::string logical,uint64_t id,uint32_t timestamp){
+std::shared_ptr<Frame> Movies::frame(std::string logical,uint64_t id,uint32_t position){
     if(!instances_.contains(id)){
         if(logical.empty())return {};auto source=payload(logical);if(!source){missing++;return {};}auto path=source->path;
         auto data=readFile(path);auto instance=std::make_unique<Instance>();instance->payload=std::move(source);instance->path=path;bool bink=data.size()>=4&&(!std::memcmp(data.data(),"KB2",3)||!std::memcmp(data.data(),"BIK",3));
         if(bink){if(!bink_){bink_=LoadLibraryW((client_/L"bink2w64.dll").c_str());if(!bink_)throw Error("cannot load client Bink2 decoder");}
-            instance->library=bink_;auto open=reinterpret_cast<void*(*)(const char*,uint32_t)>(GetProcAddress(bink_,"BinkOpen"));auto native=path.string();instance->bink=open(native.c_str(),0);
+            instance->library=bink_;auto open=reinterpret_cast<void*(*)(const char*,uint32_t)>(GetProcAddress(bink_,"BinkOpen"));auto native=path.string();
+            // CN 14729D1A0 / USA 146EF1760 enable the encoded Alpha plane.
+            instance->bink=open(native.c_str(),0x105000u);
             if(!instance->bink)throw Error("BinkOpen failed");auto fields=static_cast<uint32_t*>(instance->bink);instance->info={int(fields[0]),int(fields[1]),int(fields[2]),double(fields[5])/fields[6],true};
             if(auto sound=GetProcAddress(bink_,"BinkSetSoundOnOff"))reinterpret_cast<int(*)(void*,int)>(sound)(instance->bink,0);
         }else instance->info=aviInfo(data);
         instance->frame=std::make_shared<Frame>();auto& f=*instance->frame;auto& m=instance->info;f.width=f.fullWidth=m.width;f.height=f.fullHeight=m.height;f.rect={0,0,m.width,m.height};f.texture=std::make_shared<Pixels>();f.texture->width=m.width;f.texture->height=m.height;f.texture->rgba.resize(size_t(m.width)*m.height*4);
         instances_[id]=std::move(instance);
     }
-    auto& instance=*instances_.at(id);auto& info=instance.info;int requested=std::clamp(int(std::floor(timestamp*info.rate/1000)),0,info.frames-1);if(instance.last==requested)return instance.frame;
+    auto& instance=*instances_.at(id);auto& info=instance.info;
+    // Movie23 records Bink's one-based frame number, not elapsed milliseconds.
+    int requested=info.bink?int(std::min(position?position-1:0u,uint32_t(info.frames-1))):std::clamp(int(std::floor(position*info.rate/1000)),0,info.frames-1);
+    if(instance.last==requested)return instance.frame;
     auto& out=instance.frame->texture->rgba;
     if(info.bink){auto go=reinterpret_cast<void(*)(void*,uint32_t,uint32_t)>(GetProcAddress(bink_,"BinkGoto"));auto decode=reinterpret_cast<int(*)(void*)>(GetProcAddress(bink_,"BinkDoFrame"));auto copy=reinterpret_cast<void(*)(void*,void*,int32_t,uint32_t,uint32_t,uint32_t,uint32_t)>(GetProcAddress(bink_,"BinkCopyToBuffer"));
         go(instance.bink,requested+1,0);if(decode(instance.bink))throw Error("BinkDoFrame failed");copy(instance.bink,out.data(),info.width*4,info.height,0,0,6);

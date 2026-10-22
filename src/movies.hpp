@@ -15,7 +15,8 @@ public:
     uint64_t decoded=0,missing=0;
     Movies(std::filesystem::path client,std::filesystem::path cache);
     ~Movies();
-    std::shared_ptr<Frame> frame(std::string path,uint64_t instance,uint32_t timestamp);
+    // Bink: recorded one-based frame number (0 aliases 1). AVI: milliseconds.
+    std::shared_ptr<Frame> frame(std::string path,uint64_t instance,uint32_t position);
     MovieInfo info(uint64_t instance)const;
     uint32_t color(uint64_t instance,uint32_t value,bool modern)const;
     void stop(uint64_t instance);
