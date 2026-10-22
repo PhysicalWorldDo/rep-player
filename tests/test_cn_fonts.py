@@ -119,6 +119,35 @@ class ChineseFontTests(unittest.TestCase):
                 actual = self.run_json('--font', 0, size, 400, 0, 2, 1, 1, 'A中%', CN)
                 self.assertEqual(actual['atlas_crc32'], zlib.crc32(atlas.texture_rgba().tobytes()))
 
+    def test_simsun_bitmap_thin_weights_keep_native_bitmap_pixels(self):
+        # CN 14737A6C0 ignores the bitmap-weight adjustment result. Its
+        # emboldener rejects negative pixel strengths before changing the bitmap.
+        for handle, size in ((23, 16), (7, 12), (0, 17)):
+            atlas = FontAtlas()
+            expected = []
+            for ch in '实力认证':
+                normal, metric = self.reference_glyph(handle, size, ch)
+                border = self.reference_glyph(handle, size, ch, 2)[0]
+                atlas.register((ch,), normal, border)
+                expected.append(metric)
+            for weight in (100, 200, 300):
+                with self.subTest(handle=handle, size=size, weight=weight):
+                    actual = self.run_json('--font', handle, size, weight, 0, 2, 1, 1, '实力认证', CN)
+                    self.assertEqual(actual['metrics'], expected)
+                    self.assertEqual(actual['atlas_crc32'], zlib.crc32(atlas.texture_rgba().tobytes()))
+
+    def test_registered_thin_defaults_render_cjk_in_first_frame(self):
+        for handle in (7, 11, 23):
+            with self.subTest(handle=handle):
+                height, _ = CONFIGURATIONS[handle]
+                expected = self.layout(handle, height, 400, flags=1, text='中文')
+                self.assertEqual(self.layout(handle, 0, 0, flags=1, text='中文'), expected)
+
+    def test_positive_bitmap_weight_adjustment_still_emboldens(self):
+        normal = self.run_json('--font', 23, 16, 400, 0, 2, 1, 1, '实力认证', CN)
+        bold = self.run_json('--font', 23, 16, 700, 0, 2, 1, 1, '实力认证', CN)
+        self.assertNotEqual(bold['atlas_crc32'], normal['atlas_crc32'])
+
     def layout(self, handle, size, weight=400, flags=0, text='AA'):
         words = (size, weight, handle, 0, 2, 1, 0, 0xffffffff, 0xff000000, 0, flags)
         cmd = op(48, struct.pack('<I11II2fB', 0, *words, 0, 0, 0, 0))

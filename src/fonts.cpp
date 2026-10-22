@@ -109,7 +109,10 @@ std::shared_ptr<Glyph> Rasterizer::glyph(int id,int height,int weight,int slant,
     int adjusted=weight+(kind==4&&mode!=FT_RENDER_MODE_MONO?200:0);float ratio=adjusted*.0025f;
     if(std::abs(ratio-1)>std::abs(ratio)*std::numeric_limits<float>::epsilon()) {
         if(outlined){if(ratio<1)ratio-=2;ftCheck(FT_Outline_Embolden(&slot->outline,long(float(f->size->metrics.y_ppem)*ratio*.64f)));}
-        else {ftCheck(FT_Render_Glyph(slot,mode));ftCheck(FT_Bitmap_Embolden(library_,&slot->bitmap,long((ratio-1)*64),0));}}
+        else {ftCheck(FT_Render_Glyph(slot,mode));
+            // CN 14737A6C0 continues after bitmap-weight adjustment: negative
+            // strengths can return Invalid_Argument while preserving the bitmap.
+            FT_Bitmap_Embolden(library_,&slot->bitmap,long((ratio-1)*64),0);}}
     ftCheck(FT_Render_Glyph(slot,mode));if(outline>0&&slot->bitmap.buffer){ftCheck(FT_GlyphSlot_Own_Bitmap(slot));FT_Bitmap_Embolden(library_,&slot->bitmap,outline<<6,outline<<6);}
     auto result=std::make_shared<Glyph>();auto& b=slot->bitmap;result->width=b.width;result->height=b.rows;result->coverage.resize(size_t(b.width)*b.rows);
     int inkLeft=INT_MAX,inkRight=0;for(unsigned y=0;y<b.rows;y++)for(unsigned x=0;x<b.width;x++) {auto line=b.buffer+(b.pitch<0?(b.rows-1-y):y)*std::abs(b.pitch);auto v=b.pixel_mode==FT_PIXEL_MODE_MONO?((line[x/8]>>(7-x%8))&1)*255:line[x];result->coverage[y*b.width+x]=uint8_t(v);
