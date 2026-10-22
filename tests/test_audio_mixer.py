@@ -53,12 +53,19 @@ class AudioMixerTests(unittest.TestCase):
             '<GROUP ID="G"><ITEM TAG="A" DELAY=".02"/></GROUP>'
             '<MUSIC ID="OFFSET" FILE="Music/ramp.wav"/>'
             '<AMBIENT ID="AM" FILE="Music/quiet.wav" LOOP_DELAY="0"/>'
-            '<EFFECT ID="FRACTION" FILE="Music/short.wav" LOOP_DELAY="0.0005" LOOP_TIMES="1"/></AUDIO>', encoding='utf-8')
+            '<EFFECT ID="FRACTION" FILE="Music/short.wav" LOOP_DELAY="0.0005" LOOP_TIMES="1"/>'
+            '<EFFECT ID="ZERO" FILE="Music/quiet.wav" DUPLICATE_LIMIT="0"/>'
+            '<EFFECT ID="FOUR" FILE="Music/quiet.wav" DUPLICATE_LIMIT="4"/>'
+            '<VOICE ID="VOICE" FILE="Music/quiet.wav"/>'
+            '<EFFECT ID="SHORT_LIMIT" FILE="Music/short.wav" DUPLICATE_LIMIT="1"/>'
+            '<EFFECT ID="SPECIAL" FILE="Music/ramp.wav" DUPLICATE_LIMIT="1"/></AUDIO>', encoding='utf-8')
         text = (cls.client / 'audio.xml').read_text(encoding='utf-8')
         entries = ''
         for n in range(24):
             shutil.copy2(music / 'a.wav', music / ('cold' + str(n) + '.wav'))
             entries += '<EFFECT ID="C' + str(n) + '" FILE="Music/cold' + str(n) + '.wav"/>'
+        for n in range(35):
+            entries += '<EFFECT ID="RESERVED' + str(n) + '" FILE="Music/quiet.wav"/>'
         (cls.client / 'audio.xml').write_text(text.replace('</AUDIO>', entries + '</AUDIO>'), encoding='utf-8')
         cls.exe = cls.folder / 'mixer_probe.exe'
         command = [str(ROOT / 'toolchain/llvm-mingw-20260616-ucrt-x86_64/bin/clang++.exe'),
@@ -97,6 +104,72 @@ class AudioMixerTests(unittest.TestCase):
         self.assertAlmostEqual(data['samples'][0], .5, places=4)
         self.assertAlmostEqual(data['samples'][20], .75, places=4)
         self.assertEqual(data['events'], 3)
+
+    def test_missing_duplicate_limit_uses_native_three_voice_default(self):
+        for profile in ('dfo', 'dnf-july'):
+            with self.subTest(profile=profile):
+                data = self.mix({0: play(0)}, [(0, (0,) * 5), (20, (0,) * 5), (100, ())], profile=profile)
+                self.assertAlmostEqual(data['samples'][0], .75, places=4)
+                self.assertAlmostEqual(data['samples'][20], .75, places=4)
+                self.assertEqual(data['events'], 10)
+
+    def test_zero_duplicate_limit_uses_native_three_voice_default(self):
+        data = self.mix({0: play(0)}, [(0, (0,) * 5), (100, ())], resources=('ZERO',))
+        self.assertAlmostEqual(data['samples'][0], .375, places=4)
+
+    def test_voice_uses_native_default_duplicate_limit(self):
+        data = self.mix({0: play(0)}, [(0, (0,) * 5), (100, ())], resources=('VOICE',))
+        self.assertAlmostEqual(data['samples'][0], .375, places=4)
+
+    def test_explicit_duplicate_limit_overrides_default(self):
+        data = self.mix({0: play(0)}, [(0, (0,) * 5), (100, ())], resources=('FOUR',))
+        self.assertAlmostEqual(data['samples'][0], .5, places=4)
+
+    def test_default_limit_counts_same_tag_across_owners(self):
+        commands = {n: play(0, key=n) for n in range(5)}
+        data = self.mix(commands, [(0, tuple(commands)), (100, ())])
+        self.assertAlmostEqual(data['samples'][0], .75, places=4)
+
+    def test_distinct_tags_sharing_pcm_have_separate_duplicate_counts(self):
+        data = self.mix({0: play(0), 1: play(1)}, [(0, (0,) * 3 + (1,) * 4), (100, ())], resources=('ZERO', 'FOUR'))
+        self.assertAlmostEqual(data['samples'][0], .875, places=4)
+
+    def test_default_limit_counts_pending_requests_at_start(self):
+        data = self.mix({0: play(0, delay=80), 1: play(0)}, [(0, (0,) * 3), (10, (1,)), (100, ())])
+        self.assertAlmostEqual(data['samples'][10], 0, places=4)
+        self.assertAlmostEqual(data['samples'][80], .75, places=4)
+
+    def test_delayed_request_is_checked_when_it_starts_after_old_voice_ends(self):
+        data = self.mix({0: play(0), 1: play(0, delay=30)}, [(0, (0,)), (1, (1,)), (100, ())], resources=('SHORT_LIMIT',))
+        self.assertAlmostEqual(data['samples'][0], .25, places=4)
+        self.assertAlmostEqual(data['samples'][31], .25, places=4)
+
+    def test_delayed_queue_is_not_rejected_before_native_start_check(self):
+        commands = {n: play(0, delay=20 * (n + 1)) for n in range(4)}
+        data = self.mix(commands, [(0, tuple(commands)), (100, ())])
+        for ms, expected in ((20, 0), (40, .25), (60, .5), (80, .75)):
+            self.assertAlmostEqual(data['samples'][ms], expected, places=4)
+
+    def test_native_special_slots_bypass_duplicate_limit(self):
+        for slot in (14, 15, 25, 35, 36, 37, 38, 39):
+            with self.subTest(slot=slot):
+                data = self.mix({0: play(0, slot=slot)}, [(0, (0,)), (20, (0,)), (100, ())], resources=('SPECIAL',))
+                self.assertAlmostEqual(data['samples'][20], 0, places=4)
+                self.assertAlmostEqual(data['samples'][40], 3200 / 32768, places=4)
+
+    def test_ordinary_explicit_slot_still_checks_duplicate_limit(self):
+        data = self.mix({0: play(0, slot=42)}, [(0, (0,)), (20, (0,)), (100, ())], resources=('SPECIAL',))
+        self.assertAlmostEqual(data['samples'][20], 3200 / 32768, places=4)
+
+    def test_auto_allocation_preserves_reserved_slots_35_through_37(self):
+        names = tuple('RESERVED' + str(n) for n in range(35)) + ('SPECIAL',)
+        commands = {n: play(n, key=n) for n in range(35)}
+        commands.update({200+n: play(35, slot=35+n) for n in range(3)})
+        commands.update({100+n: control(2, key=n) for n in range(32)})
+        data = self.mix(commands, [(0, tuple(range(35))), (10, tuple(range(100, 132))),
+                                   (20, (200, 201, 202)), (100, ())], resources=names)
+        self.assertAlmostEqual(data['samples'][10], .375, places=4)
+        self.assertAlmostEqual(data['samples'][20], .375, places=4)
 
     def test_random_parent_is_not_played_again_with_recorded_leaf(self):
         data = self.mix({0: play(3), 1: play(0)}, [(0, (0, 1)), (100, ())])
@@ -153,6 +226,16 @@ class AudioMixerTests(unittest.TestCase):
         self.assertAlmostEqual(data['samples'][0], .5, places=4)
         self.assertAlmostEqual(data['samples'][69], .5, places=4)
         self.assertAlmostEqual(data['samples'][70], .25, places=4)
+
+    def test_switch_policy_admits_new_sound_when_limit_is_only_pending(self):
+        data = self.mix({0: play(5, delay=80), 1: play(5)}, [(0, (0,)), (10, (1,)), (200, ())])
+        self.assertAlmostEqual(data['samples'][10], .25, places=4)
+        self.assertAlmostEqual(data['samples'][80], .5, places=4)
+
+    def test_switch_policy_restarts_first_old_voice_stop_window(self):
+        data = self.mix({0: play(5)}, [(0, (0,)), (10, (0,)), (20, (0,)), (300, ())], seek=50)
+        self.assertAlmostEqual(data['samples'][60], .75, places=4)
+        self.assertAlmostEqual(data['samples'][70], .5, places=4)
 
     def test_group_uses_recorded_child_request_without_duplicate_expansion(self):
         data = self.mix({0: play(7), 1: play(0)}, [(0, (0,)), (20, (1,)), (100, ())])

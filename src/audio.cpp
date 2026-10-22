@@ -13,6 +13,9 @@
 namespace rep {
 namespace {
 int64_t sampleAt(int64_t milliseconds){return std::max<int64_t>(0,milliseconds)*AudioTrack::SampleRate/1000;}
+bool specialSlot(int slot){
+    switch(slot){case 14:case 15:case 25:case 35:case 36:case 37:case 38:case 39:return true;default:return false;}
+}
 struct AudioEvent {
     int64_t sample=0;
     uint32_t opcode=0;
@@ -65,13 +68,18 @@ struct AudioTrack::Impl {
             event.sample=end(v)+sampleAt(int64_t(v.definition->loopDelay));pending.push_back(std::move(event));count++;
         }
     }
-    bool allowed(const AudioEvent& event,int64_t at){
-        auto definition=resources->definition(event.tag);if(!definition||definition->duplicateLimit<=0)return true;
+    bool allowed(const AudioEvent& event,int64_t at,int slot){
+        auto definition=resources->definition(event.tag);if(!definition||specialSlot(slot))return true;
+        // Native manager default is three; an absent/zero XML limit inherits it.
+        const int limit=definition->duplicateLimit>0?definition->duplicateLimit:3;
         auto active=std::count_if(voices.begin(),voices.end(),[&](const Voice& v){return v.event.tag==event.tag;});
         auto waiting=std::count_if(pending.begin(),pending.end(),[&](const AudioEvent& v){return v.tag==event.tag;});
-        if(active+waiting<definition->duplicateLimit)return true;
+        if(active+waiting<limit)return true;
         if(definition->kind==AudioKind::Effect&&definition->duplicatePolicy=="SWITCH"){
-            for(auto& voice:voices)if(voice.event.tag==event.tag&&voice.forcedEnd==INT64_MAX){voice.forcedEnd=std::min(end(voice),at+sampleAt(100));return true;}
+            for(auto& voice:voices)if(voice.event.tag==event.tag){
+                voice.forcedEnd=INT64_MAX;voice.forcedEnd=std::min(end(voice),at+sampleAt(100));break;
+            }
+            return true;
         }
         return false;
     }
@@ -79,11 +87,11 @@ struct AudioTrack::Impl {
         auto definition=resources->definition(event.tag);
         if(definition&&!definition->playable)return;
         auto clip=resources->clip(event.tag,cancelled);if(!clip||!clip->frames()||!definition)return;
-        expire(at);if(!allowed(event,at))return;
         int slot=event.words[7];if(definition->kind==AudioKind::Music)slot=25;else if(definition->kind==AudioKind::Ambient)slot=15;
+        expire(at);if(!allowed(event,at,slot))return;
         if(slot<0){
             for(int candidate=0;candidate<256;candidate++){
-                if(candidate==14||candidate==15||candidate==25||candidate==38||candidate==39)continue;
+                if(specialSlot(candidate))continue;
                 if(std::none_of(voices.begin(),voices.end(),[&](const Voice& v){return v.slot==candidate;})){slot=candidate;break;}
             }
             if(slot<0)return;
@@ -99,7 +107,8 @@ struct AudioTrack::Impl {
             // The native stop rank belongs to the shared TAG definition, so a
             // later request also changes the predicate for its older voices.
             ranks[event.tag]=event.words[6];
-            if(event.words[2]>0){if(!allowed(event,at))return;auto later=event;later.sample=at+sampleAt(event.words[2]);pending.push_back(std::move(later));}
+            // Native delayed requests enter the queue before the start-time limit check.
+            if(event.words[2]>0){auto later=event;later.sample=at+sampleAt(event.words[2]);pending.push_back(std::move(later));}
             else startVoice(event,at);
             return;
         }
