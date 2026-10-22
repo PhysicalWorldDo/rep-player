@@ -148,6 +148,21 @@ class ChineseFontTests(unittest.TestCase):
         bold = self.run_json('--font', 23, 16, 700, 0, 2, 1, 1, '实力认证', CN)
         self.assertNotEqual(bold['atlas_crc32'], normal['atlas_crc32'])
 
+    def test_degenerate_outline_weight_adjustment_preserves_native_space_metrics(self):
+        expected = self.reference_glyph(12, 34, ' ')[1]
+        for weight in (100, 700):
+            with self.subTest(weight=weight):
+                actual = self.run_json('--font', 12, 34, weight, 0, 2, 1, 1, ' ', CN)
+                self.assertEqual(actual['metrics'], [expected])
+
+    def test_registered_bold_outline_text_retains_its_space_advance(self):
+        joined = self.layout(12, 0, 0, text='中文')
+        spaced = self.layout(12, 0, 0, text='中 文')
+        self.assertEqual(len(joined), 2)
+        self.assertEqual(len(spaced), 2)
+        self.assertEqual(spaced[0]['x'], joined[0]['x'])
+        self.assertEqual(spaced[1]['x'] - joined[1]['x'], self.reference_glyph(12, 34, ' ')[1][2])
+
     def layout(self, handle, size, weight=400, flags=0, text='AA'):
         words = (size, weight, handle, 0, 2, 1, 0, 0xffffffff, 0xff000000, 0, flags)
         cmd = op(48, struct.pack('<I11II2fB', 0, *words, 0, 0, 0, 0))

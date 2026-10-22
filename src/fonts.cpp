@@ -108,7 +108,10 @@ std::shared_ptr<Glyph> Rasterizer::glyph(int id,int height,int weight,int slant,
     if(outlined&&slant){FT_Matrix matrix{65536,long(slant/32.f*65536),0,65536};FT_Outline_Transform(&slot->outline,&matrix);}
     int adjusted=weight+(kind==4&&mode!=FT_RENDER_MODE_MONO?200:0);float ratio=adjusted*.0025f;
     if(std::abs(ratio-1)>std::abs(ratio)*std::numeric_limits<float>::epsilon()) {
-        if(outlined){if(ratio<1)ratio-=2;ftCheck(FT_Outline_Embolden(&slot->outline,long(float(f->size->metrics.y_ppem)*ratio*.64f)));}
+        if(outlined){if(ratio<1)ratio-=2;
+            // CN 14737A6C0 continues if outline-weight adjustment rejects a
+            // degenerate outline (for example a space with no drawable area).
+            FT_Outline_Embolden(&slot->outline,long(float(f->size->metrics.y_ppem)*ratio*.64f));}
         else {ftCheck(FT_Render_Glyph(slot,mode));
             // CN 14737A6C0 continues after bitmap-weight adjustment: negative
             // strengths can return Invalid_Argument while preserving the bitmap.
