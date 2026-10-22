@@ -128,10 +128,10 @@ struct Output {float4 legacy:POSITION0;float4 color:COLOR0;float2 uv:TEXCOORD0;f
 size_t Gpu::createAllPrograms(){for(const auto& r:shaderRecords)program(r.id);return programs_.size();}
 std::shared_ptr<GpuTexture> Gpu::texture(std::shared_ptr<Pixels> pixels,bool update) {
     if(!pixels)return {};if(auto it=textures_.find(pixels.get());it!=textures_.end()){
-        if(it->second->width==pixels->width&&it->second->height==pixels->height){if(update){flush();context_->UpdateSubresource(it->second->texture.get(),0,nullptr,pixels->rgba.data(),pixels->width*4,0);}return it->second;}
+        if(it->second->width==pixels->width&&it->second->height==pixels->height){if(update&&(!pixels->revision||it->second->sourceRevision!=pixels->revision)){flush();context_->UpdateSubresource(it->second->texture.get(),0,nullptr,pixels->rgba.data(),pixels->width*4,0);it->second->sourceRevision=pixels->revision;}return it->second;}
         textures_.erase(it);
     }
-    auto t=std::make_shared<GpuTexture>();t->source=pixels;t->width=pixels->width;t->height=pixels->height;t->logicalWidth=pixels->logicalWidth?pixels->logicalWidth:pixels->width;t->logicalHeight=pixels->logicalHeight?pixels->logicalHeight:pixels->height;
+    auto t=std::make_shared<GpuTexture>();t->source=pixels;t->width=pixels->width;t->height=pixels->height;t->logicalWidth=pixels->logicalWidth?pixels->logicalWidth:pixels->width;t->logicalHeight=pixels->logicalHeight?pixels->logicalHeight:pixels->height;t->sourceRevision=pixels->revision;
     D3D11_TEXTURE2D_DESC d{};d.Width=t->width;d.Height=t->height;d.MipLevels=1;d.ArraySize=1;d.Format=DXGI_FORMAT_R8G8B8A8_UNORM;d.SampleDesc.Count=1;d.Usage=D3D11_USAGE_DEFAULT;d.BindFlags=D3D11_BIND_SHADER_RESOURCE;
     D3D11_SUBRESOURCE_DATA b{pixels->rgba.data(),UINT(t->width*4),0};check(device_->CreateTexture2D(&d,&b,t->texture.out()),"UploadDecodedIMGTexture");
     check(device_->CreateShaderResourceView(t->texture.get(),nullptr,t->view.out()),"CreateIMGShaderResourceView");textures_[pixels.get()]=t;uploads++;return t;
@@ -166,9 +166,14 @@ void Gpu::draw(std::span<const Vertex> verts,Material& material,std::array<int,4
 void Gpu::flush(){if(pending_.empty())return;submit(pending_,pendingMaterial_,pendingClip_,pendingStencil_,pendingReference_,pendingColor_);pending_.clear();}
 void Gpu::forgetTexture(const Pixels* pixels){flush();textures_.erase(pixels);}
 void Gpu::submit(std::span<const Vertex> verts,Material& material,std::array<int,4> clip,unsigned stencil,unsigned reference,bool writeColor) {
-    if(verts.empty())return;auto& p=program(material.program);D3D11_MAPPED_SUBRESOURCE b{};check(context_->Map(vertices_.get(),0,D3D11_MAP_WRITE_DISCARD,0,&b),"MapStreamVertices");
-    std::memcpy(b.pData,verts.data(),verts.size_bytes());context_->Unmap(vertices_.get(),0);
-    auto buffer=vertices_.get();UINT stride=sizeof(Vertex),offset=0;context_->IASetVertexBuffers(0,1,&buffer,&stride,&offset);context_->IASetInputLayout(p.layout.get());context_->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    if(verts.empty())return;auto& p=program(material.program);
+    // Append into untouched storage. DISCARD starts a new backing allocation
+    // only when this stream fills, so queued draws keep their original vertices.
+    bool discard=vertexCursor_+verts.size()>65536;if(discard)vertexCursor_=0;
+    UINT offset=vertexCursor_*sizeof(Vertex);D3D11_MAPPED_SUBRESOURCE b{};
+    check(context_->Map(vertices_.get(),0,discard?D3D11_MAP_WRITE_DISCARD:D3D11_MAP_WRITE_NO_OVERWRITE,0,&b),"MapStreamVertices");
+    std::memcpy(static_cast<uint8_t*>(b.pData)+offset,verts.data(),verts.size_bytes());context_->Unmap(vertices_.get(),0);vertexCursor_+=UINT(verts.size());
+    auto buffer=vertices_.get();UINT stride=sizeof(Vertex);context_->IASetVertexBuffers(0,1,&buffer,&stride,&offset);context_->IASetInputLayout(p.layout.get());context_->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     context_->VSSetShader(p.vertex.get(),nullptr,0);context_->PSSetShader(p.pixel.get(),nullptr,0);
     context_->GSSetShader(p.geometry.get(),nullptr,0);
     context_->UpdateSubresource(globals_.get(),0,nullptr,material.constants.data(),0,0);ID3D11Buffer* cb[]={matrices_.get(),globals_.get()};context_->VSSetConstantBuffers(0,2,cb);context_->PSSetConstantBuffers(0,2,cb);context_->GSSetConstantBuffers(0,2,cb);

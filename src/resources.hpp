@@ -4,7 +4,13 @@
 #include <functional>
 
 namespace rep {
-struct Pixels { int width=0,height=0,logicalWidth=0,logicalHeight=0; Bytes rgba; };
+struct Pixels {
+    int width=0,height=0,logicalWidth=0,logicalHeight=0;
+    Bytes rgba;
+    // Zero keeps explicit updates unconditional (for example decoded movies).
+    // Font atlases advance this version after refreshing their pixel contents.
+    uint64_t revision=0;
+};
 std::shared_ptr<Pixels> nativeImageTexture(std::shared_ptr<Pixels> pixels);
 struct Frame {
     std::string actualPath;
@@ -42,6 +48,20 @@ private:
     std::filesystem::path root_;
     std::unordered_map<std::string,Entry> entries_;
     std::unordered_map<std::string,std::shared_ptr<Img>> images_;
+    struct FrameKey {
+        std::string logical;
+        int index,palette;
+        bool operator==(const FrameKey&)const=default;
+    };
+    struct FrameKeyHash {
+        size_t operator()(const FrameKey& key)const noexcept {
+            auto value=std::hash<std::string>{}(key.logical);
+            value^=std::hash<int>{}(key.index)+0x9e3779b9u+(value<<6)+(value>>2);
+            return value^(std::hash<int>{}(key.palette)+0x9e3779b9u+(value<<6)+(value>>2));
+        }
+    };
+    struct ResolvedFrame {std::string requested;std::shared_ptr<Frame> frame;bool fallback=false;};
+    std::unordered_map<FrameKey,ResolvedFrame,FrameKeyHash> resolvedFrames_;
     std::unordered_set<std::string> packages_;
     uint64_t sourceRevision_=0;
     std::function<void(const std::string&,int)> frameObserver_;
@@ -62,7 +82,7 @@ public:
     bool patchesEnabled()const;
     uint64_t sourceRevision()const;
     const std::filesystem::path& root()const{return root_;}
-    void clearDecodedImages(){images_.clear();}
+    void clearDecodedImages(){resolvedFrames_.clear();images_.clear();}
     using FrameObserver=std::function<void(const std::string&,int)>;
     FrameObserver frameObserver()const{return frameObserver_;}
     void setFrameObserver(FrameObserver observer){frameObserver_=std::move(observer);}

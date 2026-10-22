@@ -169,7 +169,7 @@ std::shared_ptr<GlyphRegistration> Atlas::registerGlyph(std::string key,const Gl
     auto r=std::make_shared<GlyphRegistration>();int x=node->x+padding,y=node->y+padding;r->normal={x,y,x+n.width*scale+2*margin,y+n.height*scale+2*margin};r->outline={x,y,x+b.width*scale+2*margin,y+b.height*scale+2*margin};r->format=format_;r->scale=scale;
     upload(n,node->x+write,node->y+write,format_==5?8:0,scale);upload(b,node->x+write,node->y+write,format_==5?4:12,scale);return registrations_[key]=r;
 }
-void Atlas::refresh(){if(!dirty)return;int shifts[]={8,4,0,12};for(size_t i=0;i<packed_.size();i++)for(int c=0;c<4;c++)pixels->rgba[i*4+c]=uint8_t(((packed_[i]>>shifts[c])&15)*17);dirty=false;}
+void Atlas::refresh(){if(!dirty)return;int shifts[]={8,4,0,12};for(size_t i=0;i<packed_.size();i++)for(int c=0;c<4;c++)pixels->rgba[i*4+c]=uint8_t(((packed_[i]>>shifts[c])&15)*17);pixels->revision++;dirty=false;}
 static std::pair<int,int> configuration(int id) {
     switch(id){case 0:case 22:case 34:case 35:return {11,id==22?100:400};case 7:return {13,100};case 8:return {18,100};case 9:return {30,700};case 10:return {26,700};case 11:return {28,700};case 12:return {30,400};case 13:return {20,400};case 19:return {17,700};case 23:return {26,700};case 24:return {15,100};case 25:return {28,700};case 26:return {22,100};case 27:return {24,100};default:return {15,400};}
 }

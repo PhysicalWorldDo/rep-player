@@ -17,7 +17,7 @@ public:
 };
 void check(HRESULT hr,const char* operation);
 struct Vertex {float position[3]{},color[4]{1,1,1,1},texcoord[8][2]{};};
-struct GpuTexture {Com<ID3D11Texture2D> texture;Com<ID3D11ShaderResourceView> view;std::shared_ptr<Pixels> source;int width=0,height=0,logicalWidth=0,logicalHeight=0;};
+struct GpuTexture {Com<ID3D11Texture2D> texture;Com<ID3D11ShaderResourceView> view;std::shared_ptr<Pixels> source;int width=0,height=0,logicalWidth=0,logicalHeight=0;uint64_t sourceRevision=0;};
 struct Target {GpuTexture image;Com<ID3D11RenderTargetView> view;Com<ID3D11Texture2D> depth;Com<ID3D11DepthStencilView> depthView;};
 struct ImageInput {std::string path;int frame=0;};
 struct Material {
@@ -52,6 +52,7 @@ class Gpu {
     Com<IDXGISwapChain> swapchain_;
     Com<ID3D11RenderTargetView> backbuffer_;
     Com<ID3D11Buffer> vertices_,matrices_,globals_;
+    UINT vertexCursor_=65536;
     Com<ID3D11RasterizerState> rasterizer_;
     std::unordered_map<int,std::unique_ptr<Program>> programs_;
     std::unordered_map<const Pixels*,std::shared_ptr<GpuTexture>> textures_;

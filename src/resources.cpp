@@ -205,7 +205,7 @@ const Assets::Entry* Assets::resolve(std::string name) {
     return nullptr;
 }
 uint64_t Assets::sourceRevision()const{std::lock_guard lock(index_->rejected->mutex);return index_->rejected->revision;}
-void Assets::syncSources(){auto revision=sourceRevision();if(sourceRevision_!=revision){images_.clear();sourceRevision_=revision;}}
+void Assets::syncSources(){auto revision=sourceRevision();if(sourceRevision_!=revision){clearDecodedImages();sourceRevision_=revision;}}
 bool Assets::patchSource(const std::string& name){
     auto entry=resolve(name);return entry&&entry->patch;
 }
@@ -268,9 +268,24 @@ std::shared_ptr<Img> Assets::preload(std::string logical) {
     }
 }
 std::shared_ptr<Frame> Assets::frame(std::string logical,int index,int palette,bool fallback) {
-    if(logical.empty())return {};auto name=normalize(logical);notifyFrame(name,index);auto decoded=decodeFrame(name,index,palette);
-    if(decoded){decodedFrames++;auto frame=std::move(decoded);frame->actualPath=normalize(logical);frame->actualFrame=index;return frame;}
-    if(!fallback)throw Error("missing resource/frame: "+logical);
-    fallbacks++;auto base=preload("interface/base.img");if(!base)throw Error("native missing-resource fallback absent");auto frame=base->frame(91);frame->actualPath=normalize("interface/base.img");frame->actualFrame=91;notifyFrame(frame->actualPath,91);return frame;
+    if(logical.empty())return {};syncSources();FrameKey key{std::move(logical),index,palette};
+    if(auto it=resolvedFrames_.find(key);it!=resolvedFrames_.end()){
+        const auto& entry=it->second;notifyFrame(entry.requested,index);
+        if(entry.fallback){if(!fallback)throw Error("missing resource/frame: "+key.logical);fallbacks++;notifyFrame(entry.frame->actualPath,entry.frame->actualFrame);}
+        else decodedFrames++;
+        return entry.frame;
+    }
+    auto name=normalize(key.logical);notifyFrame(name,index);auto decoded=decodeFrame(name,index,palette);
+    ResolvedFrame entry;entry.requested=name;
+    if(decoded){
+        decodedFrames++;entry.frame=std::make_shared<Frame>(*decoded);entry.frame->actualPath=name;entry.frame->actualFrame=index;
+    }else{
+        if(!fallback)throw Error("missing resource/frame: "+key.logical);
+        fallbacks++;auto base=preload("interface/base.img");if(!base)throw Error("native missing-resource fallback absent");
+        entry.frame=std::make_shared<Frame>(*base->frame(91));entry.frame->actualPath=normalize("interface/base.img");entry.frame->actualFrame=91;entry.fallback=true;
+        notifyFrame(entry.frame->actualPath,91);
+    }
+    // Each logical alias owns its placement/source metadata; decoded pixels stay shared.
+    auto frame=entry.frame;resolvedFrames_.emplace(std::move(key),std::move(entry));return frame;
 }
 }
