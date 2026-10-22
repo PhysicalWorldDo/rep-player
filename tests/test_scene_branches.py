@@ -218,6 +218,42 @@ class NativeSceneBranchTests(unittest.TestCase):
                 pixel=self.render([(pixel_camera()+capture+draw+op(59),aux)])
                 self.assert_red_rectangle(pixel,(x,y,x+4+offset,y+4))
 
+    def test_local_additive_capture_uses_source_rgb_and_mask_alpha(self):
+        # The PVP yellow HP overlay uses a black RGB mask with coverage Alpha.
+        # Changing a mask's RGB must not replace the yellow source pixels.
+        colors=[(0,0,0,128),(0,255,255,255),(255,0,255,128)]
+        records=b'';pixels=b''
+        for color in colors:
+            raw=bytes(color)*16
+            records+=rec(16,5,4,4,len(raw),x=0,y=0,full_w=4,full_h=4)
+            pixels+=raw
+        image=img_header(2,36*3,3)+records+pixels
+        (self.assets/'sprite_mask_color.NPK').write_bytes(npk(image,'sprite/mask_color/frame.img'))
+        for mask_frame in (0,2):
+            with self.subTest(mask_frame=mask_frame):
+                capture=op(58,struct.pack('<Ii7f4B',0,mask_frame,1,1,0,0,0,0,0,0,0,0,0))
+                draw,aux=extended(4,4,opcode=45)
+                draw=bytearray(draw);struct.pack_into('<I',draw,12,1)
+                raw=pixel_camera()+op(51,bytes([2,0]))+capture+draw+op(59)+op(52,bytes(2))
+                pixel=self.render([(raw,aux)],resource='sprite/mask_color/frame.img')
+                self.assertEqual(pixel(5,5),(128,128,0))
+                self.assertEqual(pixel(3,5),(0,0,0))
+
+    def test_special_local_capture_keeps_its_additive_composition(self):
+        # Preserve target2's existing special color-composition path while
+        # correcting the ordinary HP Alpha-mask path.
+        mask=bytes([255,0,255,128])*16
+        source=bytes([0,255,255,128])*16
+        record=rec(16,5,4,4,len(mask),x=0,y=0,full_w=4,full_h=4)
+        image=img_header(2,72,2)+record+record+mask+source
+        (self.assets/'sprite_special_capture.NPK').write_bytes(npk(image,'sprite/special_capture/frame.img'))
+        capture=op(58,struct.pack('<Ii7f4B',0,0,1,1,0,0,0,0,0,0,2,0,0))
+        draw,aux=extended(4,4,opcode=45)
+        draw=bytearray(draw);struct.pack_into('<I',draw,12,1)
+        raw=pixel_camera()+op(51,bytes([2,0]))+capture+draw+op(59)+op(52,bytes(2))
+        pixel=self.render([(raw,aux)],resource='sprite/special_capture/frame.img')
+        self.assertEqual(pixel(5,5),(64,0,64))
+
     def test_local_capture_preserves_mask_scale_independent_of_source_scale(self):
         capture=op(58,struct.pack('<Ii7f4B',0,0,1,1,2,1,0,0,0,0,0,0,0))
         draw,aux=extended(6,7,scale=(2,2),opcode=45)
