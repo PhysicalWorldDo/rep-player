@@ -1,5 +1,5 @@
 param(
-    [string]$Version = '1.1.7',
+    [string]$Version = '1.2.0',
     [Parameter(Mandatory = $true)][string]$FFmpegDirectory
 )
 $ErrorActionPreference = 'Stop'

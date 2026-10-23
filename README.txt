@@ -1,6 +1,7 @@
-REP 播放器 1.1.7
+REP 播放器 1.2.0
 
 完整解压 Windows x64 运行包后，双击 rep_player.exe。
+保留 WebView2Loader.dll 和 resources；运行需要 Windows 10/11 x64、D3D11 和 Microsoft Edge WebView2 Runtime。
 点击“选择客户端”，选择包含 Replay 和 ImagePacks2 的客户端根目录。
 
 支持分层录像列表、中英技能搜索、打开指定 REP、逐帧查看、IMG 隐藏及 MOV / MP4 / PNG 导出。
@@ -41,4 +42,4 @@ NPK 补丁支持：
 同包内其他有效 IMG 继续使用，预览、逐帧与导出的资源选择保持一致。
 
 完整使用说明：https://github.com/PhysicalWorldDo/rep-player/blob/main/README.md
-下载：https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.1.7
+下载：https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.2.0

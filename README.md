@@ -4,17 +4,19 @@
 
 ## 下载与运行
 
-从 [v1.1.7 Release](https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.1.7) 下载 `rep-player-v1.1.7-windows-x64.zip`，完整解压到可写目录，直接双击最外层的 **rep_player.exe**。
+从 [v1.2.0 Release](https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.2.0) 下载 `rep-player-v1.2.0-windows-x64.zip`，完整解压到可写目录，直接双击最外层的 **rep_player.exe**。
 
 ```text
 解压目录/
 ├─ rep_player.exe
+├─ WebView2Loader.dll
 └─ resources/
    ├─ ffmpeg.exe
+   ├─ ui/
    └─ licenses/
 ```
 
-保留整个 `resources` 目录。无需安装 Python、编译器或 VC++ 运行库。运行需要支持 D3D11 的显卡，以及自行准备的完整客户端。
+保留 `WebView2Loader.dll` 和整个 `resources` 目录。无需安装 Python、编译器或 VC++ 运行库。运行需要支持 D3D11 的显卡、[Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/#download)，以及自行准备的完整客户端。
 
 首次打开后点击顶部“选择客户端”，选择包含 `Replay` 和 `ImagePacks2` 的客户端根目录。录像、图像、字体和视频都从该目录读取；使用字体和视频的录像还需要客户端中的 `Fonts`、`Video`，Bink 视频需要对应的 `bink2w64.dll`。播放器只读取客户端文件。
 
@@ -36,7 +38,7 @@
 | 主窗口非文本面板内按 ← / → | 前帧 / 后帧；搜索框保留光标移动，弹窗保留自身输入 |
 | 点击进度条 | 精确定位到目标时间对应记录 |
 | 拖动进度条 | 即时显示目标时间，松手后精确定位；Esc 取消 |
-| 静音 / 音量 | 控制预览声音；音量弹窗提供 0–100% 滑块 |
+| 音量控件 | 控制预览声音；点击展开 0–100% 滑块和静音开关 |
 | 速度 | 选择 0.25×–4× 预览速度，默认 1× |
 
 实时播放可能跳过中间记录以跟随录像时间。逐帧查看按记录顺序执行，相同时间戳的记录也可分别查看。
@@ -59,7 +61,7 @@
 
 描边依据当前源素材像素、混合方式和绘制位置，可能包含后来被遮挡或被着色器裁去的部分。仅作遮罩、着色器输入或离屏输入的资源没有独立轮廓时会显示提示；隐藏素材保持隐藏。
 
-“移除背景”“移除怪物”“移除人物”是横向并排的开关，默认全关，名称和开/关状态分两行显示。切换立即受理当前画面更新，不需要刷新 NPK，保持记录位置和播放状态；复杂录像的画面更新仍可能需要重建。三个选择保存在 `runtime/image_filters.txt`，切换 REP 和重开程序后保留。
+“移除背景”“移除怪物”“移除人物”是横向并排的开关，默认全关，名称和开/关状态分两行显示。切换立即受理当前画面更新，不需要刷新 NPK，保持记录位置和播放状态；复杂录像的画面更新仍可能需要重建。三个选择保存在 `runtime`，切换 REP 和重开程序后保留。
 
 类别规则按常见资源路径判断，怪物/人物的 effect/effects 路径免于自动隐藏，背景规则保持原覆盖。手动勾选优先：可在类别开启时勾回单个 IMG，也可在类别关闭时手动隐藏；类别来回切换保留例外。切到不同 REP 清空手动例外，同一 REP 重播和刷新 NPK 保留。
 
@@ -79,7 +81,7 @@
 
 改名、添加、删除或替换补丁后，点击顶部“刷新 NPK / Refresh NPK”。刷新会重建图像和声音资源，释放旧图片、纹理和声音缓存，从头重新播放当前 REP，保留分类开关、当前 REP 手动例外、画布、负坐标显示和预览音量设置。普通播放、重播和切换 REP 复用已应用的补丁选择；预览、逐帧和随后开始的导出共用当前资源选择，MOV/MP4 音轨也使用当前声音补丁。加载和导出期间不能切换补丁开关或刷新。
 
-已应用的补丁开关保存在 `runtime/npk_patches.txt`，重新打开程序或选择客户端时继续使用；未刷新的选择不会保存，刷新索引失败也不会覆盖上次设置。没有有效设置时默认启用。
+已应用的补丁开关保存在 `runtime`，重新打开程序或选择客户端时继续使用；未刷新的选择不会保存，刷新索引失败也不会覆盖上次设置。没有有效设置时默认启用。
 
 此功能只扫描命名分界之前的包，分界之后的补丁不参与覆盖；对应目录没有 `sprite*.NPK` 或 `sounds*.NPK` 时不加载该目录的前置补丁。补丁替换整个 IMG 或声音文件；补丁 IMG 无法读取、像素解码失败或缺少所需帧时，自动跳过该 IMG，重新读取同路径的客户端原始 IMG，不弹出补丁读取错误。补丁声音读取或解码失败时回退到同路径官方声音。同包内其他有效资源继续使用，预览、逐帧与导出使用相同资源选择。客户端文件始终只读。
 
@@ -99,7 +101,7 @@
 
 ## 设置与缓存
 
-客户端、语言、布局、画布、声音、分类开关和负坐标显示设置保存在程序目录的 `runtime` 中。声音设置使用 `audio.txt`，负坐标显示使用 `negative_img_offsets.txt`。切换到不同 REP 时自动释放旧录像的图像、纹理和声音缓存；同一录像重播保留热缓存。支持 `Neople Video Fil` 和 `Neople Video Stream` 视频封装；解包临时文件在停止使用、切换录像或关闭播放器时回收，避免长期积累。设置和已导出素材会保留。
+客户端、语言、布局、画布、声音、分类开关和负坐标显示设置保存在程序目录的 `runtime/dnf-ui.json` 中。切换到不同 REP 时自动释放旧录像的图像、纹理和声音缓存；同一录像重播保留热缓存。支持 `Neople Video Fil` 和 `Neople Video Stream` 视频封装；解包临时文件在停止使用、切换录像或关闭播放器时回收，避免长期积累。设置和已导出素材会保留。
 
 ### 画布扩展
 
@@ -137,7 +139,7 @@ DNF 兼容模式仅对 REP 1.8 / minor 6 中完整、独立的 `4200000000` 字�
 
 ## 源码与许可
 
-源码见 [PhysicalWorldDo/rep-player](https://github.com/PhysicalWorldDo/rep-player)，构建方法见 [BUILDING.md](BUILDING.md)，更新记录见 [RELEASE_NOTES.md](RELEASE_NOTES.md)。
+公开源码保留原生 UI，构建方法见 [BUILDING.md](BUILDING.md)；Release 运行包使用新版 UI。更新记录见 [RELEASE_NOTES.md](RELEASE_NOTES.md)。
 
 第三方来源与许可见 [THIRD_PARTY.txt](THIRD_PARTY.txt) 和 [licenses](licenses)；运行包中的通知位于 `resources/licenses`。FFmpeg 对应源码链接见 [FFMPEG_SOURCE.md](licenses/FFMPEG_SOURCE.md)。
 

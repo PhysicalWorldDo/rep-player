@@ -1,5 +1,12 @@
 # 更新记录
 
+## v1.2.0
+
+- 更新播放器 UI。
+- 支持 SoundPacks 声音补丁，与图像补丁共用开关和刷新规则。
+- 优化素材查找、顶点与字体上传，提升渲染效率。
+- 修复部分字体、血条颜色、BK2 透明度与帧定位，以及重复音效过度叠加问题。
+
 ## v1.1.7
 
 发布日期：2026-10-21。下载 [Windows x64 运行包](https://github.com/PhysicalWorldDo/rep-player/releases/download/v1.1.7/rep-player-v1.1.7-windows-x64.zip)。完整解压后直接运行 `rep_player.exe`。
