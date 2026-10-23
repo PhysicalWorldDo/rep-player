@@ -4,7 +4,7 @@
 
 ## 下载与运行
 
-从 [v1.2.0 Release](https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.2.0) 下载 `rep-player-v1.2.0-windows-x64.zip`，完整解压到可写目录，直接双击最外层的 **rep_player.exe**。
+从 [v1.2.1 Release](https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.2.1) 下载 `rep-player-v1.2.1-windows-x64.zip`，完整解压到可写目录，直接双击最外层的 **rep_player.exe**。
 
 ```text
 解压目录/
@@ -27,7 +27,7 @@
 - 按实际目录层级列出整个 `Replay` 目录下的 REP，包括根部文件、多层子目录和大写 `.REP` 扩展名。
 - 技能录像显示中英文名称，支持中文技能名、英文文件名、VP 名称和相对路径搜索。包含帝国骑士、女蓝拳的技能及 VP 中文名称；未登记名称的文件显示原名。
 - 点击列表条目自动播放，再点当前条目从头重播；播放结束保留末帧。
-- 顶部“打开 REP”可选择任意位置的录像。列表内文件会自动展开并定位；列表外文件使用当前所选客户端的资源。
+- 顶部“打开 REP”可选择任意位置的录像，再次打开时沿用当前录像所在目录。列表内文件会自动展开并定位；列表外文件使用当前所选客户端的资源。
 - 中文 / EN 界面切换；可拖动分隔线调整画面、列表和 IMG 面板大小。
 
 | 操作 | 行为 |
