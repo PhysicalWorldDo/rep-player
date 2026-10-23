@@ -157,7 +157,7 @@ struct AudioTrack::Impl {
         position=target;expire(target);
     }
 };
-AudioTrack::AudioTrack(const std::filesystem::path& client,const std::filesystem::path& cache,Replay& replay,const std::function<bool()>& cancelled)
+AudioTrack::AudioTrack(const std::filesystem::path& client,const std::filesystem::path& cache,Replay& replay,const std::function<bool()>& cancelled,AudioResources::IndexPtr index)
     :impl_(std::make_unique<Impl>()){
     impl_->cancelled=cancelled;impl_->profile=replay.options.profile;
     std::unordered_map<uint32_t,std::vector<AudioEvent>> commands;
@@ -182,7 +182,7 @@ AudioTrack::AudioTrack(const std::filesystem::path& client,const std::filesystem
     }}catch(...){replay.rewind();throw;}
     replay.rewind();
     std::stable_sort(impl_->events.begin(),impl_->events.end(),[](const AudioEvent& a,const AudioEvent& b){return a.sample<b.sample;});
-    if(!impl_->events.empty())impl_->resources=std::make_shared<AudioResources>(client,cache);
+    if(!impl_->events.empty())impl_->resources=index?std::make_shared<AudioResources>(std::move(index)):std::make_shared<AudioResources>(client,cache);
 }
 AudioTrack::~AudioTrack()=default;
 bool AudioTrack::hasEvents()const{return !impl_->events.empty();}

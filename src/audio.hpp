@@ -1,5 +1,5 @@
 #pragma once
-#include "protocol.hpp"
+#include "audio_resources.hpp"
 #include <functional>
 #include <chrono>
 
@@ -12,7 +12,7 @@ class AudioTrack {
 public:
     static constexpr int SampleRate=48000;
     AudioTrack(const std::filesystem::path& client,const std::filesystem::path& cache,
-               Replay& replay,const std::function<bool()>& cancelled={});
+               Replay& replay,const std::function<bool()>& cancelled={},AudioResources::IndexPtr index={});
     ~AudioTrack();
     AudioTrack(const AudioTrack&)=delete;AudioTrack& operator=(const AudioTrack&)=delete;
     void seek(int64_t milliseconds);

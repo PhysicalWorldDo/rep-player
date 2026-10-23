@@ -92,15 +92,46 @@ Decoded decode(const std::filesystem::path& ffmpeg,const Bytes& input,const std:
     return result;
 }
 }
-AudioResources::AudioResources(std::filesystem::path clientRoot,std::filesystem::path cacheRoot):client_(std::move(clientRoot)),ffmpeg_(ffmpegExecutable()){
-    // PCM is memory-owned; existing on-disk caches and source assets are untouched.
-    (void)cacheRoot;loadDefinitions();
+struct AudioResources::Index {
+    std::filesystem::path client;
+    std::unordered_map<std::string,SoundDefinition> definitions;
+    std::unordered_map<std::string,Entry> patches;
+    std::vector<std::filesystem::path> officialPackages;
+    std::vector<std::string> diagnostics;
+    uint64_t missing=0;
+    // Keep a failed path on the official source for every reader until refresh.
+    struct RejectedPatches {std::mutex mutex;std::unordered_set<std::string> paths;};
+    std::shared_ptr<RejectedPatches> rejected=std::make_shared<RejectedPatches>();
+};
+AudioResources::AudioResources(std::filesystem::path clientRoot,std::filesystem::path cacheRoot,bool patchesEnabled)
+    :AudioResources(buildIndex(std::move(clientRoot),patchesEnabled)){(void)cacheRoot;}
+AudioResources::AudioResources(IndexPtr index):index_(std::move(index)),ffmpeg_(ffmpegExecutable()){
+    if(!index_)throw Error("sound resource index is absent");
+    diagnostics_=index_->diagnostics;missing_=index_->missing;
+}
+AudioResources::IndexPtr AudioResources::buildIndex(std::filesystem::path clientRoot,bool patchesEnabled){
+    auto index=std::make_shared<Index>();index->client=std::move(clientRoot);loadDefinitions(*index);
+    auto directory=index->client/L"SoundPacks";std::vector<std::filesystem::path> packages;
+    if(std::filesystem::is_directory(directory))for(const auto& item:std::filesystem::directory_iterator(directory))
+        if(item.is_regular_file()&&canonical(utf8(item.path().extension().wstring()))==".npk")packages.push_back(item.path());
+    // Match ImagePacks2: preserve case and compare unsigned UTF-16 filenames.
+    std::sort(packages.begin(),packages.end(),[](const auto& a,const auto& b){
+        auto x=a.filename().native(),y=b.filename().native();
+        return std::lexicographical_compare(x.begin(),x.end(),y.begin(),y.end(),[](wchar_t x,wchar_t y){return uint16_t(x)<uint16_t(y);});
+    });
+    auto official=[](const auto& path){return canonical(utf8(path.filename().wstring())).rfind("sounds",0)==0;};
+    auto boundary=std::find_if(packages.begin(),packages.end(),official);
+    if(patchesEnabled&&boundary!=packages.end())for(auto it=packages.begin();it!=boundary;++it)readPackage(*it,index->patches,true);
+    for(const auto& package:packages)if(official(package))index->officialPackages.push_back(package);
+    return index;
 }
 void AudioResources::report(const std::string& key,std::string message,bool missing){
     std::lock_guard lock(mutex_);if(reported_.insert(key).second){diagnostics_.push_back(std::move(message));if(missing)missing_++;}
 }
-void AudioResources::loadDefinitions(){
-    auto path=client_/L"audio.xml";if(!std::filesystem::is_regular_file(path)){report("registry","Client audio.xml is unavailable",true);return;}
+void AudioResources::loadDefinitions(Index& index){
+    auto& definitions_=index.definitions;
+    auto report=[&](const char*,std::string message,bool missing){index.diagnostics.push_back(std::move(message));if(missing)index.missing++;};
+    auto path=index.client/L"audio.xml";if(!std::filesystem::is_regular_file(path)){report("registry","Client audio.xml is unavailable",true);return;}
     try{
         auto bytes=readFile(path);std::string_view xml(reinterpret_cast<const char*>(bytes.data()),bytes.size());size_t position=0;std::vector<std::string> sources;
         while((position=xml.find('<',position))!=std::string_view::npos){
@@ -128,11 +159,15 @@ void AudioResources::loadDefinitions(){
     }catch(const std::exception& error){report("registry","Cannot read audio.xml: "+std::string(error.what()),true);}
 }
 const SoundDefinition* AudioResources::definition(const std::string& tag)const{
-    auto it=definitions_.find(tag);return it==definitions_.end()?nullptr:&it->second;
+    auto it=index_->definitions.find(tag);return it==index_->definitions.end()?nullptr:&it->second;
 }
 std::vector<std::string> AudioResources::diagnostics()const{std::lock_guard lock(mutex_);return diagnostics_;}
 void AudioResources::indexPackage(const std::filesystem::path& package){
-    auto packageKey=canonical(utf8(package.filename().wstring()));if(indexedPackages_.contains(packageKey))return;indexedPackages_.insert(packageKey);
+    auto key=canonical(utf8(package.filename().wstring()));if(!indexedPackages_.insert(key).second)return;
+    readPackage(package,entries_);
+}
+void AudioResources::readPackage(const std::filesystem::path& package,std::unordered_map<std::string,Entry>& entries,bool patch){
+    auto packageKey=canonical(utf8(package.filename().wstring()));
     std::ifstream file(package,std::ios::binary);if(!file)return;std::array<uint8_t,20> header{};file.read(reinterpret_cast<char*>(header.data()),header.size());
     if(!file||std::memcmp(header.data(),"NeoplePack_Bill\0",16))throw Error("invalid sound NPK header: "+packageKey);
     uint32_t count=at<uint32_t>(header,16);file.seekg(0,std::ios::end);auto size=file.tellg();if(size<20||uint64_t(count)*264>uint64_t(size)-20)throw Error("truncated sound NPK table: "+packageKey);
@@ -141,18 +176,21 @@ void AudioResources::indexPackage(const std::filesystem::path& package){
     for(uint32_t i=0;i<count;i++){
         auto record=std::span(table).subspan(size_t(i)*264,264);std::string logical;for(size_t j=0;j<256;j++){char c=char(record[8+j]^uint8_t(seed[j]));if(!c)break;logical+=c;}
         auto offset=at<uint32_t>(record,0),length=at<uint32_t>(record,4);if(uint64_t(offset)+length>uint64_t(size))throw Error("sound NPK entry exceeds package: "+packageKey);
-        entries_.try_emplace(logicalPath(std::move(logical)),Entry{package,offset,length});
+        entries.try_emplace(logicalPath(std::move(logical)),Entry{package,offset,length,patch});
     }
 }
-std::optional<AudioResources::Entry> AudioResources::resolve(const std::string& logical){
-    std::lock_guard lock(mutex_);if(auto it=entries_.find(logical);it!=entries_.end())return it->second;
-    auto directory=client_/L"SoundPacks";auto parent=logical.substr(0,logical.find_last_of('/'));
+std::optional<AudioResources::Entry> AudioResources::resolve(const std::string& logical,bool original){
+    std::lock_guard lock(mutex_);
+    if(!original)if(auto it=index_->patches.find(logical);it!=index_->patches.end()){
+        std::lock_guard rejectedLock(index_->rejected->mutex);if(!index_->rejected->paths.contains(logical))return it->second;
+    }
+    if(auto it=entries_.find(logical);it!=entries_.end())return it->second;
+    auto directory=index_->client/L"SoundPacks";auto parent=logical.substr(0,logical.find_last_of('/'));
     while(parent.find('/')!=std::string::npos){auto name=parent;std::replace(name.begin(),name.end(),'/','_');auto package=directory/wide(name+".npk");if(std::filesystem::is_regular_file(package))indexPackage(package);
         if(auto it=entries_.find(logical);it!=entries_.end())return it->second;parent=parent.substr(0,parent.find_last_of('/'));
     }
     if(!allPackagesIndexed_){
-        allPackagesIndexed_=true;std::vector<std::filesystem::path> packages;if(std::filesystem::is_directory(directory))for(auto& item:std::filesystem::directory_iterator(directory))if(item.is_regular_file()&&canonical(utf8(item.path().extension().wstring()))==".npk")packages.push_back(item.path());
-        std::sort(packages.begin(),packages.end());for(auto& package:packages)indexPackage(package);
+        allPackagesIndexed_=true;for(const auto& package:index_->officialPackages)indexPackage(package);
     }
     auto it=entries_.find(logical);return it==entries_.end()?std::nullopt:std::optional<Entry>(it->second);
 }
@@ -164,13 +202,24 @@ std::shared_ptr<const AudioClip> AudioResources::clip(const std::string& tag,con
     if(!owner){std::unique_lock lock(pending->mutex);while(!pending->done){if(cancelled&&cancelled())return {};pending->ready.wait_for(lock,std::chrono::milliseconds(25));}return pending->result;}
     std::shared_ptr<const AudioClip> result;bool wasCancelled=false;
     try{
-        Bytes input;if(file.rfind("sounds/",0)==0){auto entry=resolve(file);if(!entry)throw Error("sound resource is absent from SoundPacks: "+source->file);
-            std::ifstream stream(entry->package,std::ios::binary);stream.seekg(entry->offset);input.resize(entry->length);stream.read(reinterpret_cast<char*>(input.data()),input.size());if(!stream)throw Error("cannot read sound NPK payload");
-        }else{auto path=client_/wide(source->file);if(!std::filesystem::is_regular_file(path))throw Error("audio file is absent: "+source->file);input=readFile(path);}
-        auto decoded=decode(ffmpeg_,input,cancelled);wasCancelled=decoded.cancelled;if(!wasCancelled){if(decoded.data.empty())throw Error("audio decode failed: "+decoded.error);
+        auto readEntry=[](const Entry& entry){Bytes input(entry.length);std::ifstream stream(entry.package,std::ios::binary);stream.seekg(entry.offset);
+            stream.read(reinterpret_cast<char*>(input.data()),input.size());if(!stream)throw Error("cannot read sound NPK payload");return input;};
+        auto decodeClip=[&](const Bytes& input){
+            auto decoded=decode(ffmpeg_,input,cancelled);if(decoded.cancelled)return std::shared_ptr<const AudioClip>{};
+            if(decoded.data.empty())throw Error("audio decode failed: "+decoded.error);
             auto clip=std::make_shared<AudioClip>();clip->samples.resize(decoded.data.size()/sizeof(float));std::memcpy(clip->samples.data(),decoded.data.data(),decoded.data.size());
-            if(!std::all_of(clip->samples.begin(),clip->samples.end(),[](float sample){return std::isfinite(sample);}))throw Error("audio decoder returned non-finite PCM");result=std::move(clip);decoded_++;
-        }
+            if(!std::all_of(clip->samples.begin(),clip->samples.end(),[](float sample){return std::isfinite(sample);}))throw Error("audio decoder returned non-finite PCM");
+            return std::shared_ptr<const AudioClip>(std::move(clip));
+        };
+        if(file.rfind("sounds/",0)==0){auto entry=resolve(file);if(!entry)throw Error("sound resource is absent from SoundPacks: "+source->file);
+            try{result=decodeClip(readEntry(*entry));}
+            catch(...){
+                if(!entry->patch||(cancelled&&cancelled()))throw;
+                {std::lock_guard lock(index_->rejected->mutex);index_->rejected->paths.insert(file);}
+                auto original=resolve(file,true);if(!original)throw;result=decodeClip(readEntry(*original));
+            }
+        }else{auto path=index_->client/wide(source->file);if(!std::filesystem::is_regular_file(path))throw Error("audio file is absent: "+source->file);result=decodeClip(readFile(path));}
+        wasCancelled=!result;if(result)decoded_++;
     }catch(const std::exception& error){wasCancelled=cancelled&&cancelled();if(!wasCancelled)report("file:"+file,"Audio TAG "+tag+": "+error.what(),true);}
     {std::lock_guard lock(mutex_);if(result)clips_[file]=result;else if(!wasCancelled)unavailable_.insert(file);pending_.erase(file);}
     {std::lock_guard lock(pending->mutex);pending->result=result;pending->done=true;}pending->ready.notify_all();return result;

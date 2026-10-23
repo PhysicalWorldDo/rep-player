@@ -312,7 +312,7 @@ struct Application {
         }
         if(exportThread.joinable())exportThread.join();auto selected=selectedPath,selectedClient=client;cancelExport=false;
         {std::lock_guard lock(exportMutex);exporting=true;exportDone=false;exportFailed=false;exportMessage=t(L"正在准备导出…",L"Preparing export…");}
-        bool en=english;auto requested=options;requested.protocol=protocol;requested.canvas=canvasSettings;requested.negativeImgOffsetsEnabled=negativeImgOffsetsEnabled;requested.imageVisibility=imageVisibility;requested.hiddenImages.clear();
+        bool en=english;auto requested=options;requested.audioIndex=worker->audioIndex();requested.protocol=protocol;requested.canvas=canvasSettings;requested.negativeImgOffsetsEnabled=negativeImgOffsetsEnabled;requested.imageVisibility=imageVisibility;requested.hiddenImages.clear();
         exportThread=std::thread([this,options=std::move(requested),selected,selectedClient,en,index=std::move(index)]{
             try{
                 rep::Gpu gpu(root/L"assets"/L"shaders");gpu.createAllPrograms();rep::Assets assets(index);

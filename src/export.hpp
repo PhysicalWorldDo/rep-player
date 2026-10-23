@@ -2,6 +2,7 @@
 #include "engine.hpp"
 #include "client_protocol.hpp"
 #include "image_categories.hpp"
+#include "audio_resources.hpp"
 #include <unordered_set>
 
 namespace rep {
@@ -18,6 +19,7 @@ struct ExportOptions {
     ImageVisibilityPolicy imageVisibility;
     ClientProtocolSelection protocol;
     CanvasSettings canvas;
+    AudioResources::IndexPtr audioIndex;
 };
 struct ExportProgress {
     uint64_t completedFrames=0,totalFrames=0;

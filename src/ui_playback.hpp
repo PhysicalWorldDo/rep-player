@@ -2,6 +2,7 @@
 #include "engine.hpp"
 #include "client_protocol.hpp"
 #include "canvas.hpp"
+#include "audio_resources.hpp"
 #include <windows.h>
 #include <mutex>
 #include <condition_variable>
@@ -82,6 +83,7 @@ class PlaybackController {
     std::unordered_set<std::string> hidden_;
     ImageVisibilityPolicy imageVisibility_;
     Assets::IndexPtr imageIndex_;
+    AudioResources::IndexPtr audioIndex_;
     bool patchesEnabled_=true;
     bool refreshImagesRequested_=false;
     PlayerStatus status_;
@@ -102,6 +104,7 @@ public:
     void configureClient(const std::filesystem::path& client);
     void refreshImages(std::optional<bool> patchesEnabled={});
     Assets::IndexPtr imageIndex();
+    AudioResources::IndexPtr audioIndex();
     std::optional<bool> appliedPatchesEnabled();
     void setHiddenImages(std::unordered_set<std::string> hidden);
     void setImageVisibility(const ImageVisibilityPolicy& policy);

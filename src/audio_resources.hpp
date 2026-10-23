@@ -28,15 +28,20 @@ struct SoundDefinition {
     float gain=1;
 };
 class AudioResources {
-    struct Entry {std::filesystem::path package;uint32_t offset=0,length=0;};
+public:
+    struct Index;
+    using IndexPtr=std::shared_ptr<const Index>;
+    static IndexPtr buildIndex(std::filesystem::path clientRoot,bool patchesEnabled=true);
+private:
+    struct Entry {std::filesystem::path package;uint32_t offset=0,length=0;bool patch=false;};
     struct Pending {
         std::mutex mutex;
         std::condition_variable ready;
         bool done=false;
         std::shared_ptr<const AudioClip> result;
     };
-    std::filesystem::path client_,ffmpeg_;
-    std::unordered_map<std::string,SoundDefinition> definitions_;
+    IndexPtr index_;
+    std::filesystem::path ffmpeg_;
     std::unordered_map<std::string,Entry> entries_;
     std::unordered_set<std::string> indexedPackages_,unavailable_,reported_;
     std::unordered_map<std::string,std::shared_ptr<const AudioClip>> clips_;
@@ -45,12 +50,14 @@ class AudioResources {
     mutable std::mutex mutex_;
     bool allPackagesIndexed_=false;
     std::atomic<uint64_t> decoded_{0},missing_{0};
-    void loadDefinitions();
+    static void loadDefinitions(Index& index);
+    static void readPackage(const std::filesystem::path& package,std::unordered_map<std::string,Entry>& entries,bool patch=false);
     void indexPackage(const std::filesystem::path& package);
-    std::optional<Entry> resolve(const std::string& logical);
+    std::optional<Entry> resolve(const std::string& logical,bool original=false);
     void report(const std::string& key,std::string message,bool missing=false);
 public:
-    AudioResources(std::filesystem::path clientRoot,std::filesystem::path cacheRoot);
+    AudioResources(std::filesystem::path clientRoot,std::filesystem::path cacheRoot,bool patchesEnabled=true);
+    explicit AudioResources(IndexPtr index);
     const SoundDefinition* definition(const std::string& tag)const;
     std::shared_ptr<const AudioClip> clip(const std::string& tag,const std::function<bool()>& cancelled={});
     std::vector<std::string> diagnostics()const;

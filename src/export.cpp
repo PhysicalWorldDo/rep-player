@@ -1,6 +1,7 @@
 #include "export.hpp"
 #include "runtime_paths.hpp"
 #include "audio.hpp"
+#include "audio_resources.hpp"
 #include <algorithm>
 #include <atomic>
 #include <cwctype>
@@ -145,7 +146,8 @@ ExportResult exportReplay(Gpu& gpu,Assets& assets,const std::filesystem::path& c
     std::filesystem::create_directories(directory);if(png)std::filesystem::create_directory(staging);
     std::unique_ptr<AudioFile> audioFile;
     if(options.audio&&!png){
-        AudioTrack audio(client,cache,replay,cancelled);
+        auto index=options.audioIndex?options.audioIndex:AudioResources::buildIndex(client,assets.patchesEnabled());
+        AudioTrack audio(client,cache,replay,cancelled,std::move(index));
         if(audio.hasEvents()){
             const uint64_t samples=(result.frames*AudioTrack::SampleRate+options.fps-1)/options.fps;
             if(samples>(std::numeric_limits<uint32_t>::max()-36)/8)throw Error("Audio export exceeds the WAV size limit");
