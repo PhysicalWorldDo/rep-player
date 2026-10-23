@@ -137,7 +137,7 @@ struct Assets::Index {
     std::unordered_set<std::string> packages;
     // Package mappings stay immutable; health decisions follow the applied
     // index across playback, thumbnails and new export readers.
-    struct RejectedPatches {std::mutex mutex;std::unordered_set<std::string> paths;uint64_t revision=0;};
+    struct RejectedPatches {std::mutex mutex;std::unordered_set<std::string> paths,validated;uint64_t revision=0;};
     std::shared_ptr<RejectedPatches> rejected=std::make_shared<RejectedPatches>();
 };
 Assets::Assets(std::filesystem::path root,bool patchesEnabled):Assets(buildIndex(std::move(root),patchesEnabled)){}
@@ -211,7 +211,7 @@ bool Assets::patchSource(const std::string& name){
 }
 bool Assets::skipPatch(const std::string& name){
     if(!patchSource(name))return false;
-    {std::lock_guard lock(index_->rejected->mutex);if(index_->rejected->paths.insert(name).second)++index_->rejected->revision;}
+    {std::lock_guard lock(index_->rejected->mutex);if(index_->rejected->paths.insert(name).second){++index_->rejected->revision;index_->rejected->validated.clear();}}
     syncSources();return true;
 }
 static std::optional<std::pair<std::string,int>> paletteImagePath(std::string name){
@@ -232,35 +232,54 @@ static std::optional<std::pair<std::string,int>> paletteImagePath(std::string na
     }
     return {};
 }
-std::shared_ptr<Frame> Assets::decodeFrame(const std::string& name,int index,int palette){
+std::shared_ptr<Frame> Assets::decodeFrame(const std::string& name,int index,int palette,std::string* source){
     const bool patch=patchSource(name);auto img=preload(name);
     if(!img){
-        if(auto alias=paletteImagePath(name);alias&&resolve(alias->first))return decodeFrame(alias->first,index,alias->second);
+        if(auto alias=paletteImagePath(name);alias&&resolve(alias->first))return decodeFrame(alias->first,index,alias->second,source);
         // Newer CN UI packs may retain only the (2x) entry. Keep its pixels
         // at full resolution while drawing its geometry in logical UI units.
         // This is a compatibility lookup, independent of July palette aliases.
         if(name.starts_with("sprite/interface/")){
             auto base=name.find_last_of('/')+1;
-            if(name.compare(base,4,"(2x)")!=0){auto hd=name;hd.insert(base,"(2x)");auto source=decodeFrame(hd,index,palette);
-                if(!source)return {};auto logical=std::make_shared<Frame>(*source);logical->geometryScale=.5f;return logical;}
+            if(name.compare(base,4,"(2x)")!=0){auto hd=name;hd.insert(base,"(2x)");auto decoded=decodeFrame(hd,index,palette,source);
+                if(!decoded)return {};auto logical=std::make_shared<Frame>(*decoded);logical->geometryScale=.5f;return logical;}
         }
         return {};
     }
+    *source=name;
     if(index>=0&&size_t(index)<img->count()){
         try{return img->frame(index,palette);}
-        catch(const Error&){if(patch){skipPatch(name);return decodeFrame(name,index,palette);}throw;}
-        catch(const std::out_of_range&){if(patch){skipPatch(name);return decodeFrame(name,index,palette);}throw;}
+        catch(const Error&){if(patch){skipPatch(name);return decodeFrame(name,index,palette,source);}throw;}
+        catch(const std::out_of_range&){if(patch){skipPatch(name);return decodeFrame(name,index,palette,source);}throw;}
     }
-    if(index>=0&&patch){skipPatch(name);return decodeFrame(name,index,palette);}
+    if(index>=0&&patch){skipPatch(name);return decodeFrame(name,index,palette,source);}
     return {};
 }
 std::shared_ptr<Img> Assets::preload(std::string logical) {
-    auto name=normalize(logical);syncSources();if(auto it=images_.find(name);it!=images_.end())return it->second;
+    auto name=normalize(logical);syncSources();if(auto it=images_.find(name);it!=images_.end()){touchImage(name);return it->second;}
     auto e=resolve(name);if(!e)return {};const bool patch=e->patch;
     try {
         std::ifstream f(root_/wide(e->package),std::ios::binary);if(!f)throw Error("NPK file absent: "+e->package);
         Bytes b(e->length);f.seekg(e->offset);f.read(reinterpret_cast<char*>(b.data()),b.size());if(!f)throw Error("truncated IMG entry");
-        auto img=std::make_shared<Img>(std::move(b));if(patch)img->validateFrames();images_[name]=img;return img;
+        auto img=std::make_shared<Img>(std::move(b));
+        if(patch){
+            // A successful whole-IMG check belongs to this applied Index and
+            // source revision. Decode outside the shared rejection lock so an
+            // export's cold IMG cannot stall preview's hot frame/revision read.
+            bool rejected,validate;uint64_t revision;
+            {std::lock_guard lock(index_->rejected->mutex);
+                rejected=index_->rejected->paths.contains(name);revision=index_->rejected->revision;
+                validate=!index_->rejected->validated.contains(name);
+            }
+            if(rejected)return preload(name);
+            if(validate){++patchValidations;img->validateFrames();}
+            {std::lock_guard lock(index_->rejected->mutex);
+                rejected=index_->rejected->paths.contains(name);
+                if(!rejected&&index_->rejected->revision==revision&&validate)index_->rejected->validated.insert(name);
+            }
+            if(rejected)return preload(name);
+        }
+        images_[name]=img;touchImage(name);return img;
     } catch(const Error& error) {
         if(patch){skipPatch(name);return preload(name);}
         throw Error("IMG "+name+" in NPK "+e->package+" (offset "+std::to_string(e->offset)
@@ -270,22 +289,52 @@ std::shared_ptr<Img> Assets::preload(std::string logical) {
 std::shared_ptr<Frame> Assets::frame(std::string logical,int index,int palette,bool fallback) {
     if(logical.empty())return {};syncSources();FrameKey key{std::move(logical),index,palette};
     if(auto it=resolvedFrames_.find(key);it!=resolvedFrames_.end()){
-        const auto& entry=it->second;notifyFrame(entry.requested,index);
+        const auto& entry=it->second;touchImage(entry.source);notifyFrame(entry.requested,index);
         if(entry.fallback){if(!fallback)throw Error("missing resource/frame: "+key.logical);fallbacks++;notifyFrame(entry.frame->actualPath,entry.frame->actualFrame);}
         else decodedFrames++;
         return entry.frame;
     }
-    auto name=normalize(key.logical);notifyFrame(name,index);auto decoded=decodeFrame(name,index,palette);
-    ResolvedFrame entry;entry.requested=name;
+    auto name=normalize(key.logical);notifyFrame(name,index);ResolvedFrame entry;entry.requested=name;auto decoded=decodeFrame(name,index,palette,&entry.source);
     if(decoded){
         decodedFrames++;entry.frame=std::make_shared<Frame>(*decoded);entry.frame->actualPath=name;entry.frame->actualFrame=index;
     }else{
         if(!fallback)throw Error("missing resource/frame: "+key.logical);
         fallbacks++;auto base=preload("interface/base.img");if(!base)throw Error("native missing-resource fallback absent");
-        entry.frame=std::make_shared<Frame>(*base->frame(91));entry.frame->actualPath=normalize("interface/base.img");entry.frame->actualFrame=91;entry.fallback=true;
+        entry.frame=std::make_shared<Frame>(*base->frame(91));entry.frame->actualPath=normalize("interface/base.img");entry.frame->actualFrame=91;entry.fallback=true;entry.source=entry.frame->actualPath;
         notifyFrame(entry.frame->actualPath,91);
     }
     // Each logical alias owns its placement/source metadata; decoded pixels stay shared.
     auto frame=entry.frame;resolvedFrames_.emplace(std::move(key),std::move(entry));return frame;
+}
+void Assets::touchImage(const std::string& name){if(images_.contains(name))imageTouches_[name]=++imageClock_;}
+size_t Assets::decodedImageBytes()const{
+    size_t bytes=0;std::unordered_set<const Frame*> frames;std::unordered_set<const Pixels*> pixels;
+    auto addPixels=[&](const std::shared_ptr<Pixels>& value){if(value&&pixels.insert(value.get()).second)bytes+=sizeof(Pixels)+value->rgba.capacity();};
+    auto addFrame=[&](const std::shared_ptr<Frame>& value){if(value&&frames.insert(value.get()).second){bytes+=sizeof(Frame)+value->actualPath.capacity();addPixels(value->texture);}};
+    for(const auto& [name,image]:images_){
+        bytes+=sizeof(decltype(images_)::value_type)+sizeof(void*)*6+name.capacity()+sizeof(Img)+image->data_.capacity();
+        bytes+=image->records_.capacity()*sizeof(std::vector<int32_t>)+image->atlases_.capacity()*sizeof(std::vector<int32_t>);
+        for(const auto& value:image->records_)bytes+=value.capacity()*sizeof(int32_t);
+        for(const auto& value:image->atlases_)bytes+=value.capacity()*sizeof(int32_t);
+        bytes+=(image->offsets_.capacity()+image->atlasOffsets_.capacity())*sizeof(size_t)+image->palettes_.capacity()*sizeof(Bytes);
+        for(const auto& value:image->palettes_)bytes+=value.capacity();
+        bytes+=image->frames_.size()*(sizeof(decltype(image->frames_)::value_type)+sizeof(void*)*4);
+        bytes+=image->atlasTextures_.size()*(sizeof(decltype(image->atlasTextures_)::value_type)+sizeof(void*)*4);
+        for(const auto& [key,value]:image->frames_)addFrame(value);
+        for(const auto& [key,value]:image->atlasTextures_)addPixels(value);
+    }
+    for(const auto& [key,value]:resolvedFrames_){bytes+=sizeof(decltype(resolvedFrames_)::value_type)+sizeof(void*)*4+key.logical.capacity()+value.requested.capacity()+value.source.capacity();addFrame(value.frame);}
+    for(const auto& [key,value]:imageTouches_)bytes+=sizeof(decltype(imageTouches_)::value_type)+sizeof(void*)*4+key.capacity();
+    return bytes;
+}
+void Assets::pruneDecodedImages(size_t budgetBytes){
+    syncSources();if(decodedImageBytes()<=budgetBytes)return;
+    // Logical aliases share the IMG's pixel storage. Drop their small lookup
+    // wrappers together before evicting complete IMG entries by last use.
+    resolvedFrames_.clear();
+    while(!images_.empty()&&decodedImageBytes()>budgetBytes){
+        auto oldest=images_.begin();for(auto it=images_.begin();it!=images_.end();++it)if(imageTouches_.at(it->first)<imageTouches_.at(oldest->first))oldest=it;
+        imageTouches_.erase(oldest->first);images_.erase(oldest);
+    }
 }
 }

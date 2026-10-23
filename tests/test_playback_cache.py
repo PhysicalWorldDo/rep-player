@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class PlaybackCacheTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.folder = ROOT / 'validation' / 'release_103' / 'memory' / uuid.uuid4().hex[:8]
+        cls.folder = ROOT / 'validation' / 'load_stage1_20261023' / 'cache' / 'playback' / uuid.uuid4().hex[:8]
         cls.client = cls.folder / 'client'
         packs = cls.client / 'ImagePacks2'
         replay = cls.client / 'Replay'
@@ -94,11 +94,14 @@ class PlaybackCacheTests(unittest.TestCase):
 
     def test_switching_replays_keeps_committed_memory_bounded_and_playback_correct(self):
         report = self.run_mode('playback')
-        # GPU driver/heap setup can raise the initial high-water mark. Growth
-        # after eight complete switches catches retained historical textures
-        # without depending on that one-time allocator cost.
+        # The first 16 switches populate the bounded cross-REP warm cache.
+        # The latter two passes must settle instead of accumulating history;
+        # low-byte-budget weak ownership eviction is tested in test_load_cache.
+        self.assertEqual(len(report['samples']), 64)
         self.assertLess(report['settled_growth_bytes'], 16 * 1024 * 1024,
                         'Completed REP switches accumulate old decoded and GPU textures')
+        self.assertLess(report['growth_bytes'], 256 * 1024 * 1024,
+                        'Cross-REP cache population exceeds its declared total budget')
         self.assertTrue(report['switched_pixels'])
         self.assertTrue(report['same_replay_pixels'])
         self.assertTrue(report['error_recovered'])

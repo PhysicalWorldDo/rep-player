@@ -11,17 +11,43 @@
 #include "migration_table.hpp"
 
 namespace rep {
+static void checkCancelled(const std::function<bool()>& cancelled){
+    if(cancelled&&cancelled())throw Error("REP loading cancelled");
+}
+static unsigned resourceCodePage(const ReplayOptions& options,const Header& header){
+    return options.resourceCodePage.value_or(header.country==4?936:dnfProfile(options.profile)?CP_ACP:949);
+}
+struct ReplayData {
+    Bytes compressedTimeline;
+    int version=10;
+    uint32_t versionBits=0;
+    ReplayOptions options;
+    Header header;
+    std::unordered_map<uint32_t,Command> dictionary;
+    std::vector<std::string> rawResources,resources;
+    std::vector<Bytes> resourceBytes;
+    std::vector<const Command*> dense;
+    uint64_t migrations=0;
+    bool hasCompatibilityIgnored=false;
+    ReplayData(const std::filesystem::path& path,ReplayOptions requestedOptions,const std::function<bool()>& cancelled);
+};
 std::span<const uint8_t> Reader::take(size_t n) {
     if(n>remaining()) throw Error("truncated structure at byte "+std::to_string(pos));
     auto s=data_.subspan(pos,n); pos+=n; return s;
 }
 uint32_t crc(std::span<const uint8_t> d) { return uint32_t(crc32(0,d.data(),uInt(d.size()))); }
-Bytes readFile(const std::filesystem::path& p) {
+Bytes readFile(const std::filesystem::path& p,const std::function<bool()>& cancelled) {
+    checkCancelled(cancelled);
     std::ifstream f(p,std::ios::binary|std::ios::ate);
     if(!f) throw Error("cannot open "+utf8(p.wstring()));
     auto n=f.tellg(); if(n<0) throw Error("cannot obtain file length");
-    Bytes b(static_cast<size_t>(n)); f.seekg(0); f.read(reinterpret_cast<char*>(b.data()),b.size());
-    if(!f) throw Error("truncated file read"); return b;
+    Bytes b(static_cast<size_t>(n)); f.seekg(0);
+    for(size_t position=0;position<b.size();){
+        checkCancelled(cancelled);auto length=std::min<size_t>(1048576,b.size()-position);
+        f.read(reinterpret_cast<char*>(b.data()+position),length);
+        if(!f) throw Error("truncated file read");position+=length;
+    }
+    checkCancelled(cancelled);return b;
 }
 std::string utf8(std::wstring_view t) {
     if(t.empty()) return {};
@@ -42,7 +68,7 @@ const char* profileName(ProtocolProfile profile) {
     return dnfProfile(profile)?"dnf-july":"dfo";
 }
 unsigned Replay::effectiveCodePage() const {
-    return options.resourceCodePage.value_or(header.country==4?936:dnfProfile(options.profile)?CP_ACP:949);
+    return resourceCodePage(options,header);
 }
 static std::string hexBytes(std::span<const uint8_t> bytes) {
     constexpr char digits[]="0123456789abcdef";std::string out;out.reserve(bytes.size()*2);
@@ -83,7 +109,7 @@ public:
     }
     template<class T> T get() { T v; read(&v,sizeof(v)); return v; }
 };
-Bytes inflateAll(std::span<const uint8_t> in) {
+Bytes inflateAll(std::span<const uint8_t> in,const std::function<bool()>& cancelled) {
     Bytes out;
     z_stream z{}; z.next_in=const_cast<Bytef*>(in.data()); z.avail_in=uInt(in.size());
     if(inflateInit(&z)!=Z_OK) throw Error("inflate initialization failed");
@@ -91,6 +117,7 @@ Bytes inflateAll(std::span<const uint8_t> in) {
     std::array<uint8_t,131072> b{};
     int r;
     do {
+        checkCancelled(cancelled);
         z.next_out=b.data(); z.avail_out=b.size(); r=inflate(&z,Z_NO_FLUSH);
         if(r!=Z_OK&&r!=Z_STREAM_END) throw Error("invalid dictionary zlib stream");
         out.insert(out.end(),b.begin(),b.begin()+b.size()-z.avail_out);
@@ -267,12 +294,13 @@ static int64_t timeValue(int y,int m,int d,int seconds,int millis=0) {
     if(!date.ok())return 0;
     return duration_cast<milliseconds>(sys_days{date}.time_since_epoch()).count()+int64_t(seconds)*1000+millis;
 }
-static void migrate(Replay& r) {
+static void migrate(ReplayData& r,const std::function<bool()>& cancelled) {
     const auto& t=r.header.recorded;
     auto recorded=timeValue(t[0],t[1],t[3],t[4]*3600+t[5]*60+t[6],t[7]);if(!recorded)return;
     auto date=r.header.buildDate;auto built=timeValue(date/10000,date/100%100,date%100,r.header.buildSeconds);
     bool legacy=r.version<=13;if(!legacy&&!built)return;
     for(size_t id=0;id<r.resources.size();++id) {
+        checkCancelled(cancelled);
         auto key=canonical(r.resources[id]);int64_t best=INT64_MAX;const Migration* chosen=nullptr;
         for(const auto& rule:migrationTable) {
             if(rule.legacy!=legacy||key!=rule.source)continue;
@@ -284,10 +312,15 @@ static void migrate(Replay& r) {
         if(chosen){r.resources[id]=chosen->target;++r.migrations;}
     }
 }
-Replay::Replay(const std::filesystem::path& path,ReplayOptions requestedOptions):options(requestedOptions) {
-    auto data=readFile(path);Reader r(data);auto checksum=r.get<uint32_t>(),size=r.get<uint32_t>();
+ReplayData::ReplayData(const std::filesystem::path& path,ReplayOptions requestedOptions,const std::function<bool()>& cancelled):options(requestedOptions) {
+    auto data=readFile(path,cancelled);Reader r(data);auto checksum=r.get<uint32_t>(),size=r.get<uint32_t>();
     if(size!=data.size()-8)throw Error("invalid REP declared file length");
-    if(checksum!=crc(std::span(data).subspan(8)))throw Error("invalid REP payload CRC32");
+    uint32_t actualChecksum=0;
+    for(size_t position=8;position<data.size();){
+        checkCancelled(cancelled);auto length=std::min<size_t>(1048576,data.size()-position);
+        actualChecksum=uint32_t(crc32(actualChecksum,data.data()+position,uInt(length)));position+=length;
+    }
+    if(checksum!=actualChecksum)throw Error("invalid REP payload CRC32");
     if(r.get<uint8_t>()!=1)throw Error("invalid REP version tag");
     versionBits=r.get<uint32_t>();
     constexpr std::array<uint32_t,9> registeredVersions{
@@ -301,10 +334,11 @@ Replay::Replay(const std::filesystem::path& path,ReplayOptions requestedOptions)
     version=10+int(registered-registeredVersions.begin());
     if(r.get<uint8_t>()!=0)throw Error("invalid REP header tag");
     header=decodeHeader(r.take(r.get<uint32_t>()),version);
-    auto b=r.take(r.get<uint32_t>());compressedTimeline_.assign(b.begin(),b.end());
-    auto dict=inflateAll(r.take(r.get<uint32_t>()));r.end();Reader d(dict);
+    auto b=r.take(r.get<uint32_t>());compressedTimeline.assign(b.begin(),b.end());
+    auto dict=inflateAll(r.take(r.get<uint32_t>()),cancelled);r.end();Reader d(dict);
     Bytes previous;int64_t largest=-1;auto count=d.get<uint32_t>();
     while(count--) {
+        checkCancelled(cancelled);
         auto id=d.get<uint32_t>();auto n=version>=15?d.get<uint16_t>():d.get<uint32_t>();auto s=d.take(n);Bytes raw(s.begin(),s.end());
         if(dictionary.contains(id))throw Error("duplicate dictionary ID");
         if(n>largest)largest=n;else {if(previous.size()<n)throw Error("short XOR predecessor");for(size_t k=0;k<n;k++)raw[k]^=previous[k];}
@@ -315,6 +349,7 @@ Replay::Replay(const std::filesystem::path& path,ReplayOptions requestedOptions)
     }
     count=d.get<uint32_t>();resources.reserve(count);resourceBytes.reserve(count);
     while(count--) {
+        checkCancelled(cancelled);
         auto resourceId=resources.size();
         if(version>=15&&!d.get<uint8_t>()){resources.emplace_back();resourceBytes.emplace_back();continue;}
         auto n=version>=15?d.get<uint16_t>():d.get<uint32_t>();auto s=d.take(size_t(n)+1);
@@ -322,17 +357,24 @@ Replay::Replay(const std::filesystem::path& path,ReplayOptions requestedOptions)
         resourceBytes.emplace_back(s.begin(),s.end()-1);
         auto end=std::find(s.begin(),s.end(),0);auto text=std::string_view(reinterpret_cast<const char*>(s.data()),end-s.begin());
         if(options.decodeResourceStrings) {
-            try{resources.push_back(utf8(wide(text,effectiveCodePage())));}
-            catch(const Error& e){throw Error("resource string "+std::to_string(resourceId)+" codepage "+std::to_string(effectiveCodePage())+": "+e.what()+"; raw_hex="+hexBytes(resourceBytes.back()));}
+            try{resources.push_back(utf8(wide(text,resourceCodePage(options,header))));}
+            catch(const Error& e){throw Error("resource string "+std::to_string(resourceId)+" codepage "+std::to_string(resourceCodePage(options,header))+": "+e.what()+"; raw_hex="+hexBytes(resourceBytes.back()));}
         }else resources.emplace_back();
     }
-    d.end();rawResources=resources;if(options.decodeResourceStrings)migrate(*this);
-    uint32_t max=0;for(auto& [id,c]:dictionary)max=std::max(max,id);
-    if(max<1000000){dense.resize(size_t(max)+1);for(auto& [id,c]:dictionary)dense[id]=&c;}
-    rewind();
+    d.end();rawResources=resources;if(options.decodeResourceStrings)migrate(*this,cancelled);
+    uint32_t max=0;for(auto& [id,c]:dictionary){checkCancelled(cancelled);max=std::max(max,id);}
+    if(max<1000000){dense.resize(size_t(max)+1);for(auto& [id,c]:dictionary){checkCancelled(cancelled);dense[id]=&c;}}
+    checkCancelled(cancelled);
 }
+Replay::Replay(std::shared_ptr<const ReplayData> data)
+    :data_(std::move(data)),version(data_->version),versionBits(data_->versionBits),options(data_->options),header(data_->header),
+     dictionary(data_->dictionary),rawResources(data_->rawResources),resources(data_->resources),resourceBytes(data_->resourceBytes),
+     dense(data_->dense),migrations(data_->migrations),hasCompatibilityIgnored(data_->hasCompatibilityIgnored){rewind();}
+Replay::Replay(const std::filesystem::path& path,ReplayOptions options,const std::function<bool()>& cancelled)
+    :Replay(std::make_shared<ReplayData>(path,options,cancelled)){}
+Replay::Replay(const Replay& source):Replay(source.data_){}
 Replay::~Replay()=default;
-void Replay::rewind(){timeline_=std::make_unique<Timeline>(compressedTimeline_);ordinal_=0;}
+void Replay::rewind(){timeline_=std::make_unique<Timeline>(data_->compressedTimeline);ordinal_=0;}
 const Command* Replay::command(uint32_t id) const {
     if(!dense.empty())return id<dense.size()?dense[id]:nullptr;
     auto it=dictionary.find(id);return it==dictionary.end()?nullptr:&it->second;

@@ -1,10 +1,11 @@
-REP 播放器 1.2.1
+REP 播放器 1.2.2
 
 完整解压 Windows x64 运行包后，双击 rep_player.exe。
 保留 WebView2Loader.dll 和 resources；运行需要 Windows 10/11 x64、D3D11 和 Microsoft Edge WebView2 Runtime。
 点击“选择客户端”，选择包含 Replay 和 ImagePacks2 的客户端根目录。
 
 支持分层录像列表、中英技能搜索、打开指定 REP、逐帧查看、IMG 隐藏及 MOV / MP4 / PNG 导出。
+可切换客户端 Replay 和自定义目录；自定义目录支持子目录、刷新与搜索，目录和来源重启恢复，切换列表不打断播放。
 点击 IMG 行可在预览中用黄色轮廓定位素材，同路径的当前实例一起高亮；再点同一行或按 Esc 清除。
 高亮跟随播放、暂停、逐帧和预览尺寸，切换 REP 清除；显隐复选框保持独立，高亮不进入导出。
 描边用于定位源素材轮廓；仅作遮罩、着色器输入或离屏输入的资源可能没有独立轮廓，面板会提示。
@@ -27,7 +28,7 @@ MOV/MP4 可选择包含音频，默认开启；预览静音和音量不影响导
 中国区录像自动使用 GBK / CP936；国服客户端采用独立字体注册和中文缺字回退。
 旧武器路径缺失时支持调色板编号回退；界面仅有 (2x) 资源时，按一半尺寸及 IMG 偏移绘制，录像坐标不变。
 声音仅还原已记录且资源可用的内容，不保证与原客户端逐采样一致。
-切换不同录像时释放旧素材缓存，视频临时文件使用后自动回收。
+同录像重播复用解析和热缓存，切换录像按容量预算保留可复用素材；刷新 NPK 或切客户端会清空旧缓存。视频临时文件使用后自动回收。
 DNF 默认启用有限兼容模式；出现“兼容播放”提示时，部分未识别指令已跳过，画面可能与客户端不同。
 
 NPK 补丁支持：
@@ -42,4 +43,4 @@ NPK 补丁支持：
 同包内其他有效 IMG 继续使用，预览、逐帧与导出的资源选择保持一致。
 
 完整使用说明：https://github.com/PhysicalWorldDo/rep-player/blob/main/README.md
-下载：https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.2.1
+下载：https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.2.2

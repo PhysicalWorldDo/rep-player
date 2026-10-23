@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <span>
@@ -30,8 +31,8 @@ template<class T> T at(std::span<const uint8_t> data,size_t offset) {
 }
 template<class T,class C> void put(C& data,size_t offset,T v) { std::memcpy(data.data()+offset,&v,sizeof(T)); }
 uint32_t crc(std::span<const uint8_t> data);
-Bytes inflateAll(std::span<const uint8_t> data);
-Bytes readFile(const std::filesystem::path& path);
+Bytes inflateAll(std::span<const uint8_t> data,const std::function<bool()>& cancelled={});
+Bytes readFile(const std::filesystem::path& path,const std::function<bool()>& cancelled={});
 std::string utf8(std::wstring_view text);
 std::wstring wide(std::string_view text, unsigned codepage=65001);
 std::string canonical(std::string text);
@@ -96,24 +97,29 @@ struct Statistics {
     bool exactEof=false;
 };
 class Timeline;
+struct ReplayData;
 class Replay {
-    Bytes compressedTimeline_;
+    std::shared_ptr<const ReplayData> data_;
     std::unique_ptr<Timeline> timeline_;
     uint64_t ordinal_=0;
+    explicit Replay(std::shared_ptr<const ReplayData> data);
 public:
-    int version=10;
-    uint32_t versionBits=0;
-    ReplayOptions options;
-    Header header;
-    std::unordered_map<uint32_t,Command> dictionary;
-    std::vector<std::string> rawResources,resources;
-    std::vector<Bytes> resourceBytes;
-    std::vector<Command*> dense;
-    uint64_t migrations=0;
-    bool hasCompatibilityIgnored=false;
-    explicit Replay(const std::filesystem::path& path,ReplayOptions options={});
+    const int& version;
+    const uint32_t& versionBits;
+    const ReplayOptions& options;
+    const Header& header;
+    const std::unordered_map<uint32_t,Command>& dictionary;
+    const std::vector<std::string>& rawResources;
+    const std::vector<std::string>& resources;
+    const std::vector<Bytes>& resourceBytes;
+    const std::vector<const Command*>& dense;
+    const uint64_t& migrations;
+    const bool& hasCompatibilityIgnored;
+    explicit Replay(const std::filesystem::path& path,ReplayOptions options={},const std::function<bool()>& cancelled={});
     ~Replay();
-    Replay(const Replay&)=delete;
+    // Share validated immutable data, with an independent timeline at its start.
+    Replay(const Replay& source);
+    Replay& operator=(const Replay&)=delete;
     void rewind();
     bool next(Scene& scene);
     const Command* command(uint32_t id) const;

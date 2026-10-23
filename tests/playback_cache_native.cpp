@@ -39,8 +39,10 @@ int wmain(int argc,wchar_t** argv) {try{
         if(!window)throw std::runtime_error("Create regression canvas failed");
         uint64_t first=0,peak=0;uint32_t last=0;bool switched=true,replaySame=true,errorRecovered=false;std::vector<uint64_t> samples;
         {rep::ui::PlaybackController controller(window,root,client,false,rep::ui::Clock::now());
-            for(int n=0;n<16;n++){
-                auto path=client/L"Replay"/(L"cache"+std::to_wstring(n)+L".rep");controller.open(path);auto status=wait(controller,rep::ui::Phase::Ended);
+            // Four passes exercise the bounded warm cache after its initial
+            // population; the first pass is allowed to retain useful assets.
+            for(int n=0;n<64;n++){
+                auto path=client/L"Replay"/(L"cache"+std::to_wstring(n%16)+L".rep");controller.open(path);auto status=wait(controller,rep::ui::Phase::Ended);
                 auto crc=capture(controller);if(n)switched&=crc!=last;last=crc;auto memory=committed();samples.push_back(memory);if(!n)first=memory;peak=std::max(peak,memory);
             }
             controller.replay();wait(controller,rep::ui::Phase::Ended);replaySame=capture(controller)==last;

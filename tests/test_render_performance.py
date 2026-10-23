@@ -28,7 +28,7 @@ inline HRESULT measuredMap(ID3D11DeviceContext* context,ID3D11Buffer* buffer,UIN
 '''
         (cls.folder/'counters.hpp').write_text(counters,encoding='utf-8')
         resources=(ROOT/'src/resources.cpp').read_text(encoding='utf-8')
-        needle='std::shared_ptr<Frame> Assets::decodeFrame(const std::string& name,int index,int palette){'
+        needle='std::shared_ptr<Frame> Assets::decodeFrame(const std::string& name,int index,int palette,std::string* source){'
         assert resources.count(needle)==1
         resources=resources.replace(needle,needle+'measuredDecodeCalls++;')
         (cls.folder/'resources.cpp').write_text('#include "counters.hpp"\n'+resources,encoding='utf-8')

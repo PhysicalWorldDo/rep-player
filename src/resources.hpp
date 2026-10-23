@@ -23,6 +23,7 @@ struct Frame {
     Bytes cropped() const;
 };
 class Img {
+    friend class Assets;
     Bytes data_;
     std::vector<std::vector<int32_t>> records_,atlases_;
     std::vector<size_t> offsets_,atlasOffsets_;
@@ -48,6 +49,9 @@ private:
     std::filesystem::path root_;
     std::unordered_map<std::string,Entry> entries_;
     std::unordered_map<std::string,std::shared_ptr<Img>> images_;
+    std::unordered_map<std::string,uint64_t> imageTouches_;
+    uint64_t imageClock_=0;
+    void touchImage(const std::string& name);
     struct FrameKey {
         std::string logical;
         int index,palette;
@@ -60,7 +64,7 @@ private:
             return value^(std::hash<int>{}(key.palette)+0x9e3779b9u+(value<<6)+(value>>2));
         }
     };
-    struct ResolvedFrame {std::string requested;std::shared_ptr<Frame> frame;bool fallback=false;};
+    struct ResolvedFrame {std::string requested,source;std::shared_ptr<Frame> frame;bool fallback=false;};
     std::unordered_map<FrameKey,ResolvedFrame,FrameKeyHash> resolvedFrames_;
     std::unordered_set<std::string> packages_;
     uint64_t sourceRevision_=0;
@@ -73,16 +77,20 @@ private:
     bool skipPatch(const std::string& name);
     bool patchSource(const std::string& name);
     void syncSources();
-    std::shared_ptr<Frame> decodeFrame(const std::string& name,int index,int palette);
+    std::shared_ptr<Frame> decodeFrame(const std::string& name,int index,int palette,std::string* source);
 public:
-    uint64_t fallbacks=0,decodedFrames=0;
+    uint64_t fallbacks=0,decodedFrames=0,patchValidations=0;
     explicit Assets(std::filesystem::path root,bool patchesEnabled=true);
     explicit Assets(IndexPtr index);
     IndexPtr index()const{return index_;}
     bool patchesEnabled()const;
     uint64_t sourceRevision()const;
     const std::filesystem::path& root()const{return root_;}
-    void clearDecodedImages(){resolvedFrames_.clear();images_.clear();}
+    void clearDecodedImages(){resolvedFrames_.clear();images_.clear();imageTouches_.clear();}
+    // Estimates owned IMG bytes, frame metadata and unique decoded pixels.
+    // External references remain valid when their cache entry is evicted.
+    size_t decodedImageBytes()const;
+    void pruneDecodedImages(size_t budgetBytes);
     using FrameObserver=std::function<void(const std::string&,int)>;
     FrameObserver frameObserver()const{return frameObserver_;}
     void setFrameObserver(FrameObserver observer){frameObserver_=std::move(observer);}

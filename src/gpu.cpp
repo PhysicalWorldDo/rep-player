@@ -128,13 +128,23 @@ struct Output {float4 legacy:POSITION0;float4 color:COLOR0;float2 uv:TEXCOORD0;f
 size_t Gpu::createAllPrograms(){for(const auto& r:shaderRecords)program(r.id);return programs_.size();}
 std::shared_ptr<GpuTexture> Gpu::texture(std::shared_ptr<Pixels> pixels,bool update) {
     if(!pixels)return {};if(auto it=textures_.find(pixels.get());it!=textures_.end()){
+        it->second->lastUse=++textureClock_;
         if(it->second->width==pixels->width&&it->second->height==pixels->height){if(update&&(!pixels->revision||it->second->sourceRevision!=pixels->revision)){flush();context_->UpdateSubresource(it->second->texture.get(),0,nullptr,pixels->rgba.data(),pixels->width*4,0);it->second->sourceRevision=pixels->revision;}return it->second;}
         textures_.erase(it);
     }
-    auto t=std::make_shared<GpuTexture>();t->source=pixels;t->width=pixels->width;t->height=pixels->height;t->logicalWidth=pixels->logicalWidth?pixels->logicalWidth:pixels->width;t->logicalHeight=pixels->logicalHeight?pixels->logicalHeight:pixels->height;t->sourceRevision=pixels->revision;
+    auto t=std::make_shared<GpuTexture>();t->source=pixels;t->width=pixels->width;t->height=pixels->height;t->logicalWidth=pixels->logicalWidth?pixels->logicalWidth:pixels->width;t->logicalHeight=pixels->logicalHeight?pixels->logicalHeight:pixels->height;t->sourceRevision=pixels->revision;t->lastUse=++textureClock_;
     D3D11_TEXTURE2D_DESC d{};d.Width=t->width;d.Height=t->height;d.MipLevels=1;d.ArraySize=1;d.Format=DXGI_FORMAT_R8G8B8A8_UNORM;d.SampleDesc.Count=1;d.Usage=D3D11_USAGE_DEFAULT;d.BindFlags=D3D11_BIND_SHADER_RESOURCE;
     D3D11_SUBRESOURCE_DATA b{pixels->rgba.data(),UINT(t->width*4),0};check(device_->CreateTexture2D(&d,&b,t->texture.out()),"UploadDecodedIMGTexture");
     check(device_->CreateShaderResourceView(t->texture.get(),nullptr,t->view.out()),"CreateIMGShaderResourceView");textures_[pixels.get()]=t;uploads++;return t;
+}
+size_t Gpu::textureCacheBytes()const{
+    size_t bytes=0;for(const auto& [key,value]:textures_)bytes+=sizeof(GpuTexture)+sizeof(decltype(textures_)::value_type)+sizeof(void*)*4+size_t(value->width)*size_t(value->height)*4+(value->source?sizeof(Pixels)+value->source->rgba.capacity():0);return bytes;
+}
+void Gpu::pruneTextures(size_t budgetBytes){
+    flush();while(!textures_.empty()&&textureCacheBytes()>budgetBytes){
+        auto oldest=textures_.begin();for(auto it=textures_.begin();it!=textures_.end();++it)if(it->second->lastUse<oldest->second->lastUse)oldest=it;
+        textures_.erase(oldest);
+    }
 }
 std::shared_ptr<GpuTexture> Gpu::floatTexture(std::span<const float> v,int w,int h) {
     auto t=std::make_shared<GpuTexture>();t->width=w;t->height=h;D3D11_TEXTURE2D_DESC d{};d.Width=w;d.Height=h;d.MipLevels=1;d.ArraySize=1;d.Format=DXGI_FORMAT_R32G32B32A32_FLOAT;d.SampleDesc.Count=1;d.Usage=D3D11_USAGE_IMMUTABLE;d.BindFlags=D3D11_BIND_SHADER_RESOURCE;

@@ -17,7 +17,7 @@ public:
 };
 void check(HRESULT hr,const char* operation);
 struct Vertex {float position[3]{},color[4]{1,1,1,1},texcoord[8][2]{};};
-struct GpuTexture {Com<ID3D11Texture2D> texture;Com<ID3D11ShaderResourceView> view;std::shared_ptr<Pixels> source;int width=0,height=0,logicalWidth=0,logicalHeight=0;uint64_t sourceRevision=0;};
+struct GpuTexture {Com<ID3D11Texture2D> texture;Com<ID3D11ShaderResourceView> view;std::shared_ptr<Pixels> source;int width=0,height=0,logicalWidth=0,logicalHeight=0;uint64_t sourceRevision=0,lastUse=0;};
 struct Target {GpuTexture image;Com<ID3D11RenderTargetView> view;Com<ID3D11Texture2D> depth;Com<ID3D11DepthStencilView> depthView;};
 struct ImageInput {std::string path;int frame=0;};
 struct Material {
@@ -56,6 +56,7 @@ class Gpu {
     Com<ID3D11RasterizerState> rasterizer_;
     std::unordered_map<int,std::unique_ptr<Program>> programs_;
     std::unordered_map<const Pixels*,std::shared_ptr<GpuTexture>> textures_;
+    uint64_t textureClock_=0;
     std::unordered_map<unsigned,Com<ID3D11BlendState>> blends_;
     std::unordered_map<unsigned,Com<ID3D11DepthStencilState>> stencils_;
     Program& program(int id);
@@ -87,6 +88,9 @@ public:
     void flush();
     void forgetTexture(const Pixels* pixels);
     void resetTextures(){flush();textures_.clear();}
+    // Includes the RGBA GPU allocation and its retained CPU source shadow.
+    size_t textureCacheBytes()const;
+    void pruneTextures(size_t budgetBytes);
     Target* buildHighlightMask(const HighlightFrame& frame,std::string_view selected);
     void drawHighlight(Target& mask,std::array<float,4> placement,int width,int height);
     Bytes readback(Target& target);

@@ -162,6 +162,7 @@ AudioTrack::AudioTrack(const std::filesystem::path& client,const std::filesystem
     impl_->cancelled=cancelled;impl_->profile=replay.options.profile;
     std::unordered_map<uint32_t,std::vector<AudioEvent>> commands;
     for(const auto& [id,command]:replay.dictionary){
+        if(cancelled&&cancelled())throw Error("Audio preparation cancelled");
         for(const auto& i:command.instructions){
             if(i.opcode!=6&&i.opcode!=7&&i.opcode!=41)continue;
             AudioEvent event;event.opcode=i.opcode;
@@ -178,7 +179,8 @@ AudioTrack::AudioTrack(const std::filesystem::path& client,const std::filesystem
     try{while(replay.next(scene)){
         if(cancelled&&cancelled())throw Error("Audio preparation cancelled");
         impl_->duration=std::max<int64_t>(impl_->duration,scene.timestamp);
-        for(auto id:scene.ids)if(auto found=commands.find(id);found!=commands.end())for(auto event:found->second){event.sample=sampleAt(scene.timestamp);impl_->events.push_back(std::move(event));}
+        size_t references=0;
+        for(auto id:scene.ids){if((++references&1023)==0&&cancelled&&cancelled())throw Error("Audio preparation cancelled");if(auto found=commands.find(id);found!=commands.end())for(auto event:found->second){event.sample=sampleAt(scene.timestamp);impl_->events.push_back(std::move(event));}}
     }}catch(...){replay.rewind();throw;}
     replay.rewind();
     std::stable_sort(impl_->events.begin(),impl_->events.end(),[](const AudioEvent& a,const AudioEvent& b){return a.sample<b.sample;});

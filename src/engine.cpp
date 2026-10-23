@@ -24,9 +24,9 @@ static std::vector<ImgCall> dispatchedImages(const Replay& replay,const Instruct
     return calls;
 }
 ReplayInspection inspectReplayImages(Replay& replay,const std::function<bool()>& cancelled){
-    ReplayInspection result;registeredImages(replay,result.images);replay.rewind();Scene scene;
+    ReplayInspection result;registeredImages(replay,result.images);replay.rewind();Scene scene;uint64_t instructions=0;
     while(replay.next(scene)){if(cancelled&&cancelled())return result;result.durationMilliseconds=std::max(result.durationMilliseconds,scene.timestamp);result.scenes++;uint32_t layerId=0;Reader aux(scene.aux);std::vector<const Effect*> effects;unsigned phantom=0;int stencilPhase=0,stencilChannel=-1;
-        for(auto id:scene.ids)if(auto command=replay.command(id))for(const auto& i:command->instructions){auto payload=std::span(command->raw).subspan(i.offset,i.payloadBytes);aux.take(i.auxBytes);if(i.opcode==16)layerId=payload[0];else if(i.opcode==17)layerId=0;
+        for(auto id:scene.ids)if(auto command=replay.command(id))for(const auto& i:command->instructions){if((++instructions&1023)==0&&cancelled&&cancelled())return result;auto payload=std::span(command->raw).subspan(i.offset,i.payloadBytes);aux.take(i.auxBytes);if(i.opcode==16)layerId=payload[0];else if(i.opcode==17)layerId=0;
             if(i.opcode==19&&i.effect.present&&!i.effect.obsolete){if(i.effect.programNull())phantom++;else effects.push_back(&i.effect);}else if(i.opcode==20){if(phantom)phantom--;else if(!effects.empty())effects.pop_back();}else if(i.opcode==40&&i.nativeContextState&&!effects.empty())effects.pop_back();
             if((i.opcode==26||i.opcode==27)&&payload[0]<3){stencilChannel=payload[0];stencilPhase=i.opcode==26?1:2;}else if(i.opcode==29){stencilChannel=-1;stencilPhase=0;}
             auto calls=dispatchedImages(replay,i,payload,i.opcode>=42?i.layer:layerId);bool drawing=std::any_of(calls.begin(),calls.end(),[](const ImgCall& call){return !call.dependency;})||i.opcode==5||i.opcode==48;
@@ -165,6 +165,7 @@ void Executor::attach(Replay& replay){
 void Executor::prepare(const std::function<bool()>& cancelled){
     if(!replay_)return;std::set<std::pair<std::string,int>> requested;
     for(const auto& [id,command]:replay_->dictionary)for(const auto& i:command.instructions){
+        if(cancelled&&cancelled())return;
         auto path=replay_->path(i.resource);
         if(i.opcode==3||i.opcode==4||i.opcode==10||(i.opcode>=42&&i.opcode<=47)||i.opcode==57||i.opcode==58||i.opcode==15){
             if(i.opcode==10)for(auto value:i.instances)requested.emplace(path,value[1]);else requested.emplace(path,i.frame);}
