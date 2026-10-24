@@ -99,6 +99,9 @@ std::shared_ptr<Pixels> Img::atlas(int index) {
 }
 std::shared_ptr<Frame> Img::frameInner(int index,int palette,std::unordered_set<int>& visiting) {
     if(index<0||size_t(index)>=records_.size())throw std::out_of_range("IMG frame out of range");
+    // CN 148C38C10 / 148C38CC0 load one palette for v4/v5;
+    // the filename selector is only meaningful for the v6 palette table.
+    if(version==4||version==5)palette=0;
     uint64_t key=(uint64_t(uint32_t(index))<<32)|uint32_t(palette);if(auto it=frames_.find(key);it!=frames_.end())return it->second;
     if(!visiting.insert(index).second)throw Error("linked IMG frame cycle");
     const auto& a=records_[index];if(a[0]==17)return frames_[key]=frameInner(a[1],palette,visiting);

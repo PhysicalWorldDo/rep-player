@@ -26,6 +26,17 @@ def paletted():
     return header + palettes + struct.pack('<9i', 14, 6, 2, 2, len(pixels), 0, 0, 2, 2) + pixels
 
 
+def single_paletted(version):
+    header = b'Neople Img File\0' + struct.pack('<4I', 44, 0, version, 2)
+    if version == 5:
+        header += struct.pack('<2I', 0, 0)  # no atlases
+    palette = struct.pack('<I', 2) + bytes(4) + bytes(BLUE)
+    pixels = zlib.compress(bytes([1]) * 4)
+    return (header + palette
+            + struct.pack('<9i', 14, 6, 2, 2, len(pixels), 0, 0, 2, 2)
+            + struct.pack('<2i', 17, 0) + pixels)
+
+
 class PalettePathTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -76,6 +87,29 @@ class PalettePathTests(unittest.TestCase):
         samples = json.loads(result.stdout)['samples']
         self.assertEqual([x['pixel'] for x in samples], [list(x) for x in [GREEN, BLUE, RED, GREEN, BLUE]])
         self.assertEqual([x['actual_path'] for x in samples], [BASE + name for name in names])
+
+    def test_v4_and_v5_aliases_use_the_single_palette_for_linked_frames(self):
+        names = ['katana0101c.img', 'katana0111c.img', 'katana0100c.img', 'katana0101c.img']
+        for version in (4, 5):
+            with self.subTest(version=version):
+                packs = self.folder / self._testMethodName / str(version)
+                packs.mkdir(parents=True)
+                write_package(packs / PACKAGE, {BASE + 'katana0100c.img': single_paletted(version)})
+                result = subprocess.run([str(self.exe), str(packs), '1', '1', 'single',
+                                         *[BASE + name for name in names]],
+                                        capture_output=True, text=True, encoding='utf-8')
+                self.assertEqual(result.returncode, 0, result.stderr)
+                samples = json.loads(result.stdout)['samples']
+                self.assertEqual([x['pixel'] for x in samples], [list(BLUE)] * len(names))
+                self.assertEqual([x['actual_path'] for x in samples], [BASE + name for name in names])
+                self.assertEqual([x['actual_frame'] for x in samples], [1] * len(names))
+                self.assertEqual([x['fallbacks'] for x in samples], [0] * len(names))
+
+    def test_v6_alias_out_of_range_is_still_rejected(self):
+        packs = self.packs({BASE + 'katana0100b.img': paletted()})
+        result = self.frame(packs, 'katana0199b.img')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('IMG palette index out of range', result.stderr)
 
     def test_alias_patch_rejection_is_shared_with_another_reader(self):
         packs = self.packs({BASE + 'katana0100b.img': paletted()})
