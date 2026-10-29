@@ -376,6 +376,77 @@ class NativeSceneBranchTests(unittest.TestCase):
         packed=self.render([(effect+draw+op(20),aux)],resource='sprite/packed/frame.img')
         self.assertEqual(packed(7,7),pixel(7,7))
         self.assertEqual(packed(8,8),pixel(8,8))
+    @staticmethod
+    def glow_effect(kind):
+        # Yellow weapon glow preset3, with a black source below so that the
+        # original shaders' RGB-derived blur intensity is independently zero.
+        values=([5.9,.5,1.,1.85]+[0.]*8+[1.,1.,147/255,1.] if kind==14 else
+                [2.,7.,5.9,1.,3.,.7,5465.,.5,1.,1.85,100000.,5470.,1.,1.,1.,147/255,1.,0.,3.])
+        return op(19,b'\1'+struct.pack('<IIBII',kind,len(values),0,0,0)+struct.pack('<%df'%len(values),*values))
+    def glow_black_source(self):
+        raw=bytes([0,0,0,255])*16
+        image=img_header(2,36,1)+rec(16,5,4,4,len(raw),x=0,y=0,full_w=4,full_h=4)+raw
+        (self.assets/'sprite_glow_black.NPK').write_bytes(npk(image,'sprite/glow_black/frame.img'))
+        return 'sprite/glow_black/frame.img'
+    def test_glow_baseline_follows_blend_stack_in_both_directions(self):
+        # Native 146F81780 (StaticBranch) and 147034B30 (Glow) select p0=0
+        # for native blend2 and p0=1 otherwise, regardless of sprite facing.
+        # Since1.7, op19 captures op51 flags when pushing the effect; older
+        # versions use the current global op0 blend selector at draw time.
+        # Both original PSs add p0 to the source's RGB blur intensity. A black
+        # source therefore contributes no additive light even with alpha255.
+        resource=self.glow_black_source()
+        for version in (1.6,1.7):
+            for kind in (14,16):
+                for direction in (0,1):
+                    for blend in (0,2):
+                        with self.subTest(version=version,kind=kind,direction=direction,blend=blend):
+                            draw,aux=legacy(6 if direction==0 else 10,6,direction=direction)
+                            begin=op(51,struct.pack('<H',blend)) if version>=1.7 else op(0,struct.pack('<2I',blend,0))
+                            end=op(52,bytes(2)) if version>=1.7 else op(1)
+                            raw=begin+self.glow_effect(kind)+draw+op(20)+end
+                            self.render([(raw,aux)],version=version,resource=resource)
+                            energy=sum(self.pixels[n] for n in range(len(self.pixels)) if n%4!=3)
+                            if blend==2:self.assertEqual(energy,0)
+                            else:self.assertGreater(energy,0)
+    def test_glow_modern_push_captures_flags_and_legacy_reads_current_stack(self):
+        resource=self.glow_black_source()
+        draw,aux=legacy(6,6)
+        for version in (1.6,1.7):
+            for kind in (14,16):
+                for pushed,current in ((0,2),(2,0)):
+                    with self.subTest(version=version,kind=kind,pushed=pushed,current=current):
+                        begin=lambda blend:op(51,struct.pack('<H',blend)) if version>=1.7 else op(0,struct.pack('<2I',blend,0))
+                        end=op(52,bytes(2)) if version>=1.7 else op(1)
+                        raw=begin(pushed)+self.glow_effect(kind)+begin(current)+draw+end+op(20)+end
+                        self.render([(raw,aux)],version=version,resource=resource)
+                        energy=sum(self.pixels[n] for n in range(len(self.pixels)) if n%4!=3)
+                        native=pushed if version>=1.7 else current
+                        if native==2:self.assertEqual(energy,0)
+                        else:self.assertGreater(energy,0)
+    def test_static_glow_cached_material_distinguishes_blend_stack(self):
+        resource=self.glow_black_source()
+        draw,aux=legacy(6,6)
+        # Both records reuse the same dictionary Effect and source texture,
+        # so the material cache must distinguish the native blend input.
+        header=b'\x0b\0'+struct.pack('<8h',16,16,16,16,16,16,16,16)+b'\x0c'+struct.pack('<H',7)+bytes(126)
+        for version in (1.6,1.7):
+            begin=lambda blend:op(51,struct.pack('<H',blend)) if version>=1.7 else op(0,struct.pack('<2I',blend,0))
+            end=op(52,bytes(2)) if version>=1.7 else op(1)
+            commands={0:begin(0),1:begin(2),2:self.glow_effect(16),3:draw,4:op(20)+end}
+            commands=dict(sorted(commands.items(),key=lambda p:len(p[1])))
+            for first,last in ((0,1),(1,0)):
+                with self.subTest(version=version,first=first,last=last):
+                    path=self.folder/('glow_cache_%.1f_%d_%d.rep'%(version,first,last))
+                    timeline=[(0,(first,2,3,4),aux),(10,(last,2,3,4),aux)]
+                    path.write_bytes(pack_replay(version,commands,timeline,[resource],header=header))
+                    report=path.with_suffix('.json');rgba=path.with_suffix('.rgba')
+                    result=subprocess.run([str(ROOT/'build'/'rep_gpu.exe'),'--consume',str(path),str(report),str(rgba),str(self.assets)],capture_output=True,text=True)
+                    self.assertEqual(result.returncode,0,result.stderr)
+                    self.assertTrue(json.loads(report.read_text())['exact_eof'])
+                    pixels=rgba.read_bytes();energy=sum(pixels[n] for n in range(len(pixels)) if n%4!=3)
+                    if last==1:self.assertEqual(energy,0)
+                    else:self.assertGreater(energy,0)
     def test_rotated_special_quad_uses_physical_source_and_swaps_extents(self):
         draw,aux=legacy(2,2,special=1,pivot=(2,0),source=(1,0,4,2),scale=(4/3,2))
         pixel=self.render([(draw,aux)],resource='sprite/rotated/frame.img')

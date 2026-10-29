@@ -64,7 +64,7 @@ Material Binder::bind(const Effect* e,std::shared_ptr<GpuTexture> source,ShaderC
         }
     };
     if(!c.transientSource&&e&&(e->type==16||e->type==17||e->type==57)){
-        CacheKey key{e,source.get(),c.width,c.height,c.channel,c.direction,c.directSource};auto it=materials_.find(key);if(it!=materials_.end()){for(auto& input:it->second.inputs)assets_.notifyFrame(input.path,input.frame);return it->second;}
+        CacheKey key{e,source.get(),c.width,c.height,c.channel,c.direction,c.directSource,c.additiveBlend};auto it=materials_.find(key);if(it!=materials_.end()){for(auto& input:it->second.inputs)assets_.notifyFrame(input.path,input.frame);return it->second;}
         auto material=stableCreate();materials_[key]=material;return material;
     }
     return stableCreate();
@@ -100,7 +100,7 @@ Material Binder::bindUncached(const Effect* e,std::shared_ptr<GpuTexture> source
     case 11:if(mode==0){require(2);m.program=programId("spriteEffect_HS");range(0,2);}else if(mode==1){require(4);m.program=programId("spriteEffect_ExceptColor");range(0,4);}else throw Error("invalid HS mode");break;
     case 12:require(29);m.program=programId("Sprite_Dissolve");params({f[9],f[10],f[23]*f[24],f[17],f[18],f[19]});extra({f[21],float(bool(f[22])),float(bool(f[26])),0});tex(1,int(f[25]),1);break;
     case 13:require(17);m.elapsed=f[2];extraRange(3,4);if(mode==0){m.program=programId("Sprite_Metal");m.parameters[0]=1;}else if(mode==1){m.program=programId("Sprite_Mask_Metal");params({1,0,f[11],f[12],f[13],f[14]});tex(1,6);}else throw Error("invalid Metal mode");break;
-    case 14:require(16);m.program=programId("Sprite_Glow");extraRange(12,4);params({1,0,f[0],f[1],f[2],f[3]});break;
+    case 14:require(16);m.program=programId("Sprite_Glow");extraRange(12,4);params({c.additiveBlend?0.f:1.f,0,f[0],f[1],f[2],f[3]});break;
     case 29:require(2);m.program=programId("sprite_MaskBlur");canvas();params({float(c.canvas->width),float(c.canvas->height),f[0],f[1],0,0});break;
     case 15:{require(27);const char* names[]={"Sprite_Shiny","Sprite_OnlyShiny_with_maskTex","Sprite_OnlyShiny_Overlay","Sprite_OnlyShiny"};if(mode<0||mode>=4)throw Error("invalid Shiny mode");m.program=programId(names[mode]);params({f[3],f[2],f[14],f[15],f[16],f[17]});extra({f[8],f[7],0,0,f[10],f[11],f[12],f[13]});if(mode==1)tex(1,5);break;}
     case 16:{
@@ -110,7 +110,8 @@ Material Binder::bindUncached(const Effect* e,std::shared_ptr<GpuTexture> source
         auto name=staticName(flags);
         // 146F7FB30 resolves selector 116 through the builtin draw program (4),
         // including effects without a preset tail. Its UVs retain IMG padding/atlas mapping.
-        m.program=name=="StaticBranch_Draw"?4:programId(name);params({float(c.direction),0,0,0,1,1});
+        // 146F81780 uses the effect's blend selector, not sprite facing.
+        m.program=name=="StaticBranch_Draw"?4:programId(name);params({c.additiveBlend?0.f:1.f,0,0,0,1,1});
         if(groups.contains(1)){auto& g=groups[1];scalar(2,g[0]);color(3,g.data()+3);m.elapsed=g[1];}
         if(groups.contains(2)){auto& g=groups[2];scalar(4,g[1]);scalar(5,g[6]);scalar(6,g[7]);scalar(7,g[8]);color(8,g.data()+12);m.elapsed=g[10];}
         for(int bit:{16,128,256,64})if(groups.contains(bit)){auto& g=groups[bit];scalar(9,g[1]);scalar(10,g[2]);color(11,g.data()+4);scalar(12,g[11]);scalar(13,g[12]);break;}

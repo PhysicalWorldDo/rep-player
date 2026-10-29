@@ -7,7 +7,7 @@ struct ShaderContext {
     int width=0,height=0,version=14,minor=3,channel=0;
     float x=0,y=0,scaleX=1,scaleY=1;
     int direction=1;
-    bool imagePresent=false,directSource=false,transientSource=false;
+    bool imagePresent=false,directSource=false,transientSource=false,additiveBlend=false;
     float cacheScale=0,cacheX=0,cacheY=0;
     std::shared_ptr<GpuTexture> canvas;
     std::array<std::shared_ptr<GpuTexture>,4> external{};
@@ -17,7 +17,7 @@ struct ShaderContext {
 class Binder {
     Gpu& gpu_;Assets& assets_;Replay* replay_;
     std::unordered_map<uint64_t,std::shared_ptr<Frame>> builtin_;
-    using CacheKey=std::tuple<const Effect*,const GpuTexture*,int,int,int,int,bool>;
+    using CacheKey=std::tuple<const Effect*,const GpuTexture*,int,int,int,int,bool,bool>;
     std::map<CacheKey,Material> materials_;
     uint32_t randomState_=1;
     uint64_t sourceRevision_=0;

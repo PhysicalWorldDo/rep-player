@@ -58,6 +58,7 @@ struct Executor::State {
     std::vector<Blend> blends;
     struct EffectBinding {
         const Effect* effect=nullptr;
+        unsigned blend=0;
         std::shared_ptr<GpuTexture> mask;
         std::shared_ptr<ContextVersion> contextInput;
         size_t contextSlot=0;
@@ -353,6 +354,9 @@ void Executor::draw(Sprite s,State& state){
     auto sourceTexture=gpu_.texture(frame.texture,s.update);ShaderContext c;c.version=replay_->version;c.minor=replay_->header.minor;c.width=originalWidth;c.height=originalHeight;c.channel=s.channel;c.imagePresent=true;c.transientSource=s.update;c.directSource=s.font||s.sourceRect.has_value()||s.params[36]||(quad2&&s.instruction->native[16]);c.x=m.x;c.y=m.y;c.scaleX=at<float>(s.params,20);c.scaleY=at<float>(s.params,24);c.direction=s.params[6]==1?0:1;
     auto& destination=renderTarget(s.context);
     const Effect* effect=state.effects.empty()?nullptr:state.effects.back().effect;
+    // REP >=1.7 captures the renderer flags when the effect is pushed
+    // (146FDB440 -> 146FA26C0). Older effects query the active blend stack.
+    c.additiveBlend=replay_->version>=17?(!state.effects.empty()&&state.effects.back().blend==2):(!state.blends.empty()&&state.blends.back().type==2);
     Effect contextEffect;
     if(effect&&state.effects.back().mask){
         auto mask=state.effects.back().mask;contextEffect=*effect;
@@ -551,7 +555,7 @@ void Executor::interpret(const Scene& scene){
             case 15:capture(i,payload,true,state);break;
             case 16:case 17:layer(state,i,payload,*replay_);break;
             case 18:case 64:if(!payload[4]){auto s=sprite();s.params=drawDefaults();s.x=at<int16_t>(payload,0);s.y=at<int16_t>(payload,2);s.frameIndex=payload[5];s.layer=i.opcode==64?at<uint32_t>(payload,8):state.layer;s.explicitCamera=i.opcode==64;draw(std::move(s),state);}break;
-            case 19:if(i.effect.present&&!i.effect.obsolete){if(i.effect.type<67)statistics.effects[i.effect.type]++;if(i.effect.programNull()){state.phantom++;statistics.phantomPushes++;}else {State::EffectBinding binding{};binding.effect=&i.effect;if(dnfProfile(replay_->options.profile)&&i.effect.type==54&&i.effect.floats.size()==7&&i.effect.floats[6]!=0){int slot=selectedContext_-219;if(contextBound_[slot])if(auto context=resolveContext(slot)){binding.mask=gpu_.view(context->target);binding.contextInput=std::move(context);binding.contextSlot=slot;}}state.effects.push_back(std::move(binding));}}break;
+            case 19:if(i.effect.present&&!i.effect.obsolete){if(i.effect.type<67)statistics.effects[i.effect.type]++;if(i.effect.programNull()){state.phantom++;statistics.phantomPushes++;}else {State::EffectBinding binding{};binding.effect=&i.effect;binding.blend=state.flags;if(dnfProfile(replay_->options.profile)&&i.effect.type==54&&i.effect.floats.size()==7&&i.effect.floats[6]!=0){int slot=selectedContext_-219;if(contextBound_[slot])if(auto context=resolveContext(slot)){binding.mask=gpu_.view(context->target);binding.contextInput=std::move(context);binding.contextSlot=slot;}}state.effects.push_back(std::move(binding));}}break;
             case 20:if(state.phantom)state.phantom--;else if(!state.effects.empty())state.effects.pop_back();break;
             case 21:statistics.nullCaches++;break;
             case 23:{auto instance=at<uint64_t>(payload,8);auto moviePosition=at<uint32_t>(payload,36);auto previousPixels=movies_->pixels(instance);auto frame=movies_->frame(replay_->path(i.resource),instance,moviePosition);if(previousPixels&&(!frame||previousPixels.get()!=frame->texture.get()))gpu_.forgetTexture(previousPixels.get());if(!frame)break;auto s=sprite();s.opcode=3;s.params=drawDefaults();s.frame=frame;s.x=at<int32_t>(payload,16);s.y=at<int32_t>(payload,20);s.layer=i.layer;s.explicitCamera=replay_->version>=17;s.update=true;put(s.params,28,0.f);put(s.params,32,0.f);put(s.params,20,at<float>(payload,24));put(s.params,24,at<float>(payload,28));put(s.params,8,movies_->color(instance,at<uint32_t>(payload,32),replay_->version>=17));auto oldClip=state.clip;std::array<int,4> movieClip;bool any=false;for(int n=0;n<4;n++){movieClip[n]=at<int16_t>(payload,40+n*2);any|=movieClip[n]!=0;}if(any){for(int n=0;n<4;n++)state.clip[n]=n<2?std::max(oldClip[n],movieClip[n]):std::min(oldClip[n],movieClip[n]);if(state.clip[0]>=state.clip[2]||state.clip[1]>=state.clip[3])state.clip=canvasClip();}draw(std::move(s),state);state.clip=oldClip;break;}
