@@ -220,12 +220,12 @@ class ProtocolRenderAdaptationTests(unittest.TestCase):
             self.assertEqual(snapshot['crc'], snapshot['reference_crc'], snapshot)
         return report['snapshots']
 
-    def test_cn_cached_context_refresh_rebuilds_entry_texture_state(self):
+    def test_cn_cached_context_refresh_uses_current_scene_entry_texture(self):
         snapshots = self.cached_context_navigation('next,next,hide,hide,prev,next')
         self.assertEqual([v['ordinal'] for v in snapshots], [0, 1, 1, 1, 0, 1])
         self.assertTrue(all(v['paused'] for v in snapshots))
 
-    def test_cn_cached_context_select_executes_skipped_scene_dependencies(self):
+    def test_cn_cached_context_select_does_not_execute_skipped_scene(self):
         snapshots = self.cached_context_navigation('select=100,hide')
         self.assertEqual([v['ordinal'] for v in snapshots], [1, 1])
 

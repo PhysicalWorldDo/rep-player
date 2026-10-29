@@ -2,8 +2,27 @@
 #include <algorithm>
 #include <fstream>
 #include <mutex>
+#include <condition_variable>
+#include <chrono>
+#include <deque>
+#include <thread>
 
 namespace rep {
+namespace {
+using ResourceCancelled=ImagePreparationCancelled;
+thread_local std::function<bool()> resourceCancellation;
+struct ResourceCancellationScope {
+    std::function<bool()> previous;
+    explicit ResourceCancellationScope(std::function<bool()> callback):previous(std::move(resourceCancellation)){resourceCancellation=std::move(callback);}
+    ~ResourceCancellationScope(){resourceCancellation=std::move(previous);}
+};
+void checkResourceCancelled(const std::function<bool()>& callback){if(callback&&callback())throw ResourceCancelled{};}
+auto lockImage(std::recursive_timed_mutex& mutex,const std::function<bool()>& cancelled){
+    std::unique_lock<std::recursive_timed_mutex> lock(mutex,std::defer_lock);
+    while(!lock.try_lock_for(std::chrono::milliseconds(2)))checkResourceCancelled(cancelled);
+    checkResourceCancelled(cancelled);return lock;
+}
+}
 std::shared_ptr<Pixels> nativeImageTexture(std::shared_ptr<Pixels> pixels){
     int w=pixels->width,h=pixels->height;pixels->logicalWidth=w;pixels->logicalHeight=h;
     if(w<=512&&h<=512){auto power=[](int n){int p=16;while(p<n)p*=2;return p;};int pw=power(w),ph=power(h);
@@ -98,6 +117,7 @@ std::shared_ptr<Pixels> Img::atlas(int index) {
     if(raw.size()!=size_t(a[4]))throw Error("atlas raw length mismatch");return atlasTextures_[index]=nativeImageTexture(rawPixels(raw,a[1],a[5],a[6]));
 }
 std::shared_ptr<Frame> Img::frameInner(int index,int palette,std::unordered_set<int>& visiting) {
+    checkResourceCancelled(resourceCancellation);
     if(index<0||size_t(index)>=records_.size())throw std::out_of_range("IMG frame out of range");
     // CN 148C38C10 / 148C38CC0 load one palette for v4/v5;
     // the filename selector is only meaningful for the v6 palette table.
@@ -120,15 +140,20 @@ std::shared_ptr<Frame> Img::frameInner(int index,int palette,std::unordered_set<
         f->texture=nativeImageTexture(rawPixels(s,a[0],f->width,f->height,p));f->rect={0,0,f->width,f->height};}
     return frames_[key]=f;
 }
-std::shared_ptr<Frame> Img::frame(int index,int palette){std::unordered_set<int> visiting;return frameInner(index,palette,visiting);}
+std::shared_ptr<Frame> Img::frame(int index,int palette,const std::function<bool()>& cancelled){auto lock=lockImage(mutex_,cancelled);ResourceCancellationScope scope(cancelled);std::unordered_set<int> visiting;return frameInner(index,palette,visiting);}
 void Img::validateFrames(){
+    auto cancelled=resourceCancellation;validateFrames(cancelled);
+}
+void Img::validateFrames(const std::function<bool()>& cancelled){
+    auto lock=lockImage(mutex_,cancelled);ResourceCancellationScope scope(cancelled);
     for(size_t i=0;i<records_.size();++i){
+        checkResourceCancelled(cancelled);
         if(records_[i][0]==17){
             std::unordered_set<int> visiting;int target=int(i);
             while(true){if(target<0||size_t(target)>=records_.size())throw Error("IMG link target out of range");
                 if(!visiting.insert(target).second)throw Error("linked IMG frame cycle");
                 if(records_[target][0]!=17)break;target=records_[target][1];}
-        }else{frame(int(i));frames_.clear();}
+        }else{frame(int(i),0,cancelled);frames_.clear();}
     }
     atlasTextures_.clear();
 }
@@ -143,11 +168,108 @@ struct Assets::Index {
     struct RejectedPatches {std::mutex mutex;std::unordered_set<std::string> paths,validated;uint64_t revision=0;};
     std::shared_ptr<RejectedPatches> rejected=std::make_shared<RejectedPatches>();
 };
+struct Assets::PendingImage {
+    std::mutex mutex;std::condition_variable condition;bool done=false;
+    uint64_t revision=0;std::shared_ptr<Img> image;std::exception_ptr error;
+};
+struct Assets::Prefetch {
+    using Clock=std::chrono::steady_clock;
+    struct Job {
+        FrameKey key;int priority=2;uint64_t generation=0,epoch=0,revision=0;
+        std::function<bool()> cancelled;Clock::time_point queuedAt=Clock::now();
+        enum State {Pending,Running,Done} state=Pending;
+        std::mutex mutex;std::condition_variable condition;bool done=false,aborted=false;
+        std::weak_ptr<Frame> frame;std::exception_ptr error;
+        std::weak_ptr<Img> image;
+    };
+    Assets& owner;std::mutex mutex;std::condition_variable condition;
+    std::atomic<bool> quitting=false;std::atomic<uint64_t> epoch=1;uint64_t generation=0;
+    std::array<std::deque<std::shared_ptr<Job>>,3> queues;
+    std::unordered_map<FrameKey,std::shared_ptr<Job>,FrameKeyHash> jobs;
+    std::deque<std::shared_ptr<Job>> ready;
+    PrefetchStats stats;std::thread thread;
+    explicit Prefetch(Assets& assets):owner(assets),thread([this]{run();}){}
+    ~Prefetch(){quitting=true;epoch++;condition.notify_all();if(thread.joinable())thread.join();}
+    void cancelLocked(){
+        epoch++;ready.clear();
+        for(auto& [key,job]:jobs)if(job->state==Job::Pending){
+            job->state=Job::Done;{std::lock_guard lock(job->mutex);job->done=job->aborted=true;}
+            job->condition.notify_all();stats.cancelled++;if(stats.pendingJobs)stats.pendingJobs--;
+        }
+        for(auto& queue:queues)queue.clear();jobs.clear();
+    }
+    void run(){
+        while(!quitting){
+            std::shared_ptr<Job> job;
+            {std::unique_lock lock(mutex);condition.wait(lock,[&]{return quitting||!queues[0].empty()||!queues[1].empty()||!queues[2].empty();});
+                if(quitting)break;
+                for(int priority=0;priority<3&&!job;priority++)while(!queues[priority].empty()){
+                    auto candidate=std::move(queues[priority].front());queues[priority].pop_front();
+                    if(candidate->state==Job::Pending&&candidate->priority==priority){job=std::move(candidate);job->state=Job::Running;break;}
+                }}
+            if(!job)continue;
+            const auto began=Clock::now();std::shared_ptr<Frame> frame;std::shared_ptr<Img> image;std::exception_ptr error;bool aborted=false;
+            auto cancelled=[this,job]{return quitting.load()||epoch.load()!=job->epoch||(job->cancelled&&job->cancelled());};
+            try{checkResourceCancelled(cancelled);if(owner.sourceRevision()!=job->revision)throw ResourceCancelled{};
+                if(job->key.index<0)image=owner.preloadInner(job->key.logical,cancelled);
+                else frame=owner.frameInner(job->key.logical,job->key.index,job->key.palette,true,cancelled);
+                checkResourceCancelled(cancelled);
+            }catch(const ResourceCancelled&){aborted=true;}catch(...){error=std::current_exception();}
+            auto revision=owner.sourceRevision();auto ended=Clock::now();
+            aborted|=cancelled();
+            {std::lock_guard lock(mutex);aborted|=quitting.load()||epoch.load()!=job->epoch;job->state=Job::Done;
+                {std::lock_guard resultLock(job->mutex);job->frame=frame;job->image=image;job->revision=revision;job->error=error;job->aborted=aborted;job->done=true;}
+                if(stats.pendingJobs)stats.pendingJobs--;stats.queueMilliseconds+=std::chrono::duration<double,std::milli>(began-job->queuedAt).count();
+                auto milliseconds=std::chrono::duration<double,std::milli>(ended-began).count();stats.jobMilliseconds+=milliseconds;stats.maxJobMilliseconds=std::max(stats.maxJobMilliseconds,milliseconds);
+                if(aborted)stats.cancelled++;else if(error)stats.failed++;else {stats.completed++;ready.push_back(job);}
+            }
+            job->condition.notify_all();frame.reset();image.reset();
+            // This is the active replay's working set. Its existing Pixels may
+            // already be held by GPU/material entries, so do not evict/redecode
+            // them while warming. The controller prunes retention at REP changes.
+        }
+    }
+};
 Assets::Assets(std::filesystem::path root,bool patchesEnabled):Assets(buildIndex(std::move(root),patchesEnabled)){}
 Assets::Assets(IndexPtr index):index_(std::move(index)){
     if(!index_)throw Error("resource index is absent");
     root_=index_->root;
 }
+Assets::~Assets(){prefetch_.reset();}
+Assets::Prefetch& Assets::prefetchState(){if(!prefetch_)prefetch_=std::make_unique<Prefetch>(*this);return *prefetch_;}
+void Assets::prefetch(const std::vector<FrameRequest>& requests,uint64_t generation,const std::function<bool()>& cancelled){
+    auto& state=prefetchState();auto revision=sourceRevision();std::vector<FrameKey> retouch;
+    {std::lock_guard lock(state.mutex);
+    if(state.generation!=generation){state.cancelLocked();state.generation=generation;}
+    for(const auto& request:requests){if(request.path.empty())continue;FrameKey key{normalize(request.path),request.index,request.palette};
+        auto found=state.jobs.find(key);auto priority=std::clamp(request.priority,0,2);
+        if(found!=state.jobs.end()){
+            auto job=found->second;
+            if(job->revision==revision&&job->epoch==state.epoch){
+                if(job->state==Prefetch::Job::Pending&&priority<job->priority){job->priority=priority;state.queues[priority].push_back(job);}
+                if(job->state!=Prefetch::Job::Done)continue;
+                std::lock_guard resultLock(job->mutex);if(job->error)continue;
+                if(!job->frame.expired()||!job->image.expired()){if(priority<2)retouch.push_back(job->key);continue;}
+            }
+        }
+        auto job=std::make_shared<Prefetch::Job>();job->key=std::move(key);job->priority=priority;job->generation=generation;job->epoch=state.epoch;job->revision=revision;job->cancelled=cancelled;
+        state.jobs[job->key]=job;state.queues[priority].push_back(job);state.stats.queued++;state.stats.pendingJobs++;
+    }
+    state.condition.notify_one();}
+    // Rolling lookahead is reuse, just like a foreground hit. Refresh its real
+    // source after releasing the queue lock so source invalidation cannot invert
+    // queue/cache lock order. No additional strong references pin the window.
+    if(!retouch.empty()){std::lock_guard lock(mutex_);syncSources();for(const auto& key:retouch){auto found=resolvedFrames_.find(key);if(found!=resolvedFrames_.end())touchImage(found->second.source);else if(key.index<0)touchImage(key.logical);}}
+}
+void Assets::cancelPrefetch(){if(prefetch_){std::lock_guard lock(prefetch_->mutex);prefetch_->cancelLocked();prefetch_->condition.notify_all();}}
+std::vector<std::shared_ptr<Frame>> Assets::drainReady(uint64_t generation,size_t maxCount){
+    std::vector<std::shared_ptr<Frame>> result;if(!prefetch_)return result;auto revision=sourceRevision();std::lock_guard lock(prefetch_->mutex);
+    if(prefetch_->generation!=generation)return result;
+    while(!prefetch_->ready.empty()&&result.size()<maxCount){auto job=std::move(prefetch_->ready.front());prefetch_->ready.pop_front();
+        if(job->epoch==prefetch_->epoch&&job->revision==revision)if(auto frame=job->frame.lock())result.push_back(std::move(frame));}
+    return result;
+}
+Assets::PrefetchStats Assets::prefetchStats()const{if(!prefetch_)return {};std::lock_guard lock(prefetch_->mutex);auto result=prefetch_->stats;result.readyFrames=prefetch_->ready.size();return result;}
 bool Assets::patchesEnabled()const{return index_->patchesEnabled;}
 Assets::IndexPtr Assets::buildIndex(std::filesystem::path root,bool patchesEnabled){
     auto index=std::make_shared<Index>();index->root=std::move(root);index->patchesEnabled=patchesEnabled;
@@ -192,23 +314,27 @@ void Assets::readPackage(const std::filesystem::path& root,const std::string& na
     for(uint32_t k=0;k<n;k++){auto b=std::span(table).subspan(size_t(k)*264,264);std::string logical;for(int j=0;j<256;j++){auto c=char(b[8+j]^uint8_t(seed[j]));if(!c)break;logical.push_back(c);}entries.try_emplace(normalize(logical),Entry{name,at<uint32_t>(b,0),at<uint32_t>(b,4),patch});}
 }catch(const std::exception& error){throw Error("NPK "+name+": "+error.what());}}
 void Assets::indexPackage(const std::string& name) {
-    if(packages_.contains(name)||index_->packages.contains(name))return;
+    {std::lock_guard lock(mutex_);if(packages_.contains(name)||index_->packages.contains(name))return;}
     if(!std::filesystem::exists(root_/wide(name)))return;
-    readPackage(root_,name,entries_);
-    packages_.insert(name);
+    std::unordered_map<std::string,Entry> entries;readPackage(root_,name,entries);
+    std::lock_guard lock(mutex_);for(auto& [logical,entry]:entries)entries_.try_emplace(logical,std::move(entry));packages_.insert(name);
 }
 const Assets::Entry* Assets::resolve(std::string name) {
     name=normalize(name);
     bool rejected;{std::lock_guard lock(index_->rejected->mutex);rejected=index_->rejected->paths.contains(name);}
     if(rejected){if(auto it=index_->originals.find(name);it!=index_->originals.end())return &it->second;}
     else if(auto it=index_->entries.find(name);it!=index_->entries.end())return &it->second;
-    if(auto it=entries_.find(name);it!=entries_.end())return &it->second;
+    {std::lock_guard lock(mutex_);if(auto it=entries_.find(name);it!=entries_.end())return &it->second;}
     auto parent=name.substr(0,name.find_last_of('/'));
-    while(parent.find('/')!=std::string::npos){auto package=parent;std::replace(package.begin(),package.end(),'/','_');indexPackage(package+".NPK");if(auto it=entries_.find(name);it!=entries_.end())return &it->second;parent=parent.substr(0,parent.find_last_of('/'));}
+    while(parent.find('/')!=std::string::npos){auto package=parent;std::replace(package.begin(),package.end(),'/','_');indexPackage(package+".NPK");{std::lock_guard lock(mutex_);if(auto it=entries_.find(name);it!=entries_.end())return &it->second;}parent=parent.substr(0,parent.find_last_of('/'));}
     return nullptr;
 }
 uint64_t Assets::sourceRevision()const{std::lock_guard lock(index_->rejected->mutex);return index_->rejected->revision;}
-void Assets::syncSources(){auto revision=sourceRevision();if(sourceRevision_!=revision){clearDecodedImages();sourceRevision_=revision;}}
+bool Assets::publishAtRevision(uint64_t expected,const std::function<void()>& install){
+    std::lock_guard lock(index_->rejected->mutex);if(index_->rejected->revision!=expected)return false;install();return true;
+}
+void Assets::syncSources(){std::lock_guard lock(mutex_);auto revision=sourceRevision();if(sourceRevision_!=revision){clearDecodedImages();sourceRevision_=revision;}}
+void Assets::clearDecodedImages(){cancelPrefetch();std::lock_guard lock(mutex_);resolvedFrames_.clear();images_.clear();imageTouches_.clear();}
 bool Assets::patchSource(const std::string& name){
     auto entry=resolve(name);return entry&&entry->patch;
 }
@@ -236,7 +362,8 @@ static std::optional<std::pair<std::string,int>> paletteImagePath(std::string na
     return {};
 }
 std::shared_ptr<Frame> Assets::decodeFrame(const std::string& name,int index,int palette,std::string* source){
-    const bool patch=patchSource(name);auto img=preload(name);
+    checkResourceCancelled(resourceCancellation);
+    const bool patch=patchSource(name);auto img=preloadInner(name,resourceCancellation);
     if(!img){
         if(auto alias=paletteImagePath(name);alias&&resolve(alias->first))return decodeFrame(alias->first,index,alias->second,source);
         // Newer CN UI packs may retain only the (2x) entry. Keep its pixels
@@ -251,7 +378,8 @@ std::shared_ptr<Frame> Assets::decodeFrame(const std::string& name,int index,int
     }
     *source=name;
     if(index>=0&&size_t(index)<img->count()){
-        try{return img->frame(index,palette);}
+        try{return img->frame(index,palette,resourceCancellation);}
+        catch(const ResourceCancelled&){throw;}
         catch(const Error&){if(patch){skipPatch(name);return decodeFrame(name,index,palette,source);}throw;}
         catch(const std::out_of_range&){if(patch){skipPatch(name);return decodeFrame(name,index,palette,source);}throw;}
     }
@@ -259,62 +387,98 @@ std::shared_ptr<Frame> Assets::decodeFrame(const std::string& name,int index,int
     return {};
 }
 std::shared_ptr<Img> Assets::preload(std::string logical) {
-    auto name=normalize(logical);syncSources();if(auto it=images_.find(name);it!=images_.end()){touchImage(name);return it->second;}
-    auto e=resolve(name);if(!e)return {};const bool patch=e->patch;
-    try {
-        std::ifstream f(root_/wide(e->package),std::ios::binary);if(!f)throw Error("NPK file absent: "+e->package);
-        Bytes b(e->length);f.seekg(e->offset);f.read(reinterpret_cast<char*>(b.data()),b.size());if(!f)throw Error("truncated IMG entry");
-        auto img=std::make_shared<Img>(std::move(b));
-        if(patch){
-            // A successful whole-IMG check belongs to this applied Index and
-            // source revision. Decode outside the shared rejection lock so an
-            // export's cold IMG cannot stall preview's hot frame/revision read.
-            bool rejected,validate;uint64_t revision;
-            {std::lock_guard lock(index_->rejected->mutex);
-                rejected=index_->rejected->paths.contains(name);revision=index_->rejected->revision;
-                validate=!index_->rejected->validated.contains(name);
-            }
-            if(rejected)return preload(name);
-            if(validate){++patchValidations;img->validateFrames();}
-            {std::lock_guard lock(index_->rejected->mutex);
-                rejected=index_->rejected->paths.contains(name);
-                if(!rejected&&index_->rejected->revision==revision&&validate)index_->rejected->validated.insert(name);
-            }
-            if(rejected)return preload(name);
+    auto name=normalize(logical);{std::lock_guard lock(mutex_);syncSources();if(auto it=images_.find(name);it!=images_.end()){touchImage(name);return it->second;}}
+    checkResourceCancelled(demandCancellation_);if(demandWaitCallback_)demandWaitCallback_();return preloadInner(std::move(name),demandCancellation_);
+}
+std::shared_ptr<Img> Assets::preloadInner(std::string logical,const std::function<bool()>& cancelled){
+    auto name=normalize(std::move(logical));
+    for(;;){
+        checkResourceCancelled(cancelled);auto revision=sourceRevision();std::shared_ptr<PendingImage> pending;Entry entry;bool owner=false;
+        {std::lock_guard lock(mutex_);syncSources();if(auto it=images_.find(name);it!=images_.end()){touchImage(name);return it->second;}}
+        auto e=resolve(name);if(!e)return {};entry=*e;
+        {std::lock_guard lock(mutex_);syncSources();if(auto it=images_.find(name);it!=images_.end()){touchImage(name);return it->second;}
+            auto it=pendingImages_.find(name);
+            if(it!=pendingImages_.end()&&it->second->revision==revision)pending=it->second;
+            else {pending=std::make_shared<PendingImage>();pending->revision=revision;pendingImages_[name]=pending;owner=true;}}
+        if(!owner){
+            std::unique_lock lock(pending->mutex);while(!pending->done){checkResourceCancelled(cancelled);pending->condition.wait_for(lock,std::chrono::milliseconds(2));}
+            auto error=pending->error;auto image=pending->image;lock.unlock();checkResourceCancelled(cancelled);
+            if(error){try{std::rethrow_exception(error);}catch(const ResourceCancelled&){continue;}}
+            if(sourceRevision()!=revision)continue;if(image)return image;continue;
         }
-        images_[name]=img;touchImage(name);return img;
-    } catch(const Error& error) {
-        if(patch){skipPatch(name);return preload(name);}
-        throw Error("IMG "+name+" in NPK "+e->package+" (offset "+std::to_string(e->offset)
-            +", length "+std::to_string(e->length)+"): "+error.what());
+        std::shared_ptr<Img> image;std::exception_ptr error;bool retry=false;
+        try{
+            std::ifstream input(root_/wide(entry.package),std::ios::binary);if(!input)throw Error("NPK file absent: "+entry.package);
+            Bytes bytes(entry.length);input.seekg(entry.offset);size_t offset=0;
+            while(offset<bytes.size()){checkResourceCancelled(cancelled);auto count=std::min<size_t>(1048576,bytes.size()-offset);input.read(reinterpret_cast<char*>(bytes.data()+offset),std::streamsize(count));if(!input)throw Error("truncated IMG entry");offset+=count;}
+            image=std::make_shared<Img>(std::move(bytes));
+            if(entry.patch){
+                bool rejected,validate;
+                {std::lock_guard lock(index_->rejected->mutex);rejected=index_->rejected->paths.contains(name);validate=!index_->rejected->validated.contains(name);}
+                if(!rejected&&validate){++patchValidations;ResourceCancellationScope scope(cancelled);image->validateFrames();}
+                {std::lock_guard lock(index_->rejected->mutex);rejected=index_->rejected->paths.contains(name);if(!rejected&&index_->rejected->revision==revision&&validate)index_->rejected->validated.insert(name);}
+                retry=rejected;
+            }
+            checkResourceCancelled(cancelled);retry|=sourceRevision()!=revision;
+        }catch(const ResourceCancelled&){error=std::current_exception();}
+        catch(const Error& failure){
+            if(entry.patch){skipPatch(name);retry=true;}
+            else error=std::make_exception_ptr(Error("IMG "+name+" in NPK "+entry.package+" (offset "+std::to_string(entry.offset)+", length "+std::to_string(entry.length)+"): "+failure.what()));
+        }catch(...){error=std::current_exception();}
+        {std::lock_guard lock(mutex_);
+            if(!retry&&!error){std::lock_guard sourceLock(index_->rejected->mutex);if(index_->rejected->revision==revision){images_[name]=image;touchImage(name);}else retry=true;}
+            auto found=pendingImages_.find(name);if(found!=pendingImages_.end()&&found->second==pending)pendingImages_.erase(found);}
+        {std::lock_guard lock(pending->mutex);pending->image=retry?std::shared_ptr<Img>{}:image;pending->error=error;pending->done=true;}pending->condition.notify_all();
+        if(error)std::rethrow_exception(error);if(retry)continue;return image;
+    }
+}
+bool Assets::frameReady(std::string logical,int index,int palette){
+    std::lock_guard lock(mutex_);syncSources();auto name=normalize(std::move(logical));if(index<0)return images_.contains(name);return resolvedFrames_.contains(FrameKey{std::move(name),index,palette});
+}
+std::shared_ptr<Frame> Assets::frameInner(std::string logical,int index,int palette,bool fallback,const std::function<bool()>& cancelled){
+    if(logical.empty())return {};FrameKey key{normalize(std::move(logical)),index,palette};ResourceCancellationScope scope(cancelled);
+    for(;;){
+        checkResourceCancelled(cancelled);auto revision=sourceRevision();
+        {std::lock_guard lock(mutex_);syncSources();if(auto it=resolvedFrames_.find(key);it!=resolvedFrames_.end()){if(it->second.fallback&&!fallback)throw Error("missing resource/frame: "+key.logical);touchImage(it->second.source);return it->second.frame;}}
+        ResolvedFrame entry;entry.requested=key.logical;auto decoded=decodeFrame(key.logical,index,palette,&entry.source);
+        if(decoded){entry.frame=std::make_shared<Frame>(*decoded);entry.frame->actualPath=key.logical;entry.frame->actualFrame=index;}
+        else {if(!fallback)throw Error("missing resource/frame: "+key.logical);auto base=preloadInner("interface/base.img",cancelled);if(!base)throw Error("native missing-resource fallback absent");
+            entry.frame=std::make_shared<Frame>(*base->frame(91,0,cancelled));entry.frame->actualPath=normalize("interface/base.img");entry.frame->actualFrame=91;entry.fallback=true;entry.source=entry.frame->actualPath;}
+        checkResourceCancelled(cancelled);std::lock_guard lock(mutex_);
+        {std::lock_guard sourceLock(index_->rejected->mutex);if(index_->rejected->revision==revision){
+            auto [it,inserted]=resolvedFrames_.emplace(key,std::move(entry));touchImage(it->second.source);return it->second.frame;
+        }}
+        // Never clear sources or cancel the queue while holding its Index lock.
+        syncSources();
     }
 }
 std::shared_ptr<Frame> Assets::frame(std::string logical,int index,int palette,bool fallback) {
-    if(logical.empty())return {};syncSources();FrameKey key{std::move(logical),index,palette};
-    if(auto it=resolvedFrames_.find(key);it!=resolvedFrames_.end()){
-        const auto& entry=it->second;touchImage(entry.source);notifyFrame(entry.requested,index);
-        if(entry.fallback){if(!fallback)throw Error("missing resource/frame: "+key.logical);fallbacks++;notifyFrame(entry.frame->actualPath,entry.frame->actualFrame);}
-        else decodedFrames++;
-        return entry.frame;
+    if(logical.empty())return {};FrameKey key{normalize(logical),index,palette};bool ready=frameReady(key.logical,index,palette);
+    if(!ready){checkResourceCancelled(demandCancellation_);if(demandWaitCallback_)demandWaitCallback_();}
+    if(!ready&&prefetch_){
+        std::shared_ptr<Prefetch::Job> job;auto revision=sourceRevision();
+        {std::lock_guard lock(prefetch_->mutex);prefetch_->stats.demandMisses++;auto found=prefetch_->jobs.find(key);
+            if(found!=prefetch_->jobs.end()&&found->second->epoch==prefetch_->epoch&&found->second->revision==revision){job=found->second;if(job->state==Prefetch::Job::Pending&&job->priority>0){job->priority=0;prefetch_->queues[0].push_back(job);prefetch_->condition.notify_one();}}}
+        if(job){auto began=Prefetch::Clock::now();std::unique_lock lock(job->mutex);bool waited=!job->done;
+            while(!job->done){checkResourceCancelled(demandCancellation_);job->condition.wait_for(lock,std::chrono::milliseconds(2));}
+            auto error=job->error;auto aborted=job->aborted;lock.unlock();checkResourceCancelled(demandCancellation_);
+            if(waited){std::lock_guard statsLock(prefetch_->mutex);prefetch_->stats.demandWaits++;prefetch_->stats.demandWaitMilliseconds+=std::chrono::duration<double,std::milli>(Prefetch::Clock::now()-began).count();}
+            if(error&&!aborted)std::rethrow_exception(error);
+        }
     }
-    auto name=normalize(key.logical);notifyFrame(name,index);ResolvedFrame entry;entry.requested=name;auto decoded=decodeFrame(name,index,palette,&entry.source);
-    if(decoded){
-        decodedFrames++;entry.frame=std::make_shared<Frame>(*decoded);entry.frame->actualPath=name;entry.frame->actualFrame=index;
-    }else{
-        if(!fallback)throw Error("missing resource/frame: "+key.logical);
-        fallbacks++;auto base=preload("interface/base.img");if(!base)throw Error("native missing-resource fallback absent");
-        entry.frame=std::make_shared<Frame>(*base->frame(91));entry.frame->actualPath=normalize("interface/base.img");entry.frame->actualFrame=91;entry.fallback=true;entry.source=entry.frame->actualPath;
-        notifyFrame(entry.frame->actualPath,91);
-    }
-    // Each logical alias owns its placement/source metadata; decoded pixels stay shared.
-    auto frame=entry.frame;resolvedFrames_.emplace(std::move(key),std::move(entry));return frame;
+    auto result=frameInner(key.logical,index,palette,fallback,demandCancellation_);
+    // A background prune may remove the lookup wrapper after frameInner returns;
+    // immutable placement metadata still identifies the native fallback exactly.
+    notifyFrame(key.logical,index);if(result->actualPath!=key.logical||result->actualFrame!=index){fallbacks++;notifyFrame(result->actualPath,result->actualFrame);}else decodedFrames++;return result;
 }
 void Assets::touchImage(const std::string& name){if(images_.contains(name))imageTouches_[name]=++imageClock_;}
 size_t Assets::decodedImageBytes()const{
+    std::lock_guard lock(mutex_);
     size_t bytes=0;std::unordered_set<const Frame*> frames;std::unordered_set<const Pixels*> pixels;
     auto addPixels=[&](const std::shared_ptr<Pixels>& value){if(value&&pixels.insert(value.get()).second)bytes+=sizeof(Pixels)+value->rgba.capacity();};
     auto addFrame=[&](const std::shared_ptr<Frame>& value){if(value&&frames.insert(value.get()).second){bytes+=sizeof(Frame)+value->actualPath.capacity();addPixels(value->texture);}};
     for(const auto& [name,image]:images_){
+        std::lock_guard imageLock(image->mutex_);
         bytes+=sizeof(decltype(images_)::value_type)+sizeof(void*)*6+name.capacity()+sizeof(Img)+image->data_.capacity();
         bytes+=image->records_.capacity()*sizeof(std::vector<int32_t>)+image->atlases_.capacity()*sizeof(std::vector<int32_t>);
         for(const auto& value:image->records_)bytes+=value.capacity()*sizeof(int32_t);
@@ -331,13 +495,41 @@ size_t Assets::decodedImageBytes()const{
     return bytes;
 }
 void Assets::pruneDecodedImages(size_t budgetBytes){
+    std::lock_guard lock(mutex_);
     syncSources();if(decodedImageBytes()<=budgetBytes)return;
     // Logical aliases share the IMG's pixel storage. Drop their small lookup
     // wrappers together before evicting complete IMG entries by last use.
     resolvedFrames_.clear();
-    while(!images_.empty()&&decodedImageBytes()>budgetBytes){
-        auto oldest=images_.begin();for(auto it=images_.begin();it!=images_.end();++it)if(imageTouches_.at(it->first)<imageTouches_.at(oldest->first))oldest=it;
-        imageTouches_.erase(oldest->first);images_.erase(oldest);
+    struct ObjectCost {size_t owners=0,bytes=0;};
+    struct Item {std::string name;uint64_t touch=0;size_t bytes=0;std::vector<const Frame*> frames;std::vector<const Pixels*> pixels;};
+    std::unordered_map<const Frame*,ObjectCost> frames;std::unordered_map<const Pixels*,ObjectCost> pixels;
+    std::vector<Item> items;items.reserve(images_.size());size_t bytes=0;
+    std::vector<std::shared_ptr<Img>> lockedImages;lockedImages.reserve(images_.size());
+    std::vector<std::unique_lock<std::recursive_timed_mutex>> imageLocks;imageLocks.reserve(images_.size());
+    for(const auto& [name,image]:images_){
+        lockedImages.push_back(image);imageLocks.emplace_back(image->mutex_);Item item;item.name=name;auto touch=imageTouches_.find(name);if(touch!=imageTouches_.end())item.touch=touch->second;
+        item.bytes=sizeof(decltype(images_)::value_type)+sizeof(void*)*6+name.capacity()+sizeof(Img)+image->data_.capacity();
+        item.bytes+=image->records_.capacity()*sizeof(std::vector<int32_t>)+image->atlases_.capacity()*sizeof(std::vector<int32_t>);
+        for(const auto& value:image->records_)item.bytes+=value.capacity()*sizeof(int32_t);
+        for(const auto& value:image->atlases_)item.bytes+=value.capacity()*sizeof(int32_t);
+        item.bytes+=(image->offsets_.capacity()+image->atlasOffsets_.capacity())*sizeof(size_t)+image->palettes_.capacity()*sizeof(Bytes);
+        for(const auto& value:image->palettes_)item.bytes+=value.capacity();
+        item.bytes+=image->frames_.size()*(sizeof(decltype(image->frames_)::value_type)+sizeof(void*)*4);
+        item.bytes+=image->atlasTextures_.size()*(sizeof(decltype(image->atlasTextures_)::value_type)+sizeof(void*)*4);
+        if(touch!=imageTouches_.end())item.bytes+=sizeof(decltype(imageTouches_)::value_type)+sizeof(void*)*4+touch->first.capacity();
+        std::unordered_set<const Frame*> ownFrames;std::unordered_set<const Pixels*> ownPixels;
+        auto addPixels=[&](const std::shared_ptr<Pixels>& value){if(value&&ownPixels.insert(value.get()).second){auto& cost=pixels[value.get()];if(!cost.owners++)cost.bytes=sizeof(Pixels)+value->rgba.capacity();item.pixels.push_back(value.get());}};
+        for(const auto& [key,value]:image->frames_)if(value&&ownFrames.insert(value.get()).second){auto& cost=frames[value.get()];if(!cost.owners++)cost.bytes=sizeof(Frame)+value->actualPath.capacity();item.frames.push_back(value.get());addPixels(value->texture);}
+        for(const auto& [key,value]:image->atlasTextures_)addPixels(value);
+        bytes+=item.bytes;items.push_back(std::move(item));
+    }
+    for(const auto& [key,cost]:frames)bytes+=cost.bytes;for(const auto& [key,cost]:pixels)bytes+=cost.bytes;
+    std::stable_sort(items.begin(),items.end(),[](const Item& a,const Item& b){return a.touch<b.touch;});
+    for(const auto& item:items){
+        if(bytes<=budgetBytes)break;bytes-=item.bytes;
+        for(auto value:item.frames){auto& cost=frames.at(value);if(!--cost.owners)bytes-=cost.bytes;}
+        for(auto value:item.pixels){auto& cost=pixels.at(value);if(!--cost.owners)bytes-=cost.bytes;}
+        imageTouches_.erase(item.name);images_.erase(item.name);
     }
 }
 }

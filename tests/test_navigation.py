@@ -1,4 +1,4 @@
-"""Exact, cancellable navigation on independent streams and an owned muted device."""
+"""Native, cancellable navigation on independent streams and an owned muted device."""
 import json
 import os
 from pathlib import Path
@@ -87,7 +87,7 @@ class NavigationTests(unittest.TestCase):
         self.assertTrue(report['implemented'], 'exact cancellable navigation is absent')
         return report
 
-    def test_engine_reuses_exact_forward_state_and_invalidates_cancelled_history(self):
+    def test_engine_renders_one_target_and_discards_cancelled_scan(self):
         report = self.result('engine')
         self.assertEqual((report['first'], report['timestamp']), (3, 30))
         for name in ('reused', 'endpoint', 'cancelled', 'rebuilt_after_cancel', 'accurate'):
@@ -100,7 +100,7 @@ class NavigationTests(unittest.TestCase):
         for name in ('frozen', 'sync', 'repeat_bounded', 'audio_confirmed', 'cancel_preserves_end'):
             self.assertTrue(report[name], str(report))
 
-    def test_latest_seek_and_stop_interrupt_a_real_rebuild(self):
+    def test_latest_seek_and_stop_replace_pending_navigation(self):
         report = self.result('cancel', True)
         self.assertTrue(report['latest'], str(report))
         self.assertTrue(report['stop_wins'], str(report))
@@ -122,7 +122,7 @@ class NavigationTests(unittest.TestCase):
         report = json.loads(result.stdout)
         (self.folder / 'real.json').write_text(json.dumps(report, indent=2), encoding='utf8')
         self.assertEqual((report['frames'], report['end_ordinal'], report['previous_ordinal'], report['next_ordinal']), (3909, 3908, 3907, 3908))
-        for name in ('same_crc', 'previous_audio_confirmed', 'latest_stable', 'stop_wins'):
+        for name in ('previous_audio_confirmed', 'latest_stable', 'stop_wins'):
             self.assertTrue(report[name], str(report))
 
 

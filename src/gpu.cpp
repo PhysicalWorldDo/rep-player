@@ -141,10 +141,11 @@ size_t Gpu::textureCacheBytes()const{
     size_t bytes=0;for(const auto& [key,value]:textures_)bytes+=sizeof(GpuTexture)+sizeof(decltype(textures_)::value_type)+sizeof(void*)*4+size_t(value->width)*size_t(value->height)*4+(value->source?sizeof(Pixels)+value->source->rgba.capacity():0);return bytes;
 }
 void Gpu::pruneTextures(size_t budgetBytes){
-    flush();while(!textures_.empty()&&textureCacheBytes()>budgetBytes){
-        auto oldest=textures_.begin();for(auto it=textures_.begin();it!=textures_.end();++it)if(it->second->lastUse<oldest->second->lastUse)oldest=it;
-        textures_.erase(oldest);
-    }
+    flush();struct Item {const Pixels* key;uint64_t use;size_t bytes;};std::vector<Item> items;items.reserve(textures_.size());size_t bytes=0;
+    for(const auto& [key,value]:textures_){auto cost=sizeof(GpuTexture)+sizeof(decltype(textures_)::value_type)+sizeof(void*)*4+size_t(value->width)*size_t(value->height)*4+(value->source?sizeof(Pixels)+value->source->rgba.capacity():0);bytes+=cost;items.push_back({key,value->lastUse,cost});}
+    if(bytes<=budgetBytes)return;
+    std::stable_sort(items.begin(),items.end(),[](const Item& a,const Item& b){return a.use<b.use;});
+    for(const auto& item:items){if(bytes<=budgetBytes)break;textures_.erase(item.key);bytes-=item.bytes;}
 }
 std::shared_ptr<GpuTexture> Gpu::floatTexture(std::span<const float> v,int w,int h) {
     auto t=std::make_shared<GpuTexture>();t->width=w;t->height=h;D3D11_TEXTURE2D_DESC d{};d.Width=w;d.Height=h;d.MipLevels=1;d.ArraySize=1;d.Format=DXGI_FORMAT_R32G32B32A32_FLOAT;d.SampleDesc.Count=1;d.Usage=D3D11_USAGE_IMMUTABLE;d.BindFlags=D3D11_BIND_SHADER_RESOURCE;
@@ -204,6 +205,7 @@ void Gpu::submit(std::span<const Vertex> verts,Material& material,std::array<int
     context_->OMSetDepthStencilState(stencils_[stencil].get(),reference);context_->Draw(UINT(verts.size()),0);draws++;
 }
 void Gpu::capture(Target& src,Target& dst){flush();ID3D11ShaderResourceView* nulls[16]{};context_->PSSetShaderResources(0,16,nulls);context_->CopyResource(dst.image.texture.get(),src.image.texture.get());}
+void Gpu::copyTarget(Target& src,Target& dst){capture(src,dst);if(src.depth&&dst.depth)context_->CopyResource(dst.depth.get(),src.depth.get());}
 std::shared_ptr<GpuTexture> Gpu::view(Target& t){auto image=std::make_shared<GpuTexture>();image->width=t.image.width;image->height=t.image.height;t.image.view->AddRef();*image->view.out()=t.image.view.get();return image;}
 void Gpu::clearStencil(Target& t){flush();if(t.depthView)context_->ClearDepthStencilView(t.depthView.get(),D3D11_CLEAR_STENCIL,1,0);}
 Target* Gpu::buildHighlightMask(const HighlightFrame& frame,std::string_view selected){

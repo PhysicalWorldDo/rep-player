@@ -1,5 +1,6 @@
 #pragma once
 #include "resources.hpp"
+#include "retained_cache.hpp"
 #include <ft2build.h>
 #include FT_FREETYPE_H
 #include FT_OUTLINE_H
@@ -13,17 +14,21 @@ class Rasterizer {
     std::filesystem::path root_;
     bool usRegistry_=true;
     FT_Library library_=nullptr;
-    std::map<std::string,Bytes> fontFiles_;
+    std::shared_ptr<RetainedCache> cache_;
+    std::string glyphDomain_;
+    std::function<void()> demandWait_;
+    std::map<std::string,std::shared_ptr<const Bytes>> fontFiles_;
     std::map<std::pair<std::string,int>,FT_Face> faces_;
-    std::map<std::tuple<int,int,int,int,int,int,uint32_t>,std::shared_ptr<Glyph>> glyphs_;
+    std::map<std::tuple<int,int,int,int,int,int,uint32_t>,std::shared_ptr<const Glyph>> glyphs_;
     FT_Face face(int id,int height,int weight);
     FT_Face loadFace(const std::filesystem::path& file,int height);
 public:
-    explicit Rasterizer(std::filesystem::path root={});~Rasterizer();
+    explicit Rasterizer(std::filesystem::path root={},std::shared_ptr<RetainedCache> cache={});~Rasterizer();
+    void setDemandWaitCallback(std::function<void()> callback){demandWait_=std::move(callback);}
     int familyKind(int handle) const;
     int registeredTracking(int handle) const;
     std::pair<int,int> registeredConfiguration(int handle) const;
-    std::shared_ptr<Glyph> glyph(int id,int height,int weight,int slant,int outline,uint32_t codepoint,int metricOutline=0);
+    std::shared_ptr<const Glyph> glyph(int id,int height,int weight,int slant,int outline,uint32_t codepoint,int metricOutline=0);
     std::pair<int,int> linePositions(int id,int height,int weight);
 };
 struct GlyphRegistration {std::array<int,4> normal{},outline{};int format=5,scale=1;};
@@ -57,7 +62,9 @@ class Fonts {
     Rasterizer rasterizer_;
     std::map<int,std::unique_ptr<Atlas>> atlases_;
 public:
-    explicit Fonts(std::filesystem::path root={}):rasterizer_(std::move(root)){}
+    explicit Fonts(std::filesystem::path root={},std::shared_ptr<RetainedCache> cache={}):rasterizer_(std::move(root),std::move(cache)){}
+    void setDemandWaitCallback(std::function<void()> callback){rasterizer_.setDemandWaitCallback(std::move(callback));}
+    void prewarmGlyphs(const Instruction& instruction,const Replay& replay);
     std::vector<GlyphQuad> prepare(const Instruction& instruction,const Replay& replay,float x,float y);
     static std::array<int32_t,11> parameters(const Instruction& i,const Replay& replay);
 };

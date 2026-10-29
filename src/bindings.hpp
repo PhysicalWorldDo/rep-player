@@ -7,7 +7,7 @@ struct ShaderContext {
     int width=0,height=0,version=14,minor=3,channel=0;
     float x=0,y=0,scaleX=1,scaleY=1;
     int direction=1;
-    bool imagePresent=false,directSource=false;
+    bool imagePresent=false,directSource=false,transientSource=false;
     float cacheScale=0,cacheX=0,cacheY=0;
     std::shared_ptr<GpuTexture> canvas;
     std::array<std::shared_ptr<GpuTexture>,4> external{};

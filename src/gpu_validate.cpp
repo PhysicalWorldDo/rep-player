@@ -56,6 +56,7 @@ int wmain(int argc,wchar_t** argv){try{
     else if(argc==5&&std::wstring_view(argv[1])==L"--frame-step"){
         rep::Assets assets(argv[3]);rep::Replay replay(argv[2],replayOptions),scan(argv[2],replayOptions),referenceReplay(argv[2],replayOptions);auto inspection=rep::inspectReplayImages(scan);
         rep::Executor executor(gpu,assets,root/L"runtime"/L"cache"),reference(gpu,assets,root/L"runtime"/L"cache");executor.setNegativeImgOffsetsEnabled(negativeImgOffsets);reference.setNegativeImgOffsetsEnabled(negativeImgOffsets);executor.setCanvasSettings(canvasSettings);reference.setCanvasSettings(canvasSettings);executor.setTransparent(true);executor.attach(replay);executor.setInspection(inspection);reference.setTransparent(true);
+        reference.attach(referenceReplay);rep::Scene referenceScene;bool hasReference=false;
         rep::Playback playback;playback.attach(replay,executor);playback.start();std::istringstream actions(rep::utf8(argv[4]));std::string action;bool first=true;
         std::cout<<"{\"frame_count\":"<<inspection.scenes<<",\"snapshots\":[";
         while(std::getline(actions,action,',')){
@@ -64,7 +65,12 @@ int wmain(int argc,wchar_t** argv){try{
             else if(action=="hide"){executor.setHiddenImages({"sprite/test/frame.img"});changed=playback.refresh();}
             else if(action=="resume"){playback.resume();Sleep(25);}else if(action=="stop")playback.stop();else throw rep::Error("unknown frame-step action");
             auto pixels=gpu.readback(executor.output());auto calls=executor.currentImages();uint32_t expected=rep::crc(pixels);
-            if(inspection.scenes){referenceReplay.rewind();reference.attach(referenceReplay);reference.setHiddenImages(executor.hiddenImages());rep::Scene frame;while(referenceReplay.next(frame)){reference.execute(frame);if(frame.ordinal>=playback.ordinal())break;}expected=rep::crc(gpu.readback(reference.output()));}
+            if(inspection.scenes){
+                reference.setHiddenImages(executor.hiddenImages());
+                if(action=="hide"){if(hasReference)reference.redraw(referenceScene);}
+                else if(changed){referenceReplay.rewind();while(referenceReplay.next(referenceScene)){if(referenceScene.ordinal==playback.ordinal())break;}hasReference=true;reference.execute(referenceScene);}
+                expected=rep::crc(gpu.readback(reference.output()));
+            }
             if(!first)std::cout<<',';first=false;std::cout<<"{\"ordinal\":"<<playback.ordinal()<<",\"timestamp\":"<<playback.timestamp()<<",\"elapsed\":"<<playback.elapsedMilliseconds()<<",\"paused\":"<<(playback.paused()?"true":"false")<<",\"ended\":"<<(playback.ended()?"true":"false")<<",\"changed\":"<<(changed?"true":"false")<<",\"crc\":"<<rep::crc(pixels)<<",\"reference_crc\":"<<expected<<",\"hidden_count\":"<<executor.hiddenImages().size()<<",\"images\":[";
             bool firstImage=true;for(auto& call:calls){if(!firstImage)std::cout<<',';firstImage=false;std::cout<<"{\"path\":\""<<call.path<<"\",\"hidden\":"<<(call.hidden?"true":"false")<<",\"drawn\":"<<(call.drawn?"true":"false")<<'}';}std::cout<<"]}";
         }std::cout<<"]}\n";

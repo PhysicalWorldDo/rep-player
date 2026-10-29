@@ -83,6 +83,7 @@ public:
     void begin(Target& target,const float* clear=nullptr);
     void draw(std::span<const Vertex> vertices,Material& material,std::array<int,4> clip,unsigned stencil=0,unsigned reference=0,bool writeColor=true);
     void capture(Target& source,Target& destination);
+    void copyTarget(Target& source,Target& destination);
     std::shared_ptr<GpuTexture> view(Target& target);
     void clearStencil(Target& target);
     void flush();

@@ -28,8 +28,8 @@ class RecordedFrameStepTests(unittest.TestCase):
         struct.pack_into('<2f', native, 16, 1, 1)
         struct.pack_into('<I', native, 28, 0xffffffff)
         draw = struct.pack('<3I', 42, 40, 0) + native
-        # The second recorded frame updates a persistent per-layer camera.
-        # Realtime selection can skip it; backward stepping must reconstruct it.
+        # Only an actually executed record updates the persistent layer camera.
+        # Native navigation does not execute camera updates in skipped records.
         camera = struct.pack('<I2fI3f', 50, 2, 0, 0, 16, 16, 1)
         initial_camera = struct.pack('<I2fI3f', 50, 0, 0, 0, 16, 16, 1)
         header = b'\x0b\0' + struct.pack('<8h', *([16] * 8)) + b'\x0c' + struct.pack('<H', 7) + bytes(126)
@@ -60,11 +60,11 @@ class RecordedFrameStepTests(unittest.TestCase):
         self.assertTrue(rows[-1]['ended'])
         self.assertTrue(all(x['crc'] == x['reference_crc'] for x in rows))
 
-    def test_steps_after_realtime_skip_reconstruct_persistent_state(self):
+    def test_steps_after_realtime_skip_keep_actually_executed_state(self):
         rows = self.run_actions(['select=0', 'select=31', 'prev', 'next', 'prev'])['snapshots']
         self.assertEqual([x['ordinal'] for x in rows], [0, 3, 2, 3, 2])
         self.assertTrue(all(x['crc'] == x['reference_crc'] for x in rows[2:]))
-        # Next after a skipped camera update must also resolve an exact recorded frame.
+        # The record number is exact; skipped camera updates are not reconstructed.
         rows = self.run_actions(['select=0', 'select=11', 'next'])['snapshots']
         self.assertEqual(rows[-1]['ordinal'], 3)
         self.assertEqual(rows[-1]['crc'], rows[-1]['reference_crc'])

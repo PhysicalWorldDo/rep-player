@@ -64,7 +64,22 @@ static std::filesystem::path fontPath(const std::filesystem::path& root,int id,i
     return systemTahoma();
 }
 static void ftCheck(FT_Error e){if(e)throw Error("FreeType error "+std::to_string(e));}
-Rasterizer::Rasterizer(std::filesystem::path root):root_(std::move(root)),usRegistry_(!std::filesystem::is_regular_file(root_.parent_path()/L"DNF.exe")){ftCheck(FT_Init_FreeType(&library_));}
+static std::string fontDomain(const std::filesystem::path& root,bool usRegistry){
+    std::vector<std::string> sources;std::error_code error;
+    if(std::filesystem::is_directory(root,error)){
+        sources.push_back(fileIdentityKey(root));
+        for(const auto& entry:std::filesystem::directory_iterator(root))if(entry.is_regular_file()){
+            auto extension=canonical(utf8(entry.path().extension().wstring()));
+            if(extension==".ttf"||extension==".ttc"||extension==".otf")sources.push_back(fileIdentityKey(entry.path()));
+        }
+    }else sources.push_back(utf8(std::filesystem::absolute(root).lexically_normal().wstring()));
+    for(auto name:{L"tahoma.ttf",L"simsun.ttc"}){auto file=systemFont(name);if(std::filesystem::is_regular_file(file))sources.push_back(fileIdentityKey(file));}
+    std::sort(sources.begin(),sources.end());std::string domain=usRegistry?"us:":"cn:";
+    for(const auto& source:sources)domain+=std::to_string(source.size())+":"+source;return domain;
+}
+Rasterizer::Rasterizer(std::filesystem::path root,std::shared_ptr<RetainedCache> cache):root_(std::move(root)),usRegistry_(!std::filesystem::is_regular_file(root_.parent_path()/L"DNF.exe")),cache_(std::move(cache)){
+    if(cache_)glyphDomain_=fontDomain(root_,usRegistry_);ftCheck(FT_Init_FreeType(&library_));
+}
 int Rasterizer::familyKind(int handle) const{return usRegistry_?usFamilyKind(handle):cnFamilyKind(handle);}
 int Rasterizer::registeredTracking(int handle) const{auto kind=familyKind(handle);return usRegistry_&&((kind>=6&&kind<=8)||(kind>=11&&kind<=13))?-50:0;}
 Rasterizer::~Rasterizer(){for(auto [key,face]:faces_)FT_Done_Face(face);FT_Done_FreeType(library_);}
@@ -75,12 +90,22 @@ FT_Face Rasterizer::loadFace(const std::filesystem::path& file,int height) {
     auto path=utf8(file.wstring());auto key=std::pair{path,height};if(auto it=faces_.find(key);it!=faces_.end())return it->second;
     // FreeType's Windows pathname loader uses narrow fopen. A filesystem path
     // reads Unicode client directories correctly; bytes must outlive all faces.
-    auto it=fontFiles_.find(path);if(it==fontFiles_.end())it=fontFiles_.emplace(path,readFile(file)).first;
-    auto& bytes=it->second;FT_Face f;ftCheck(FT_New_Memory_Face(library_,bytes.data(),FT_Long(bytes.size()),0,&f));
+    auto it=fontFiles_.find(path);if(it==fontFiles_.end()){
+        std::string sourceKey;std::shared_ptr<const Bytes> bytes;
+        if(cache_){sourceKey="font-file:"+fileIdentityKey(file);bytes=cache_->find<Bytes>(sourceKey);}
+        if(!bytes){if(demandWait_)demandWait_();bytes=std::make_shared<const Bytes>(readFile(file));
+            if(cache_){if("font-file:"+fileIdentityKey(file)!=sourceKey)throw Error("font changed while loading");cache_->insert<Bytes>(sourceKey,bytes,sizeof(Bytes)+bytes->capacity()+sourceKey.capacity());}}
+        it=fontFiles_.emplace(path,std::move(bytes)).first;
+    }
+    const auto& bytes=*it->second;FT_Face f;ftCheck(FT_New_Memory_Face(library_,bytes.data(),FT_Long(bytes.size()),0,&f));
     if(auto error=FT_Set_Pixel_Sizes(f,0,height)){FT_Done_Face(f);ftCheck(error);}return faces_[key]=f;
 }
-std::shared_ptr<Glyph> Rasterizer::glyph(int id,int height,int weight,int slant,int outline,uint32_t character,int metricOutline) {
+std::shared_ptr<const Glyph> Rasterizer::glyph(int id,int height,int weight,int slant,int outline,uint32_t character,int metricOutline) {
     auto key=std::tuple{id,height,weight,slant,outline,metricOutline,character};if(auto it=glyphs_.find(key);it!=glyphs_.end())return it->second;
+    std::string sharedKey;
+    if(cache_){sharedKey="font-glyph:"+glyphDomain_+":"+std::to_string(id)+":"+std::to_string(height)+":"+std::to_string(weight)+":"+std::to_string(slant)+":"+std::to_string(outline)+":"+std::to_string(metricOutline)+":"+std::to_string(character);
+        if(auto value=cache_->find<Glyph>(sharedKey))return glyphs_[key]=std::move(value);}
+    if(demandWait_)demandWait_();
     auto f=face(id,height,weight);int kind=familyKind(id),actualId=kind;
     bool mono=(kind==0&&height==11)||(!usRegistry_&&kind==14&&(height==11||height==12||height==16||height==17));
     FT_Int32 flags=mono?0x21000:0;FT_Render_Mode mode=flags?FT_RENDER_MODE_MONO:FT_RENDER_MODE_NORMAL;
@@ -140,7 +165,8 @@ std::shared_ptr<Glyph> Rasterizer::glyph(int id,int height,int weight,int slant,
         top-=shift;left=slot->bitmap_left;advance=nonempty&&!space?slot->advance.x>>6:blank;
     }
     else {left=slot->bitmap_left;advance=nonempty&&!space?slot->advance.x>>6:blank;if(kind==26)top-=2;}
-    if(character==8202)advance=1;result->left=left;result->top=top;result->advance=advance;return glyphs_[key]=result;
+    if(character==8202)advance=1;result->left=left;result->top=top;result->advance=advance;
+    if(cache_){auto bytes=sizeof(Glyph)+result->coverage.capacity()+sharedKey.capacity();cache_->insert<Glyph>(std::move(sharedKey),result,bytes);}return glyphs_[key]=std::move(result);
 }
 std::pair<int,int> Rasterizer::linePositions(int id,int height,int weight){auto f=face(id,height,weight);int base=int(int64_t(f->ascender)*f->size->metrics.y_scale/4194304);int u=int(float(f->underline_position)*f->size->metrics.y_ppem/f->units_per_EM);int y=base+u/2-u;return {y,y-base/2};}
 Atlas::Node* Atlas::Node::allocate(int width,int height) {
@@ -191,6 +217,17 @@ std::array<int32_t,11> Fonts::parameters(const Instruction& i,const Replay& r) {
     int id=0;for(auto [key,value]:mapping)if(key==type)id=value;auto [height,weight]=configuration(id);
     words={height,weight,id,0,2,1,0,int32_t(color),int32_t((color&0xff000000)|0xffffff),0,int32_t((style==1?1:0)|(flags==2?1<<16:flags==1?1<<24:0))};return words;
 }
+void Fonts::prewarmGlyphs(const Instruction& i,const Replay& r) {
+    auto text=wide(r.path(i.resource));if(text.empty())return;
+    auto p=parameters(i,r);int id=p[2];if(id==-1)return;auto [cfgHeight,cfgWeight]=rasterizer_.registeredConfiguration(id);
+    if(i.opcode==5){p[0]=cfgHeight;p[1]=cfgWeight;}
+    int size=std::max(1,p[0]?std::abs(p[0]):cfgHeight),weight=p[1]?p[1]:cfgWeight,padding=p[5]?p[5]:1;
+    bool fixed=rasterizer_.familyKind(id)==0&&(padding==0||padding==1)&&size>=14;int sourceSize=fixed?11:size;
+    for(size_t n=0;n<text.size();n++){uint32_t code=text[n];if(code>=0xd800&&code<=0xdbff&&n+1<text.size()){code=0x10000+((code-0xd800)<<10)+(text[++n]-0xdc00);}
+        rasterizer_.glyph(id,sourceSize,weight,p[3],0,code,p[4]);rasterizer_.glyph(id,sourceSize,weight,p[3],std::max(0,p[4]),code,p[4]);
+    }
+    if(((uint32_t(p[10])>>16)&255)==1||((uint32_t(p[10])>>24)&255)==1)rasterizer_.linePositions(id,sourceSize,weight);
+}
 std::vector<GlyphQuad> Fonts::prepare(const Instruction& i,const Replay& r,float x,float y) {
     std::vector<GlyphQuad> quads;auto text=wide(r.path(i.resource));if(text.empty())return quads;
     auto p=parameters(i,r);int id=p[2];if(id==-1)return quads;auto [cfgHeight,cfgWeight]=rasterizer_.registeredConfiguration(id);
@@ -198,7 +235,7 @@ std::vector<GlyphQuad> Fonts::prepare(const Instruction& i,const Replay& r,float
     int size=std::max(1,p[0]?std::abs(p[0]):cfgHeight),weight=p[1]?p[1]:cfgWeight,padding=p[5]?p[5]:1;
     bool fixed=rasterizer_.familyKind(id)==0&&(padding==0||padding==1)&&size>=14;int sourceSize=fixed?11:size,atlasScale=fixed?2:1;float glyphScale=float(size)/sourceSize;int margin=padding==1?0:padding;
     auto& owner=atlases_[id];if(!owner)owner=std::make_unique<Atlas>();auto& atlas=*owner;bool outline=(uint32_t(p[10])&255)==1,gradient=((uint32_t(p[10])>>8)&255)==1;
-    struct Positioned {float advance;std::shared_ptr<Glyph> normal,border;std::shared_ptr<GlyphRegistration> registration;};std::vector<Positioned> positions;float advance=0;
+    struct Positioned {float advance;std::shared_ptr<const Glyph> normal,border;std::shared_ptr<GlyphRegistration> registration;};std::vector<Positioned> positions;float advance=0;
     for(size_t n=0;n<text.size();n++){uint32_t code=text[n];if(code>=0xd800&&code<=0xdbff&&n+1<text.size()){code=0x10000+((code-0xd800)<<10)+(text[++n]-0xdc00);}
         auto normal=rasterizer_.glyph(id,sourceSize,weight,p[3],0,code,p[4]),border=rasterizer_.glyph(id,sourceSize,weight,p[3],std::max(0,p[4]),code,p[4]);
         std::string key=std::to_string(sourceSize)+":"+std::to_string(weight)+":"+std::to_string(p[3])+":"+std::to_string(p[4])+":"+std::to_string(padding)+":"+std::to_string(atlasScale==2?0:p[6])+":"+std::to_string(atlasScale)+":"+std::to_string(code);

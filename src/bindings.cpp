@@ -63,7 +63,7 @@ Material Binder::bind(const Effect* e,std::shared_ptr<GpuTexture> source,ShaderC
             randomState_=random;
         }
     };
-    if(e&&(e->type==16||e->type==17||e->type==57)){
+    if(!c.transientSource&&e&&(e->type==16||e->type==17||e->type==57)){
         CacheKey key{e,source.get(),c.width,c.height,c.channel,c.direction,c.directSource};auto it=materials_.find(key);if(it!=materials_.end()){for(auto& input:it->second.inputs)assets_.notifyFrame(input.path,input.frame);return it->second;}
         auto material=stableCreate();materials_[key]=material;return material;
     }

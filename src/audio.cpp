@@ -1,5 +1,6 @@
 #include "audio.hpp"
 #include "audio_resources.hpp"
+#include "retained_cache.hpp"
 #include <windows.h>
 #include <xaudio2.h>
 #include <algorithm>
@@ -23,6 +24,12 @@ struct AudioEvent {
     bool flag=false;
     std::string tag;
 };
+struct AudioSeekCancelled {};
+struct AudioTimeline {
+    std::weak_ptr<const void> identity;
+    std::vector<AudioEvent> events;
+    int64_t duration=0;
+};
 }
 struct AudioTrack::Impl {
     struct Voice {
@@ -35,15 +42,21 @@ struct AudioTrack::Impl {
         int64_t offset=0,forcedEnd=INT64_MAX;
     };
     std::shared_ptr<AudioResources> resources;
-    std::vector<AudioEvent> events,pending;
+    std::shared_ptr<const AudioTimeline> timeline;
+    std::span<const AudioEvent> events;
+    std::vector<AudioEvent> pending;
+    bool preparedOnly=false;
+    std::unordered_map<std::string,std::shared_ptr<const AudioClip>> preparedClips;
     std::vector<Voice> voices;
     std::unordered_map<std::string,int> ranks,loopCounters;
-    std::function<bool()> cancelled;
+    std::function<bool()> cancelled,seekCancelled;
     std::vector<std::string> notes;
     size_t cursor=0;
     std::atomic<int64_t> position=0;
     int64_t duration=0;
     ProtocolProfile profile=ProtocolProfile::Dfo;
+
+    void checkSeekCancelled()const{if(seekCancelled&&seekCancelled())throw AudioSeekCancelled{};}
 
     bool stopped(const Voice& voice,int64_t at)const {
         auto length=int64_t(voice.clip->frames());if(!length)return true;
@@ -60,6 +73,7 @@ struct AudioTrack::Impl {
     }
     void expire(int64_t at){
         for(size_t n=0;n<voices.size();){
+            checkSeekCancelled();
             if(!stopped(voices[n],at)){n++;continue;}auto v=std::move(voices[n]);voices.erase(voices.begin()+n);
             if(v.forcedEnd!=INT64_MAX||v.definition->loopDelay<=0)continue;
             auto& count=loopCounters[v.event.tag];
@@ -86,7 +100,8 @@ struct AudioTrack::Impl {
     void startVoice(const AudioEvent& event,int64_t at){
         auto definition=resources->definition(event.tag);
         if(definition&&!definition->playable)return;
-        auto clip=resources->clip(event.tag,cancelled);if(!clip||!clip->frames()||!definition)return;
+        auto clip=preparedOnly?(preparedClips.contains(event.tag)?preparedClips.at(event.tag):std::shared_ptr<const AudioClip>{}):resources->clip(event.tag,[&]{return (seekCancelled&&seekCancelled())||(cancelled&&cancelled());});
+        checkSeekCancelled();if(!clip||!clip->frames()||!definition)return;
         int slot=event.words[7];if(definition->kind==AudioKind::Music)slot=25;else if(definition->kind==AudioKind::Ambient)slot=15;
         expire(at);if(!allowed(event,at,slot))return;
         if(slot<0){
@@ -139,27 +154,34 @@ struct AudioTrack::Impl {
     }
     void boundary(int64_t at){
         expire(at);
-        while(cursor<events.size()&&events[cursor].sample<=at)apply(events[cursor++],at);
+        while(cursor<events.size()&&events[cursor].sample<=at){checkSeekCancelled();apply(events[cursor++],at);}
         for(size_t n=0;n<pending.size();){
+            checkSeekCancelled();
             if(pending[n].sample<=at){auto event=std::move(pending[n]);pending.erase(pending.begin()+n);startVoice(event,event.sample);}
             else n++;
         }
     }
     int64_t nextBoundary(int64_t limit)const {
         if(cursor<events.size())limit=std::min(limit,events[cursor].sample);
-        for(const auto& event:pending)limit=std::min(limit,event.sample);
-        for(const auto& voice:voices)limit=std::min(limit,end(voice));
+        for(const auto& event:pending){checkSeekCancelled();limit=std::min(limit,event.sample);}
+        for(const auto& voice:voices){checkSeekCancelled();limit=std::min(limit,end(voice));}
         return limit;
     }
     void advance(int64_t target){
-        auto at=position.load();boundary(at);
-        while(at<target){auto next=nextBoundary(target);at=std::max(at,next);position=at;boundary(at);}
+        checkSeekCancelled();auto at=position.load();boundary(at);
+        while(at<target){checkSeekCancelled();auto next=nextBoundary(target);at=std::max(at,next);position=at;boundary(at);}
         position=target;expire(target);
     }
 };
-AudioTrack::AudioTrack(const std::filesystem::path& client,const std::filesystem::path& cache,Replay& replay,const std::function<bool()>& cancelled,AudioResources::IndexPtr index)
+AudioTrack::AudioTrack(const std::filesystem::path& client,const std::filesystem::path& cache,Replay& replay,const std::function<bool()>& cancelled,AudioResources::IndexPtr index,std::shared_ptr<RetainedCache> cacheStore)
     :impl_(std::make_unique<Impl>()){
     impl_->cancelled=cancelled;impl_->profile=replay.options.profile;
+    auto identity=replay.dataIdentity();auto key="audio/events/"+std::to_string(reinterpret_cast<uintptr_t>(identity.get()));
+    if(cacheStore)if(auto timeline=cacheStore->find<AudioTimeline>(key);timeline&&timeline->identity.lock()==identity){
+        impl_->timeline=std::move(timeline);impl_->events=impl_->timeline->events;impl_->duration=impl_->timeline->duration;
+        if(!impl_->events.empty())impl_->resources=index?std::make_shared<AudioResources>(std::move(index),cacheStore,cache):std::make_shared<AudioResources>(client,cache,true,cacheStore);replay.rewind();return;
+    }
+    auto timeline=std::make_shared<AudioTimeline>();timeline->identity=identity;
     std::unordered_map<uint32_t,std::vector<AudioEvent>> commands;
     for(const auto& [id,command]:replay.dictionary){
         if(cancelled&&cancelled())throw Error("Audio preparation cancelled");
@@ -180,11 +202,14 @@ AudioTrack::AudioTrack(const std::filesystem::path& client,const std::filesystem
         if(cancelled&&cancelled())throw Error("Audio preparation cancelled");
         impl_->duration=std::max<int64_t>(impl_->duration,scene.timestamp);
         size_t references=0;
-        for(auto id:scene.ids){if((++references&1023)==0&&cancelled&&cancelled())throw Error("Audio preparation cancelled");if(auto found=commands.find(id);found!=commands.end())for(auto event:found->second){event.sample=sampleAt(scene.timestamp);impl_->events.push_back(std::move(event));}}
+        for(auto id:scene.ids){if((++references&1023)==0&&cancelled&&cancelled())throw Error("Audio preparation cancelled");if(auto found=commands.find(id);found!=commands.end())for(auto event:found->second){event.sample=sampleAt(scene.timestamp);timeline->events.push_back(std::move(event));}}
     }}catch(...){replay.rewind();throw;}
     replay.rewind();
-    std::stable_sort(impl_->events.begin(),impl_->events.end(),[](const AudioEvent& a,const AudioEvent& b){return a.sample<b.sample;});
-    if(!impl_->events.empty())impl_->resources=index?std::make_shared<AudioResources>(std::move(index)):std::make_shared<AudioResources>(client,cache);
+    std::stable_sort(timeline->events.begin(),timeline->events.end(),[](const AudioEvent& a,const AudioEvent& b){return a.sample<b.sample;});timeline->duration=impl_->duration;
+    if(cancelled&&cancelled())throw Error("Audio preparation cancelled");
+    if(cacheStore){size_t bytes=sizeof(AudioTimeline)+timeline->events.capacity()*sizeof(AudioEvent);for(const auto& event:timeline->events)bytes+=event.tag.capacity();cacheStore->insert<AudioTimeline>(key,timeline,bytes);}
+    impl_->timeline=std::move(timeline);impl_->events=impl_->timeline->events;
+    if(!impl_->events.empty())impl_->resources=index?std::make_shared<AudioResources>(std::move(index),cacheStore,cache):std::make_shared<AudioResources>(client,cache,true,cacheStore);
 }
 AudioTrack::~AudioTrack()=default;
 bool AudioTrack::hasEvents()const{return !impl_->events.empty();}
@@ -193,21 +218,62 @@ uint64_t AudioTrack::missingResources()const{return impl_->resources?impl_->reso
 int64_t AudioTrack::positionMilliseconds()const{return impl_->position.load()*1000/SampleRate;}
 int64_t AudioTrack::durationMilliseconds()const{return impl_->duration;}
 std::vector<std::string> AudioTrack::diagnostics()const{auto notes=impl_->resources?impl_->resources->diagnostics():std::vector<std::string>{};notes.insert(notes.end(),impl_->notes.begin(),impl_->notes.end());return notes;}
+const void* AudioTrack::eventIdentity()const{return impl_->timeline.get();}
+uint64_t AudioTrack::decoderProcesses()const{return impl_->resources?impl_->resources->decoderProcesses():0;}
 void AudioTrack::prepare(int64_t milliseconds,int64_t horizon,const std::function<bool()>& cancelled){
     auto first=sampleAt(milliseconds),last=sampleAt(milliseconds+std::max<int64_t>(0,horizon));
     std::vector<std::string> tags;std::unordered_map<std::string,bool> seen;
-    for(const auto& event:impl_->events)if(event.opcode==6&&event.sample>=first&&event.sample<=last){
+    auto begin=std::lower_bound(impl_->events.begin(),impl_->events.end(),first,[](const AudioEvent& event,int64_t at){return event.sample<at;});
+    for(auto it=begin;it!=impl_->events.end()&&it->sample<=last;++it){const auto& event=*it;if(event.opcode!=6)continue;
         auto d=impl_->resources->definition(event.tag);if(d&&!d->playable)continue;
         if(seen.emplace(event.tag,true).second)tags.push_back(event.tag);
     }
-    std::atomic<size_t> next=0;std::vector<std::future<void>> jobs;
-    for(size_t n=0;n<std::min<size_t>(4,tags.size());n++)jobs.push_back(std::async(std::launch::async,[&]{
-        for(size_t k;(k=next++)<tags.size();){if(cancelled&&cancelled())return;impl_->resources->clip(tags[k],cancelled?cancelled:impl_->cancelled);}
-    }));
-    for(auto& job:jobs)job.get();
+    auto stopped=[&]{return (cancelled&&cancelled())||(impl_->cancelled&&impl_->cancelled());};
+    // Bound optional in-flight retention to one batch window rather than
+    // pinning every decoded future clip until a whole recording is prepared.
+    for(size_t start=0;start<tags.size();start+=32){if(stopped())return;auto count=std::min<size_t>(32,tags.size()-start);std::vector<std::string> window(tags.begin()+start,tags.begin()+start+count);auto pinned=impl_->resources->prepareClips(window,stopped);pinned.clear();impl_->resources->trimCache();}
 }
-void AudioTrack::seek(int64_t milliseconds){
-    impl_->cursor=0;impl_->position=0;impl_->voices.clear();impl_->pending.clear();impl_->ranks.clear();impl_->loopCounters.clear();impl_->advance(sampleAt(milliseconds));
+bool AudioTrack::prepareRender(int64_t horizon,const std::function<bool()>& cancelled){
+    if(!impl_->resources)return true;auto last=impl_->position.load()+sampleAt(horizon);std::vector<std::string> tags;std::unordered_set<std::string> seen;
+    auto add=[&](const AudioEvent& event){if(event.opcode==6&&seen.insert(event.tag).second)tags.push_back(event.tag);};
+    for(size_t n=impl_->cursor;n<impl_->events.size()&&impl_->events[n].sample<=last;n++)add(impl_->events[n]);
+    for(const auto& event:impl_->pending)if(event.sample<=last)add(event);
+    for(const auto& voice:impl_->voices)add(voice.event);
+    std::atomic<size_t> next=0;std::vector<std::future<void>> jobs;std::mutex pinMutex;std::unordered_map<std::string,std::shared_ptr<const AudioClip>> clips;
+    for(size_t n=0;n<std::min<size_t>(4,tags.size());n++)jobs.push_back(std::async(std::launch::async,[&]{for(size_t k;(k=next++)<tags.size();){if(cancelled&&cancelled())return;auto clip=impl_->resources->clip(tags[k],cancelled?cancelled:impl_->cancelled);std::lock_guard lock(pinMutex);clips.emplace(tags[k],std::move(clip));}}));
+    for(auto& job:jobs)job.get();if(cancelled&&cancelled())return false;impl_->preparedClips=std::move(clips);impl_->resources->trimCache();return true;
+}
+bool AudioTrack::renderPrepared(std::span<float> output){
+    if(!impl_->resources){render(output);return true;}auto last=impl_->position.load()+int64_t(output.size()/2);auto clips=impl_->preparedClips;
+    for(const auto& voice:impl_->voices)clips.try_emplace(voice.event.tag,voice.clip);
+    auto add=[&](const AudioEvent& event){if(event.opcode!=6||clips.contains(event.tag))return true;auto found=impl_->resources->prepared(event.tag);if(!found.ready)return false;clips.emplace(event.tag,std::move(found.clip));return true;};
+    for(size_t n=impl_->cursor;n<impl_->events.size()&&impl_->events[n].sample<=last;n++)if(!add(impl_->events[n]))return false;
+    for(const auto& event:impl_->pending)if(event.sample<=last&&!add(event))return false;
+    impl_->preparedClips=std::move(clips);impl_->preparedOnly=true;struct Reset{Impl& impl;~Reset(){impl.preparedOnly=false;impl.preparedClips.clear();}} reset{*impl_};render(output);return true;
+}
+bool AudioTrack::seek(int64_t milliseconds,const std::function<bool()>& cancelled){
+    impl_->seekCancelled=[&]{return (cancelled&&cancelled())||(impl_->cancelled&&impl_->cancelled());};
+    struct Clear {std::function<bool()>& value;~Clear(){value={};}} clear{impl_->seekCancelled};
+    try{
+        impl_->checkSeekCancelled();auto target=sampleAt(milliseconds);
+        // Acquiring clip bytes has no interpreter side effects. Prepare the
+        // conservative past request set in parallel, then run the same exact
+        // stop/rank/delay/loop interpreter below. Unreached delayed requests
+        // cannot be needed at this target. Stop-filtered requests may be warmed
+        // speculatively; they are never emitted or otherwise applied here.
+        std::vector<std::string> tags;std::unordered_set<std::string> seen;
+        for(size_t n=0;n<impl_->events.size()&&impl_->events[n].sample<=target;n++){
+            if((n&1023)==0)impl_->checkSeekCancelled();const auto& event=impl_->events[n];if(event.opcode!=6)continue;
+            if(event.words[2]>0&&event.sample+sampleAt(event.words[2])>target)continue;
+            auto definition=impl_->resources->definition(event.tag);if(!definition||!definition->playable)continue;
+            if(seen.insert(event.tag).second)tags.push_back(event.tag);
+        }
+        std::atomic<bool> aborted=false;std::mutex cancellationMutex;
+        auto preparationCancelled=[&]{std::lock_guard lock(cancellationMutex);if(aborted)return true;if(impl_->seekCancelled&&impl_->seekCancelled()){aborted=true;return true;}return false;};
+        auto pinned=impl_->resources?impl_->resources->prepareClips(tags,preparationCancelled):std::vector<std::shared_ptr<const AudioClip>>{};if(aborted)throw AudioSeekCancelled{};
+        impl_->checkSeekCancelled();impl_->cursor=0;impl_->position=0;impl_->voices.clear();impl_->pending.clear();impl_->ranks.clear();impl_->loopCounters.clear();impl_->advance(target);
+        impl_->checkSeekCancelled();pinned.clear();if(impl_->resources)impl_->resources->trimCache();return true;
+    }catch(const AudioSeekCancelled&){if(impl_->resources)impl_->resources->trimCache();return false;}
 }
 void AudioTrack::render(std::span<float> output){
     if(output.size()%2)throw Error("Audio buffer must contain stereo frames");
@@ -234,61 +300,110 @@ struct AudioPlayer::Impl {
     using Clock=std::chrono::steady_clock;
     std::unique_ptr<AudioTrack> track;
     std::thread thread;
-    std::mutex mutex;
+    mutable std::mutex mutex;
     std::condition_variable condition;
-    bool quit=false,ready=false,playing=false,seekRequested=false;
+    bool quit=false,ready=false,playing=false,seekRequested=false,forcedBuffering=false,remainingEnabled=true;
+    bool buffering=false,clockRunning=false;
     int64_t requested=0;
     uint64_t requestedSerial=0;
-    std::atomic<uint64_t> appliedSerial=0;
+    std::function<bool()> seekCancellation;
+    std::atomic<uint64_t> appliedSerial=0,pcmSerial=0,rejectedSerial=0,deviceFrames=0,underruns=0,bufferingEvents=0,prefetchEpoch=0,remainingEpoch=0;
     float volume=1,playbackRate=1;
     bool muted=false;
     std::atomic<bool> available=false;
-    std::atomic<int64_t> position=0;
+    std::atomic<int64_t> position=0,bufferedMilliseconds=0;
     std::string failure;
-    // PCM storage outlives the worker's try scope and remains valid until
-    // DestroyVoice has finished consuming every queued buffer.
+    // Source PCM stays valid until the corresponding voice is destroyed.
     std::array<std::array<float,960>,4> buffers{};
     void run(){
         auto co=CoInitializeEx(nullptr,COINIT_MULTITHREADED);IXAudio2* engine=nullptr;IXAudio2MasteringVoice* master=nullptr;IXAudio2SourceVoice* voice=nullptr;
-        std::future<void> prefetch;std::atomic<bool> cancelPrefetch=false;
+        std::future<void> prefetch,remaining;
         auto close=[&]{if(voice)voice->DestroyVoice();if(master)master->DestroyVoice();if(engine)engine->Release();if(SUCCEEDED(co))CoUninitialize();};
+        auto cancelPrefetch=[&]{++prefetchEpoch;++remainingEpoch;if(prefetch.valid())try{prefetch.get();}catch(...){}if(remaining.valid())try{remaining.get();}catch(...){};};
         try{
             if(FAILED(XAudio2Create(&engine,0,XAUDIO2_DEFAULT_PROCESSOR))||FAILED(engine->CreateMasteringVoice(&master)))throw Error("Default audio output device is unavailable");
             WAVEFORMATEX format{};format.wFormatTag=WAVE_FORMAT_IEEE_FLOAT;format.nChannels=2;format.nSamplesPerSec=AudioTrack::SampleRate;
             format.wBitsPerSample=32;format.nBlockAlign=8;format.nAvgBytesPerSec=format.nSamplesPerSec*8;
             auto create=[&]{if(FAILED(engine->CreateSourceVoice(&voice,&format,0,4,nullptr)))throw Error("Cannot create REP audio output voice");};create();
-            // Decoding ahead must never wait on the 30ms device fill queue.
-            prefetch=std::async(std::launch::async,[&]{track->prepare(0,track->durationMilliseconds(),[&]{std::lock_guard lock(mutex);return quit||cancelPrefetch.load();});});
             {std::lock_guard lock(mutex);available=true;ready=true;condition.notify_all();}
-            size_t bufferIndex=0;bool active=false;int64_t base=0;
+            size_t bufferIndex=0;bool active=false,hadSteadyQueue=false,underrunEpisode=false,windowPrepared=false,remainingComplete=false;int64_t base=0,lastPrefetch=-1,windowEnd=0;uint64_t currentTicket=0,remainingTicket=0;
+            auto readClock=[&](bool wasActive=false){XAUDIO2_VOICE_STATE state{};voice->GetState(&state);
+                if(state.BuffersQueued>=3)hadSteadyQueue=true;
+                if((active||wasActive)&&hadSteadyQueue&&state.SamplesPlayed>0&&state.BuffersQueued==0){if(!underrunEpisode)++underruns;underrunEpisode=true;}else if(state.BuffersQueued>0)underrunEpisode=false;
+                deviceFrames=state.SamplesPlayed;position=base+int64_t(state.SamplesPlayed)*1000/AudioTrack::SampleRate;bufferedMilliseconds=std::max<int64_t>(0,track->positionMilliseconds()-position.load());return state;};
+            auto freeze=[&](bool){bool wasActive=active;if(active){voice->Stop();active=false;}readClock(wasActive);std::lock_guard lock(mutex);clockRunning=false;if(wasActive&&!buffering)++bufferingEvents;buffering=true;condition.notify_all();};
             while(true){
-                bool wanted,seek;int64_t target;float gain,rate;uint64_t serial;
-                {std::unique_lock lock(mutex);if(quit)break;wanted=playing;seek=std::exchange(seekRequested,false);target=requested;serial=requestedSerial;gain=muted?0.f:volume;rate=playbackRate;
-                    if(!wanted&&!seek){if(active){voice->Stop();active=false;}condition.wait_for(lock,std::chrono::milliseconds(10));continue;}}
+                bool wanted,seek,forced;int64_t target;float gain,rate;uint64_t serial;std::function<bool()> cancellation;
+                {std::unique_lock lock(mutex);if(quit)break;wanted=playing;seek=std::exchange(seekRequested,false);forced=forcedBuffering;target=requested;serial=requestedSerial;cancellation=seekCancellation;gain=muted?0.f:volume;rate=playbackRate;}
+                auto cancelled=[&]{{std::lock_guard lock(mutex);if(quit||requestedSerial!=serial)return true;}return cancellation&&cancellation();};
+                auto reject=[&]{freeze(false);cancelPrefetch();rejectedSerial=serial;std::lock_guard lock(mutex);if(requestedSerial==serial)playing=false;};
+                if(serial&&rejectedSerial.load()==serial){std::unique_lock lock(mutex);condition.wait_for(lock,std::chrono::milliseconds(10),[&]{return quit||seekRequested||requestedSerial!=serial;});continue;}
                 voice->SetVolume(gain);voice->SetFrequencyRatio(rate);
+                if(forced)freeze(false);
                 if(seek){
-                    // DestroyVoice waits until buffers are no longer consumed.
-                    // Re-creation also supplies a fresh, unambiguous sample clock.
-                    voice->DestroyVoice();voice=nullptr;create();voice->SetVolume(gain);voice->SetFrequencyRatio(rate);
-                    track->seek(target);base=target;bufferIndex=0;active=false;position=target;
-                    appliedSerial=serial;
+                    // Stop and recreate before expensive state work. No device
+                    // clock runs while a selected target is being prepared.
+                    freeze(false);cancelPrefetch();base=position.load();voice->DestroyVoice();voice=nullptr;create();voice->SetVolume(gain);voice->SetFrequencyRatio(rate);
+                    bufferIndex=0;lastPrefetch=-1;deviceFrames=0;bufferedMilliseconds=0;hadSteadyQueue=false;underrunEpisode=false;windowPrepared=remainingComplete=false;
+                    if(!track->seek(target,cancelled)||cancelled()){reject();continue;}
+                    base=target;
+                    {std::lock_guard lock(mutex);if(quit||requestedSerial!=serial)continue;position=target;appliedSerial=serial;}
                 }
-                {std::lock_guard lock(mutex);if(requestedSerial!=serial||!playing)wanted=false;}
-                if(wanted&&!active){voice->Start();active=true;}
-                if(!wanted)continue;
-                XAUDIO2_VOICE_STATE state{};voice->GetState(&state);
-                position=base+int64_t(state.SamplesPlayed)*1000/AudioTrack::SampleRate;
-                if(state.BuffersQueued<3){
-                    auto& buffer=buffers[bufferIndex++%buffers.size()];track->render(buffer);
-                    XAUDIO2_BUFFER submission{};submission.AudioBytes=DWORD(buffer.size()*sizeof(float));submission.pAudioData=reinterpret_cast<BYTE*>(buffer.data());
-                    if(FAILED(voice->SubmitSourceBuffer(&submission)))throw Error("REP audio output rejected PCM buffer");
+                if(cancelled()){reject();continue;}
+                if(!serial){std::unique_lock lock(mutex);condition.wait_for(lock,std::chrono::milliseconds(10));continue;}
+                auto state=readClock();
+                bool needInitial=pcmSerial.load()<serial;
+                if(needInitial||(wanted&&!forced)){
+                    while(state.BuffersQueued<3&&!cancelled()){
+                        auto& buffer=buffers[bufferIndex%buffers.size()];
+                        if(!track->renderPrepared(buffer)){
+                            freeze(active);cancelPrefetch();
+                            if(!track->prepareRender(10,cancelled)||cancelled())break;
+                            if(!track->renderPrepared(buffer))throw Error("Prepared REP audio buffer lost a required clip");
+                        }
+                        if(cancelled())break;
+                        XAUDIO2_BUFFER submission{};submission.AudioBytes=DWORD(buffer.size()*sizeof(float));submission.pAudioData=reinterpret_cast<BYTE*>(buffer.data());
+                        if(FAILED(voice->SubmitSourceBuffer(&submission)))throw Error("REP audio output rejected PCM buffer");
+                        ++bufferIndex;voice->GetState(&state);
+                    }
+                    if(cancelled()){reject();continue;}
+                    readClock();
+                    {std::lock_guard lock(mutex);if(quit||requestedSerial!=serial)continue;if(state.BuffersQueued>=3){pcmSerial=serial;condition.notify_all();}}
+                }
+                {std::lock_guard lock(mutex);wanted=playing;forced=forcedBuffering;if(requestedSerial!=serial)continue;}
+                if(wanted&&!forced&&pcmSerial.load()>=serial){
+                    {std::lock_guard lock(mutex);
+                        if(!quit&&requestedSerial==serial&&playing&&!forcedBuffering&&pcmSerial.load()>=serial&&rejectedSerial.load()!=serial){
+                            if(!active){voice->SetVolume(muted?0.f:volume);voice->SetFrequencyRatio(playbackRate);if(FAILED(voice->Start()))throw Error("REP audio output cannot start");active=true;}
+                            clockRunning=true;buffering=false;condition.notify_all();
+                        }
+                    }
                 }else{
-                    std::unique_lock lock(mutex);condition.wait_for(lock,std::chrono::milliseconds(2));
+                    if(active){voice->Stop();active=false;readClock();}
+                    std::lock_guard lock(mutex);clockRunning=false;buffering=forcedBuffering;
                 }
+                if(prefetch.valid()&&prefetch.wait_for(std::chrono::milliseconds(0))==std::future_status::ready){bool success=true;try{prefetch.get();}catch(...){success=false;}windowPrepared=success&&currentTicket==prefetchEpoch.load();}
+                if(remaining.valid()&&remaining.wait_for(std::chrono::milliseconds(0))==std::future_status::ready){bool success=true;try{remaining.get();}catch(...){success=false;}remainingComplete|=success&&remainingTicket==remainingEpoch.load();}
+                if(windowPrepared&&currentTicket!=prefetchEpoch.load())windowPrepared=false;
+                bool allowRemaining;{std::lock_guard lock(mutex);forced=forcedBuffering;allowRemaining=remainingEnabled;}
+                if(!forced&&pcmSerial.load()>=serial&&!cancelled()){
+                    auto at=track->positionMilliseconds();
+                    if(!prefetch.valid()&&(lastPrefetch<0||at-lastPrefetch>=500||!windowPrepared)){
+                        // Invalidate low work without waiting on an active
+                        // device queue. The new rolling window takes priority;
+                        // low workers notice cancellation before publication.
+                        ++remainingEpoch;windowPrepared=false;lastPrefetch=at;windowEnd=at+2000;currentTicket=++prefetchEpoch;auto ticket=currentTicket;
+                        prefetch=std::async(std::launch::async,[&,ticket,serial,at]{track->prepare(at,2000,[&]{std::lock_guard lock(mutex);return quit||requestedSerial!=serial||prefetchEpoch.load()!=ticket||forcedBuffering;});});
+                    }
+                    if(allowRemaining&&windowPrepared&&!remainingComplete&&!remaining.valid()&&windowEnd<track->durationMilliseconds()){
+                        auto from=windowEnd,horizon=track->durationMilliseconds()-from;remainingTicket=++remainingEpoch;auto ticket=remainingTicket;
+                        remaining=std::async(std::launch::async,[&,ticket,serial,from,horizon]{track->prepare(from,horizon,[&]{std::lock_guard lock(mutex);return quit||requestedSerial!=serial||remainingEpoch.load()!=ticket||forcedBuffering||!remainingEnabled;});});
+                    }
+                }
+                std::unique_lock lock(mutex);condition.wait_for(lock,std::chrono::milliseconds(active?2:10),[&]{return quit||seekRequested||forcedBuffering!=forced||playing!=wanted;});
             }
-        }catch(const std::exception& e){std::lock_guard lock(mutex);failure=e.what();available=false;ready=true;condition.notify_all();}
-        cancelPrefetch=true;if(prefetch.valid())try{prefetch.get();}catch(...){}
-        close();
+        }catch(const std::exception& e){std::lock_guard lock(mutex);failure=e.what();available=false;ready=true;clockRunning=false;buffering=false;condition.notify_all();}
+        cancelPrefetch();close();
     }
 };
 AudioPlayer::AudioPlayer(std::unique_ptr<AudioTrack> track):impl_(std::make_unique<Impl>()){
@@ -300,9 +415,13 @@ void AudioPlayer::play(int64_t milliseconds){seek(milliseconds,true);}
 void AudioPlayer::pause(){std::lock_guard lock(impl_->mutex);impl_->playing=false;impl_->condition.notify_all();}
 void AudioPlayer::resume(int64_t milliseconds){seek(milliseconds,true);}
 void AudioPlayer::stop(){seek(0,false);}
-uint64_t AudioPlayer::seek(int64_t milliseconds,bool playing){std::lock_guard lock(impl_->mutex);impl_->requested=std::max<int64_t>(0,milliseconds);impl_->playing=playing;impl_->seekRequested=true;auto serial=++impl_->requestedSerial;impl_->condition.notify_all();return serial;}
+uint64_t AudioPlayer::seek(int64_t milliseconds,bool playing,const std::function<bool()>& cancelled){std::lock_guard lock(impl_->mutex);impl_->requested=std::max<int64_t>(0,milliseconds);impl_->playing=playing;impl_->seekCancellation=cancelled;impl_->seekRequested=true;auto serial=++impl_->requestedSerial;impl_->condition.notify_all();return serial;}
 uint64_t AudioPlayer::appliedSeekSerial()const{return impl_->appliedSerial;}
-bool AudioPlayer::resumePrepared(uint64_t serial){std::lock_guard lock(impl_->mutex);if(impl_->requestedSerial!=serial||impl_->appliedSerial.load()<serial)return false;impl_->playing=true;impl_->condition.notify_all();return true;}
+uint64_t AudioPlayer::pcmReadySerial()const{return impl_->pcmSerial;}
+AudioPlayer::Statistics AudioPlayer::stats()const{std::lock_guard lock(impl_->mutex);return {impl_->appliedSerial.load(),impl_->pcmSerial.load(),impl_->deviceFrames.load(),impl_->underruns.load(),impl_->bufferedMilliseconds.load(),impl_->buffering,impl_->forcedBuffering,impl_->clockRunning,impl_->bufferingEvents.load()};}
+void AudioPlayer::pauseBuffering(bool paused){std::lock_guard lock(impl_->mutex);impl_->forcedBuffering=paused;if(paused){++impl_->prefetchEpoch;++impl_->remainingEpoch;if(!impl_->clockRunning)impl_->buffering=true;}impl_->condition.notify_all();}
+void AudioPlayer::setRemainingPrefetchEnabled(bool enabled){std::lock_guard lock(impl_->mutex);impl_->remainingEnabled=enabled;if(!enabled)++impl_->remainingEpoch;impl_->condition.notify_all();}
+bool AudioPlayer::resumePrepared(uint64_t serial){std::lock_guard lock(impl_->mutex);if(impl_->requestedSerial!=serial||impl_->rejectedSerial.load()==serial||impl_->appliedSerial.load()<serial||impl_->pcmSerial.load()<serial)return false;impl_->playing=true;impl_->condition.notify_all();return true;}
 void AudioPlayer::volume(float value,bool muted){std::lock_guard lock(impl_->mutex);impl_->volume=std::clamp(value,0.f,1.f);impl_->muted=muted;impl_->condition.notify_all();}
 void AudioPlayer::setPlaybackRate(double rate){
     if(!std::isfinite(rate)||rate<.25||rate>4)throw Error("Playback speed must be between 0.25 and 4");
@@ -310,6 +429,7 @@ void AudioPlayer::setPlaybackRate(double rate){
 }
 bool AudioPlayer::available()const{return impl_->available;}
 std::string AudioPlayer::error()const{std::lock_guard lock(impl_->mutex);return impl_->failure;}
+std::vector<std::string> AudioPlayer::diagnostics()const{return impl_->track->diagnostics();}
 uint64_t AudioPlayer::missingResources()const{return impl_->track->missingResources();}
 uint64_t AudioPlayer::eventCount()const{return impl_->track->eventCount();}
 int64_t AudioPlayer::positionMilliseconds()const{return impl_->position;}

@@ -23,6 +23,14 @@ struct PlayerStatus {
     uint64_t presentationSerial=0;
     uint64_t ordinal=0,frames=0,frameCount=0,skipped=0,captureSerial=0;
     double readySeconds=0,maxFrameMilliseconds=0,processReadySeconds=0,p50Frame=0,p95Frame=0,p99Frame=0,playbackSeconds=0;
+    double bufferingMilliseconds=0,postStartMaxFrameMilliseconds=0,resourceWaitMilliseconds=0;
+    double presentationGapP50Milliseconds=0,presentationGapP95Milliseconds=0,presentationGapP99Milliseconds=0,presentationGapMaxMilliseconds=0;
+    double presentationExcessP95Milliseconds=0,presentationExcessP99Milliseconds=0,presentationExcessMaxMilliseconds=0;
+    uint64_t presentationGap50=0,presentationGap100=0;
+    uint64_t bufferingCount=0,longFrames50=0,longFrames100=0,audioUnderruns=0,audioBufferingEvents=0;
+    uint64_t retainedCacheBytes=0,inactiveCacheBytes=0,activeCacheBytes=0,cacheEvictions=0;
+    uint64_t audioPcmReadySerial=0,audioAppliedSerial=0,audioRequestedSerial=0;
+    bool buffering=false;
     bool frozen=false,compatibilityIgnored=false;
     bool negativeImgOffsetsEnabled=false;
     bool patchesEnabled=true;
@@ -73,7 +81,7 @@ class PlaybackController {
     struct NavigationRequest {
         uint64_t serial=0,ordinal=0;
         int64_t time=0;
-        bool byOrdinal=false,last=false,resume=false,forceRebuild=false,preserveState=false,resumeOnly=false;
+        bool byOrdinal=false,last=false,resume=false,redraw=false,preserveState=false,resumeOnly=false;
         Phase originalPhase=Phase::Paused;
     };
     std::optional<NavigationRequest> navigationRequested_,activeNavigation_;

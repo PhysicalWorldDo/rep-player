@@ -7,6 +7,7 @@
 #include <unordered_set>
 
 namespace rep {
+class RetainedCache;
 struct AudioClip {
     int sampleRate=48000,channels=2;
     std::vector<float> samples;
@@ -38,30 +39,38 @@ private:
         std::mutex mutex;
         std::condition_variable ready;
         bool done=false;
+        bool cancelled=false;
         std::shared_ptr<const AudioClip> result;
     };
     IndexPtr index_;
+    struct Shared;
+    struct PackageTable;
+    std::shared_ptr<Shared> shared_;
+    std::shared_ptr<RetainedCache> cache_;
     std::filesystem::path ffmpeg_;
-    std::unordered_map<std::string,Entry> entries_;
-    std::unordered_set<std::string> indexedPackages_,unavailable_,reported_;
-    std::unordered_map<std::string,std::shared_ptr<const AudioClip>> clips_;
-    std::unordered_map<std::string,std::shared_ptr<Pending>> pending_;
+    std::filesystem::path workRoot_;
+    std::unordered_set<std::string> reported_;
     std::vector<std::string> diagnostics_;
     mutable std::mutex mutex_;
-    bool allPackagesIndexed_=false;
-    std::atomic<uint64_t> decoded_{0},missing_{0};
+    std::atomic<uint64_t> decoded_{0},missing_{0},decoderProcesses_{0};
     static void loadDefinitions(Index& index);
     static void readPackage(const std::filesystem::path& package,std::unordered_map<std::string,Entry>& entries,bool patch=false);
-    void indexPackage(const std::filesystem::path& package);
+    std::shared_ptr<const PackageTable> indexPackage(const std::filesystem::path& package);
     std::optional<Entry> resolve(const std::string& logical,bool original=false);
     void report(const std::string& key,std::string message,bool missing=false);
 public:
-    AudioResources(std::filesystem::path clientRoot,std::filesystem::path cacheRoot,bool patchesEnabled=true);
-    explicit AudioResources(IndexPtr index);
+    AudioResources(std::filesystem::path clientRoot,std::filesystem::path cacheRoot,bool patchesEnabled=true,std::shared_ptr<RetainedCache> cache={});
+    explicit AudioResources(IndexPtr index,std::shared_ptr<RetainedCache> cache={},std::filesystem::path workRoot={});
+    struct ClipState {bool ready=false;std::shared_ptr<const AudioClip> clip;};
+    // Cache-only acquisition: never reads packages, launches a decoder, or waits.
+    ClipState prepared(const std::string& tag);
+    void trimCache();
+    std::vector<std::shared_ptr<const AudioClip>> prepareClips(const std::vector<std::string>& tags,const std::function<bool()>& cancelled={});
     const SoundDefinition* definition(const std::string& tag)const;
     std::shared_ptr<const AudioClip> clip(const std::string& tag,const std::function<bool()>& cancelled={});
     std::vector<std::string> diagnostics()const;
     uint64_t decoded()const{return decoded_.load();}
     uint64_t missing()const{return missing_.load();}
+    uint64_t decoderProcesses()const{return decoderProcesses_.load();}
 };
 }

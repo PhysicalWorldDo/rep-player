@@ -23,6 +23,18 @@ static std::vector<ImgCall> dispatchedImages(const Replay& replay,const Instruct
     else if(i.opcode==58||(i.opcode==15&&payload[0]))add(replay.path(i.resource),i.frame,"mask",true);
     return calls;
 }
+std::vector<Assets::FrameRequest> commandImageRequests(const Replay& replay,const Command& command,int priority){
+    std::vector<Assets::FrameRequest> result;
+    auto add=[&](std::string path,int frame){path=imagePath(std::move(path));if(!path.empty())result.push_back({std::move(path),frame,priority});};
+    for(const auto& instruction:command.instructions){
+        auto payload=std::span(command.raw).subspan(instruction.offset,instruction.payloadBytes);
+        for(auto& image:dispatchedImages(replay,instruction,payload,0))add(std::move(image.path),image.frame);
+        if(instruction.opcode==19&&instruction.effect.present&&!instruction.effect.obsolete)
+            for(auto& input:shaderImageInputs(&instruction.effect,replay))add(input.path,input.frame);
+        if(instruction.opcode==0&&(at<uint32_t>(payload,0)&255)==7)add(replay.path(at<uint32_t>(payload,8)),-1);
+    }
+    return result;
+}
 ReplayInspection inspectReplayImages(Replay& replay,const std::function<bool()>& cancelled){
     ReplayInspection result;registeredImages(replay,result.images);replay.rewind();Scene scene;uint64_t instructions=0;
     while(replay.next(scene)){if(cancelled&&cancelled())return result;result.durationMilliseconds=std::max(result.durationMilliseconds,scene.timestamp);result.scenes++;uint32_t layerId=0;Reader aux(scene.aux);std::vector<const Effect*> effects;unsigned phantom=0;int stencilPhase=0,stencilChannel=-1;
@@ -47,6 +59,8 @@ struct Executor::State {
     struct EffectBinding {
         const Effect* effect=nullptr;
         std::shared_ptr<GpuTexture> mask;
+        std::shared_ptr<ContextVersion> contextInput;
+        size_t contextSlot=0;
         const Effect* operator->()const{return effect;}
     };
     std::vector<EffectBinding> effects;
@@ -85,6 +99,50 @@ struct Executor::Sprite {
     size_t call=SIZE_MAX;
     size_t actualCall=SIZE_MAX;
 };
+struct Executor::Navigation {
+    struct Cpu {
+        std::map<std::pair<int,uint32_t>,Camera> cameras;
+        std::map<int,std::array<float,2>> offsets;
+        unsigned blend=0;uint32_t random=1;
+        std::array<bool,12> bound{};
+        int selected=219;
+        std::array<Camera,12> actorCameras{};
+        bool localCapture=false,globalCapture=false,localHidden=false,globalHidden=false;
+        int localTarget=0,globalTarget=0;
+        Movies::Snapshot movies;
+    };
+    struct Recipe;
+    struct RecipeOutput {std::shared_ptr<Recipe> producer;size_t slot=0;};
+    struct Recipe {
+        Scene scene;
+        Cpu entry;
+        std::array<std::shared_ptr<RecipeOutput>,12> inputs{};
+        std::array<std::weak_ptr<RecipeOutput>,12> outputs{};
+    };
+    struct Entry {
+        Cpu cpu;
+        std::array<std::shared_ptr<ContextVersion>,12> contexts{};
+        std::array<std::shared_ptr<Target>,12> actors{};
+    };
+    uint64_t revision=1;
+    std::optional<Entry> displayedEntry;
+    std::optional<Target> spareOutput;
+    std::shared_ptr<Recipe> recording;
+    std::array<bool,12> written{};
+    bool rebuilding=false;
+    std::function<bool()> cancelled;
+    std::unordered_map<const RecipeOutput*,std::shared_ptr<ContextVersion>> rebuilt;
+    static Cpu cpu(Executor& e){return {e.cameras_,e.samplerOffsets_,e.lastBlend_,e.binder_.randomState(),e.contextBound_,e.selectedContext_,e.actorCameras_,e.localCapture_,e.globalCapture_,e.localHidden_,e.globalHidden_,e.localTarget_,e.globalTarget_,e.movies_->snapshot()};}
+    static void restore(Executor& e,const Cpu& c){e.cameras_=c.cameras;e.samplerOffsets_=c.offsets;e.lastBlend_=c.blend;e.binder_.restoreRandomState(c.random);e.contextBound_=c.bound;e.selectedContext_=c.selected;e.actorCameras_=c.actorCameras;e.localCapture_=c.localCapture;e.globalCapture_=c.globalCapture;e.localHidden_=c.localHidden;e.globalHidden_=c.globalHidden;e.localTarget_=c.localTarget;e.globalTarget_=c.globalTarget;for(auto& pixels:e.movies_->pixels())e.gpu_.forgetTexture(pixels.get());e.movies_->restoreSnapshot(c.movies);}
+    static Entry entry(Executor& e){return {cpu(e),e.contexts_,e.actors_};}
+    static void restore(Executor& e,const Entry& value){restore(e,value.cpu);e.contexts_=value.contexts;e.actors_=value.actors;}
+};
+struct Executor::ContextVersion {
+    Target target;
+    std::shared_ptr<Navigation::RecipeOutput> recipe;
+    uint64_t revision=0;
+};
+namespace {struct CancelledScene {};}
 static int cameraId(int context,std::optional<uint32_t> target={}){
     if(context==10||context==81)return 81;
     if((context==82||context==83||context==84)&&target)return *target==10?83:*target==11?84:82;
@@ -101,7 +159,8 @@ static void contextState(Executor::State& state,const Instruction& i){
     if(i.opcode==38){state.savedContext=state.context;state.nextContext=std::min(state.nextContext+1,230);state.context=state.nextContext;}
     else if(i.opcode==39)state.context=state.savedContext;
 }
-Executor::Executor(Gpu& gpu,Assets& assets,const std::filesystem::path& cache,const std::filesystem::path& clientRoot):gpu_(gpu),assets_(assets),binder_(gpu,assets),fonts_((clientRoot.empty()?assets.root().parent_path():clientRoot)/L"Fonts"),movies_(std::make_unique<Movies>(clientRoot.empty()?assets.root().parent_path():clientRoot,cache/L"movies")){}
+Executor::Executor(Gpu& gpu,Assets& assets,const std::filesystem::path& cache,const std::filesystem::path& clientRoot,std::shared_ptr<RetainedCache> retained):gpu_(gpu),assets_(assets),binder_(gpu,assets),fonts_((clientRoot.empty()?assets.root().parent_path():clientRoot)/L"Fonts",std::move(retained)),movies_(std::make_unique<Movies>(clientRoot.empty()?assets.root().parent_path():clientRoot,cache/L"movies")),navigation_(std::make_unique<Navigation>()){}
+void Executor::setDemandWaitCallback(std::function<void()> callback){fonts_.setDemandWaitCallback(callback);movies_->setDemandWaitCallback(std::move(callback));}
 Executor::~Executor()=default;
 bool Executor::hidden(const std::string& path)const{
     auto normalized=normalizeImagePath(path);
@@ -111,12 +170,15 @@ bool Executor::hidden(const std::string& path)const{
 bool Executor::negativeImgFrameSuppressed(const Frame& frame)const{
     return !negativeImgOffsetsEnabled_&&!frame.actualPath.empty()&&(frame.x<0||frame.y<0);
 }
-void Executor::setHiddenImages(std::unordered_set<std::string> paths){hiddenImages_.clear();for(auto& path:paths){auto normalized=imagePath(path);if(!normalized.empty())hiddenImages_.insert(std::move(normalized));}for(auto& call:currentImages_)call.hidden=hidden(call.path);for(auto& call:allImages_)call.hidden=hidden(call.path);}
+void Executor::setHiddenImages(std::unordered_set<std::string> paths){std::unordered_set<std::string> normalizedPaths;for(auto& path:paths){auto normalized=imagePath(path);if(!normalized.empty())normalizedPaths.insert(std::move(normalized));}if(hiddenImages_!=normalizedPaths){hiddenImages_=std::move(normalizedPaths);navigation_->revision++;}for(auto& call:currentImages_)call.hidden=hidden(call.path);for(auto& call:allImages_)call.hidden=hidden(call.path);}
 void Executor::setImageVisibility(const ImageVisibilityPolicy& policy){
+    if(policy.hideBackground!=imageVisibility_.hideBackground||policy.hideMonsters!=imageVisibility_.hideMonsters||policy.hideCharacters!=imageVisibility_.hideCharacters||policy.overrides!=imageVisibility_.overrides)navigation_->revision++;
     imageVisibility_=policy;
     for(auto& call:currentImages_)call.hidden=hidden(call.path);
     for(auto& call:allImages_)call.hidden=hidden(call.path);
 }
+void Executor::setNegativeImgOffsetsEnabled(bool enabled){if(negativeImgOffsetsEnabled_!=enabled){negativeImgOffsetsEnabled_=enabled;navigation_->revision++;}}
+void Executor::setTransparent(bool transparent){if(transparent_!=transparent){transparent_=transparent;navigation_->revision++;}}
 std::unordered_set<std::string> Executor::hiddenImages()const{
     std::unordered_set<std::string> result;
     for(const auto& path:hiddenImages_)if(hidden(path))result.insert(path);
@@ -132,8 +194,8 @@ size_t Executor::recordImage(std::string path,int frame,uint32_t layerId,std::st
 }
 void Executor::markDrawn(size_t call){if(call==SIZE_MAX)return;currentImages_[call].drawn=true;auto& path=currentImages_[call].path;for(auto& image:allImages_)if(image.path==path){image.drawn=true;break;}}
 void Executor::setInspection(ReplayInspection inspection){durationMilliseconds_=inspection.durationMilliseconds;for(auto& image:inspection.images){image.hidden=hidden(image.path);mergeImage(allImages_,std::move(image),false);}}
-void Executor::resetPlaybackState(){highlightFrame_.reset();gpu_.flush();for(auto& pixels:movies_->pixels())gpu_.forgetTexture(pixels.get());cameras_.clear();samplerOffsets_.clear();lastBlend_=0;movies_->reset();localCapture_=globalCapture_=localHidden_=globalHidden_=false;binder_.setReplay(replay_);selectedContext_=219;contextBound_.fill(false);sceneEntryValid_=false;}
-Target& Executor::renderTarget(int context){if(context>=219&&context<=230&&contexts_[context-219])return *contexts_[context-219];return output_;}
+void Executor::resetPlaybackState(){highlightFrame_.reset();gpu_.flush();for(auto& pixels:movies_->pixels())gpu_.forgetTexture(pixels.get());cameras_.clear();samplerOffsets_.clear();lastBlend_=0;movies_->reset();localCapture_=globalCapture_=localHidden_=globalHidden_=false;binder_.setReplay(replay_);selectedContext_=219;contextBound_.fill(false);contexts_={};actors_={};navigation_->displayedEntry.reset();navigation_->recording.reset();navigation_->rebuilt.clear();}
+Target& Executor::renderTarget(int context){if(context>=219&&context<=230&&contexts_[context-219])return contexts_[context-219]->target;return output_;}
 // Keep camera transforms and recorded clips in REP screen coordinates. Apply
 // the canvas offset only to final vertices, scissor rectangles and RT sampling.
 std::array<int,4> Executor::canvasClip()const{return {-canvasLayout_.left,-canvasLayout_.top,canvasLayout_.width-canvasLayout_.left,canvasLayout_.height-canvasLayout_.top};}
@@ -147,10 +209,12 @@ std::array<int,4> Executor::physicalClip(std::array<int,4> clip)const{
 void Executor::resizeCanvas(const CanvasLayout& layout){
     gpu_.flush();
     bool resized=output_.image.width!=layout.width||output_.image.height!=layout.height;
-    if(resized){output_=gpu_.target(layout.width,layout.height);canvas_=gpu_.target(layout.width,layout.height,false);working_=gpu_.target(layout.width,layout.height,false);raw_=gpu_.target(layout.width,layout.height,false);localMask_=gpu_.target(layout.width,layout.height,false);globalMask_=gpu_.target(layout.width,layout.height,false);}
-    if(resized||canvasLayout_!=layout){for(auto& a:actors_)a.reset();for(auto& c:contexts_)c.reset();}
+    if(resized){canvas_=gpu_.target(layout.width,layout.height,false);working_=gpu_.target(layout.width,layout.height,false);raw_=gpu_.target(layout.width,layout.height,false);localMask_=gpu_.target(layout.width,layout.height,false);globalMask_=gpu_.target(layout.width,layout.height,false);}
+    if(canvasLayout_!=layout)navigation_->revision++;
     canvasLayout_=layout;
-    float black[4]={0,0,0,transparent_?0.f:1.f};gpu_.begin(output_,black);
+    // A layout edit prepares the next transaction; the displayed output remains
+    // intact until its refreshed candidate is accepted.
+    if(!navigation_->displayedEntry){if(resized)output_=gpu_.target(layout.width,layout.height);float black[4]={0,0,0,transparent_?0.f:1.f};gpu_.begin(output_,black);}
 }
 void Executor::setCanvasSettings(const CanvasSettings& settings){
     if(replay_){auto layout=settings.resolve(replay_->header.width(),replay_->header.height());if(layout!=canvasLayout_)resizeCanvas(layout);}
@@ -159,7 +223,7 @@ void Executor::setCanvasSettings(const CanvasSettings& settings){
 }
 void Executor::attach(Replay& replay){
     gpu_.flush();
-    replay_=&replay;statistics={};resetPlaybackState();currentImages_.clear();allImages_.clear();durationMilliseconds_=0;registeredImages(replay,allImages_);
+    replay_=&replay;statistics={};resetPlaybackState();currentImages_.clear();allImages_.clear();durationMilliseconds_=0;sourceRevision_=assets_.sourceRevision();registeredImages(replay,allImages_);
     resizeCanvas(canvasSettings_.resolve(replay.header.width(),replay.header.height()));
 }
 void Executor::prepare(const std::function<bool()>& cancelled){
@@ -205,6 +269,10 @@ static std::array<int,4> cameraClip(std::array<int,4> clip,const Camera& camera,
     return clip;
 }
 void Executor::draw(Sprite s,State& state){
+    if(s.context>=219&&s.context<=230&&!state.effects.empty()&&navigation_->recording&&!navigation_->rebuilding){
+        auto& binding=state.effects.back();auto input=binding.contextInput;
+        if(input&&input->recipe&&input->recipe->producer!=navigation_->recording)navigation_->recording->inputs[binding.contextSlot]=input->recipe;
+    }
     statistics.primitives++;
     if(!s.frame){auto path=s.opcode==18||s.opcode==64?std::string("sprite/character/defaultfaces.img"):replay_->path(s.resource);if(path.empty()){statistics.nullResources++;return;}s.frame=assets_.frame(path,s.frameIndex);}
     if(s.call==SIZE_MAX&&!s.font&&s.frame){auto path=imagePath(s.instruction&&(s.instruction->opcode==18||s.instruction->opcode==64)?std::string("sprite/character/defaultfaces.img"):replay_->path(s.resource));bool stencil=state.phase==1&&(state.channel==0||state.channel==2);bool fallback=!s.frame->actualPath.empty()&&(s.frame->actualPath!=path||s.frame->actualFrame!=s.frameIndex);
@@ -244,7 +312,7 @@ void Executor::draw(Sprite s,State& state){
     Matrix m=s.matrix.value_or(affine(s,frame));
     const auto unprojectedOrigin=std::array{m.x,m.y};double placementScaleX=1,placementScaleY=1;
     if(!s.matrix||s.skipGrid){int context=s.context>=81&&s.context<=84?int(s.layer):s.context;bool eligible=state.samplerEnabled&&state.sampler&&state.sampler->number==1&&(context==10||context==11||context==28||context==29||context==30||context==33);
-        if(eligible){auto& sampler=*state.sampler;if(sampler.flag==1)samplerOffsets_[context]={sampler.x,sampler.y};auto offset=samplerOffsets_[context];m.a*=sampler.sx;m.b*=sampler.sx;m.c*=sampler.sy;m.d*=sampler.sy;m.x=sampler.sx*(m.x-sampler.ox)+offset[0];m.y=sampler.sy*(m.y-sampler.oy)+offset[1];placementScaleX=sampler.sx;placementScaleY=sampler.sy;statistics.samplerDraws++;}else samplerOffsets_.erase(context);
+        if(eligible){auto& sampler=*state.sampler;if(sampler.flag==1)samplerOffsets_[context]={sampler.x,sampler.y};auto offset=samplerOffsets_[context];m.a*=sampler.sx;m.b*=sampler.sx;m.c*=sampler.sy;m.d*=sampler.sy;m.x=sampler.sx*(m.x-sampler.ox)+offset[0];m.y=sampler.sy*(m.y-sampler.oy)+offset[1];placementScaleX=sampler.sx;placementScaleY=sampler.sy;statistics.samplerDraws++;}
     }
     auto clip=s.screenClip.value_or(state.clip);
     double cameraZoom=1,cameraScaleX=1,cameraScaleY=1;
@@ -282,7 +350,7 @@ void Executor::draw(Sprite s,State& state){
         int w=mode==1||mode==3?std::min(ax,sourceWidth):sourceWidth,h=mode==2||mode==3?std::min(ay,sourceHeight):sourceHeight;if(w==0||h==0)return;
         for(int my=0;my<((mode==2||mode==3)?2:1);my++)for(int mx=0;mx<((mode==1||mode==3)?2:1);mx++){auto part=s;part.params[12]=part.params[36]=0;part.specialUv=true;part.sourceSize=s.sourceSize.value_or(std::array{frame.width,frame.height});part.screenClip=clip;part.frame=std::make_shared<Frame>(frame);part.frame->width=w;part.frame->height=h;part.sourceRect=std::array<float,4>{source[0],source[1],source[0]+(frame.rotated?h:w),source[1]+(frame.rotated?w:h)};if(frame.rotated&&(mode==2||mode==3)){part.sourceRect->at(0)=source[2]-h;part.sourceRect->at(2)=source[2];}auto reflected=m;reflected.x+=mx?2*ax*m.a:0;reflected.y+=mx?2*ax*m.c:0;reflected.x+=my?2*ay*m.b:0;reflected.y+=my?2*ay*m.d:0;reflected.a*=mx?-1:1;reflected.c*=mx?-1:1;reflected.b*=my?-1:1;reflected.d*=my?-1:1;part.matrix=reflected;part.explicitCamera=false;draw(std::move(part),state);}return;
     }
-    auto sourceTexture=gpu_.texture(frame.texture,s.update);ShaderContext c;c.version=replay_->version;c.minor=replay_->header.minor;c.width=originalWidth;c.height=originalHeight;c.channel=s.channel;c.imagePresent=true;c.directSource=s.font||s.sourceRect.has_value()||s.params[36]||(quad2&&s.instruction->native[16]);c.x=m.x;c.y=m.y;c.scaleX=at<float>(s.params,20);c.scaleY=at<float>(s.params,24);c.direction=s.params[6]==1?0:1;
+    auto sourceTexture=gpu_.texture(frame.texture,s.update);ShaderContext c;c.version=replay_->version;c.minor=replay_->header.minor;c.width=originalWidth;c.height=originalHeight;c.channel=s.channel;c.imagePresent=true;c.transientSource=s.update;c.directSource=s.font||s.sourceRect.has_value()||s.params[36]||(quad2&&s.instruction->native[16]);c.x=m.x;c.y=m.y;c.scaleX=at<float>(s.params,20);c.scaleY=at<float>(s.params,24);c.direction=s.params[6]==1?0:1;
     auto& destination=renderTarget(s.context);
     const Effect* effect=state.effects.empty()?nullptr:state.effects.back().effect;
     Effect contextEffect;
@@ -379,22 +447,91 @@ void Executor::capture(const Instruction& i,std::span<const uint8_t> payload,boo
     std::array<Vertex,6> vertices{};int corners[]={0,1,2,2,1,3};auto& f=*s.frame;for(int n=0;n<6;n++){int corner=corners[n];auto& v=vertices[n];auto xy=matrix.apply((corner&1)*f.width,(corner>>1)*f.height);v.position[0]=xy[0]+canvasLayout_.left;v.position[1]=xy[1]+canvasLayout_.top;if(f.rotated){v.texcoord[0][0]=float(f.rect[2]-(corner>>1)*f.height)/f.texture->width;v.texcoord[0][1]=float(f.rect[1]+(corner&1)*f.width)/f.texture->height;}else{v.texcoord[0][0]=float(f.rect[corner&1?2:0])/f.texture->width;v.texcoord[0][1]=float(f.rect[corner>>1?3:1])/f.texture->height;}v.texcoord[2][0]=1;v.texcoord[7][0]=v.texcoord[7][1]=1;}
     float clear[4]{};gpu_.begin(target,clear);gpu_.draw(vertices,material,{0,0,output_.image.width,output_.image.height});gpu_.begin(renderTarget(state.context));active=true;
 }
-void Executor::execute(const Scene& scene){
+void Executor::checkNavigationCancelled(){if(navigation_->cancelled&&navigation_->cancelled())throw CancelledScene{};}
+std::shared_ptr<Executor::ContextVersion> Executor::resolveContext(size_t slot){
+    checkNavigationCancelled();auto version=contexts_[slot];if(!version)return {};
+    if(version->revision!=navigation_->revision){
+        if(!version->recipe)throw Error("context has no regeneration recipe");
+        auto outputRecipe=version->recipe;
+        if(auto found=navigation_->rebuilt.find(outputRecipe.get());found!=navigation_->rebuilt.end())version=found->second;
+        else {
+            auto entry=Navigation::entry(*this);auto images=std::move(currentImages_);auto all=std::move(allImages_);auto highlights=std::move(highlightFrame_);auto stats=statistics;auto duration=durationMilliseconds_;
+            auto recording=navigation_->recording;auto written=navigation_->written;bool rebuilding=navigation_->rebuilding,track=trackHighlights_;
+            Target output=std::move(output_);output_=gpu_.target(canvasLayout_.width,canvasLayout_.height);
+            auto restore=[&]{gpu_.flush();output_=std::move(output);Navigation::restore(*this,entry);currentImages_=std::move(images);allImages_=std::move(all);highlightFrame_=std::move(highlights);statistics=stats;durationMilliseconds_=duration;navigation_->recording=recording;navigation_->written=written;navigation_->rebuilding=rebuilding;trackHighlights_=track;};
+            try {
+                auto recipe=outputRecipe->producer;Navigation::restore(*this,recipe->entry);contexts_={};actors_={};
+                for(size_t n=0;n<12;n++)if(recipe->inputs[n]){auto input=std::make_shared<ContextVersion>();input->recipe=recipe->inputs[n];contexts_[n]=std::move(input);}
+                navigation_->recording=recipe;navigation_->written.fill(false);navigation_->rebuilding=true;trackHighlights_=false;
+                // Resolve the producer's old inputs before any of its local
+                // capture/stencil scratch is populated.
+                for(size_t n=0;n<12;n++)if(contexts_[n])resolveContext(n);
+                interpret(recipe->scene);checkNavigationCancelled();gpu_.flush();
+                for(size_t n=0;n<12;n++)if(navigation_->written[n]&&contexts_[n]&&contexts_[n]->recipe)navigation_->rebuilt[contexts_[n]->recipe.get()]=contexts_[n];
+                version=contexts_[outputRecipe->slot];if(!version)throw Error("context recipe did not produce its target");
+                navigation_->rebuilt[outputRecipe.get()]=version;
+            }catch(...){restore();throw;}
+            restore();
+        }
+        contexts_[slot]=version;
+    }
+    return version;
+}
+bool Executor::executeTransaction(const Scene& scene,bool redraw,const std::function<bool()>& cancelled,const std::function<bool()>& committing){
+    if(!replay_)throw Error("executor has no replay");
+    auto sourceRevision=assets_.sourceRevision();if(sourceRevision!=sourceRevision_)++navigation_->revision;
+    auto live=Navigation::entry(*this);auto oldImages=currentImages_;auto oldAll=allImages_;auto oldHighlight=highlightFrame_;auto oldStats=statistics;auto oldDuration=durationMilliseconds_;
+    Target candidate;
+    if(navigation_->spareOutput&&navigation_->spareOutput->image.width==canvasLayout_.width&&navigation_->spareOutput->image.height==canvasLayout_.height)candidate=std::move(*navigation_->spareOutput);
+    else candidate=gpu_.target(canvasLayout_.width,canvasLayout_.height);
+    Target previous=std::move(output_);output_=std::move(candidate);
+    navigation_->spareOutput.reset();navigation_->cancelled=cancelled;navigation_->rebuilt.clear();movies_->beginTransaction();
+    auto rollback=[&]{gpu_.flush();navigation_->spareOutput=std::move(output_);output_=std::move(previous);for(auto& pixels:movies_->pixels())gpu_.forgetTexture(pixels.get());movies_->rollbackTransaction();Navigation::restore(*this,live);currentImages_=std::move(oldImages);allImages_=std::move(oldAll);highlightFrame_=std::move(oldHighlight);statistics=oldStats;durationMilliseconds_=oldDuration;navigation_->recording.reset();navigation_->rebuilt.clear();navigation_->cancelled={};};
+    try {
+        checkNavigationCancelled();
+        if(redraw&&navigation_->displayedEntry)Navigation::restore(*this,*navigation_->displayedEntry);
+        // Rebuild active old buffers at an edit boundary, before the selected
+        // scene creates local/global masks. Navigation with unchanged settings
+        // only visits these twelve handles and performs no history execution.
+        for(size_t n=0;n<12;n++)if(contexts_[n])resolveContext(n);
+        auto entry=Navigation::entry(*this);auto recipe=std::make_shared<Navigation::Recipe>();recipe->scene=scene;recipe->entry=entry.cpu;
+        navigation_->recording=std::move(recipe);navigation_->written.fill(false);navigation_->rebuilding=false;
+        interpret(scene);checkNavigationCancelled();gpu_.flush();
+        if(assets_.sourceRevision()!=sourceRevision)throw ImageSourcesChanged{};
+        if(committing&&!committing())throw CancelledScene{};
+        checkNavigationCancelled();
+        if(!assets_.publishAtRevision(sourceRevision,[&]{navigation_->displayedEntry=std::move(entry);navigation_->spareOutput=std::move(previous);navigation_->recording.reset();navigation_->rebuilt.clear();navigation_->cancelled={};sourceRevision_=sourceRevision;}))throw ImageSourcesChanged{};
+        // Retiring an AVI decoder may wait for its child process. The source
+        // health lock protects only the already-prepared state installation.
+        movies_->commitTransaction();
+        return true;
+    }catch(const CancelledScene&){rollback();return false;}
+    catch(const ImagePreparationCancelled&){rollback();if(cancelled&&cancelled())return false;throw;}
+    catch(...){rollback();throw;}
+}
+void Executor::execute(const Scene& scene){executeSelected(scene);}
+bool Executor::executeStable(const Scene& scene,bool redraw,const std::function<bool()>& cancelled,const std::function<bool()>& committing){
+    while(true)try{return executeTransaction(scene,redraw,cancelled,committing);}
+    catch(const ImageSourcesChanged&){if(committing)throw;if(cancelled&&cancelled())return false;}
+}
+bool Executor::executeSelected(const Scene& scene,const std::function<bool()>& cancelled,const std::function<bool()>& committing){return executeStable(scene,false,cancelled,committing);}
+void Executor::interpret(const Scene& scene){
+    checkNavigationCancelled();
     if(trackHighlights_){highlightFrame_=std::make_shared<HighlightFrame>();highlightFrame_->width=output_.image.width;highlightFrame_->height=output_.image.height;}else highlightFrame_.reset();
-    if(!replay_)throw Error("executor has no replay");sceneEntryCameras_=cameras_;sceneEntryOffsets_=samplerOffsets_;sceneEntryBlend_=lastBlend_;sceneEntryRandom_=binder_.randomState();sceneEntryValid_=true;currentImages_.clear();durationMilliseconds_=std::max(durationMilliseconds_,scene.timestamp);State state;state.clip=canvasClip();auto initialize=[&](State& s){s.context=replay_->header.renderMode==2?(replay_->version>=17||replay_->version<=11?82:10):(replay_->version>=17?81:10);};initialize(state);
+    if(!replay_)throw Error("executor has no replay");currentImages_.clear();durationMilliseconds_=std::max(durationMilliseconds_,scene.timestamp);State state;state.clip=canvasClip();auto initialize=[&](State& s){s.context=replay_->header.renderMode==2?(replay_->version>=17||replay_->version<=11?82:10):(replay_->version>=17?81:10);};initialize(state);
     std::map<size_t,std::vector<GlyphQuad>> textQuads;size_t cursor=0;Reader aux(scene.aux);
-    for(auto id:scene.ids)if(auto command=replay_->command(id))for(const auto& i:command->instructions){auto payload=std::span(command->raw).subspan(i.offset,i.payloadBytes);float x=0,y=0;if(i.auxBytes){x=aux.get<int16_t>();y=aux.get<int16_t>();}
+    for(auto id:scene.ids)if(auto command=replay_->command(id))for(const auto& i:command->instructions){if((cursor&255)==0)checkNavigationCancelled();auto payload=std::span(command->raw).subspan(i.offset,i.payloadBytes);float x=0,y=0;if(i.auxBytes){x=aux.get<int16_t>();y=aux.get<int16_t>();}
         if(i.opcode==16||i.opcode==17)layer(state,i,payload,*replay_);
         contextState(state,i);
         if(i.opcode==50){Camera camera{at<float>(payload,0),at<float>(payload,4),at<float>(payload,12),at<float>(payload,16),at<float>(payload,20)};uint32_t target=at<uint32_t>(payload,8);
-            if(target==207){float clear[4]{};for(int n=0;n<12;n++){camera.x=std::clamp(camera.x,-1e6f,1e6f);camera.y=std::clamp(camera.y,-1e6f,1e6f);actorCameras_[n]=camera;if(!actors_[n])actors_[n]=gpu_.target(output_.image.width,output_.image.height,false);gpu_.begin(*actors_[n],clear);}statistics.actorPoolUpdates+=12;}
+            if(target==207){float clear[4]{};for(int n=0;n<12;n++){camera.x=std::clamp(camera.x,-1e6f,1e6f);camera.y=std::clamp(camera.y,-1e6f,1e6f);actorCameras_[n]=camera;if(!actors_[n]||actors_[n]->image.width!=output_.image.width||actors_[n]->image.height!=output_.image.height){actors_[n]=std::make_shared<Target>(gpu_.target(output_.image.width,output_.image.height,false));gpu_.begin(*actors_[n],clear);}}statistics.actorPoolUpdates+=12;}
             else {cameras_[{cameraId(state.context,target),target}]=camera;statistics.cameraUpdates++;}}
         if(i.opcode==5||i.opcode==48){if(i.opcode==48&&replay_->header.minor<7){x=at<float>(i.native,44);y=at<float>(i.native,48);}textQuads[cursor]=fonts_.prepare(i,*replay_,x,y);}cursor++;
     }
     aux.end();state={};state.clip=canvasClip();initialize(state);statistics.lastContext=state.context;cursor=0;Reader data(scene.aux);localCapture_=globalCapture_=localHidden_=globalHidden_=false;float black[4]={0,0,0,transparent_?0.f:1.f};gpu_.begin(output_,black);std::array<bool,12> activated{};
     std::set<const Pixels*> updatedFonts;
-    for(auto id:scene.ids){statistics.references++;auto command=replay_->command(id);if(!command)continue;
-        for(const auto& i:command->instructions){auto payload=std::span(command->raw).subspan(i.offset,i.payloadBytes);float x=0,y=0;if(i.auxBytes){x=data.get<int16_t>();y=data.get<int16_t>();}statistics.opcodes[i.opcode]++;
+    for(auto id:scene.ids){checkNavigationCancelled();statistics.references++;auto command=replay_->command(id);if(!command)continue;
+        for(const auto& i:command->instructions){if((cursor&255)==0)checkNavigationCancelled();auto payload=std::span(command->raw).subspan(i.offset,i.payloadBytes);float x=0,y=0;if(i.auxBytes){x=data.get<int16_t>();y=data.get<int16_t>();}statistics.opcodes[i.opcode]++;
             auto sprite=[&](){Sprite s;s.instruction=&i;s.opcode=i.opcode;s.resource=i.resource;s.frameIndex=i.frame;s.params=i.params;s.x=x;s.y=y;s.layer=state.layer;s.context=state.context;if(i.opcode>=42&&i.opcode<=47){s.layer=i.layer;s.explicitCamera=true;s.offscreen=i.opcode>=45;
                 // Modern sprite jobs call native color setter +48, which
                 // swaps ABGR to ARGB (14874DFD0); legacy draws/text use +32.
@@ -414,15 +551,17 @@ void Executor::execute(const Scene& scene){
             case 15:capture(i,payload,true,state);break;
             case 16:case 17:layer(state,i,payload,*replay_);break;
             case 18:case 64:if(!payload[4]){auto s=sprite();s.params=drawDefaults();s.x=at<int16_t>(payload,0);s.y=at<int16_t>(payload,2);s.frameIndex=payload[5];s.layer=i.opcode==64?at<uint32_t>(payload,8):state.layer;s.explicitCamera=i.opcode==64;draw(std::move(s),state);}break;
-            case 19:if(i.effect.present&&!i.effect.obsolete){if(i.effect.type<67)statistics.effects[i.effect.type]++;if(i.effect.programNull()){state.phantom++;statistics.phantomPushes++;}else {State::EffectBinding binding{&i.effect,{}};if(dnfProfile(replay_->options.profile)&&i.effect.type==54&&i.effect.floats.size()==7&&i.effect.floats[6]!=0){int slot=selectedContext_-219;if(contextBound_[slot]&&contexts_[slot])binding.mask=gpu_.view(*contexts_[slot]);}state.effects.push_back(std::move(binding));}}break;
+            case 19:if(i.effect.present&&!i.effect.obsolete){if(i.effect.type<67)statistics.effects[i.effect.type]++;if(i.effect.programNull()){state.phantom++;statistics.phantomPushes++;}else {State::EffectBinding binding{};binding.effect=&i.effect;if(dnfProfile(replay_->options.profile)&&i.effect.type==54&&i.effect.floats.size()==7&&i.effect.floats[6]!=0){int slot=selectedContext_-219;if(contextBound_[slot])if(auto context=resolveContext(slot)){binding.mask=gpu_.view(context->target);binding.contextInput=std::move(context);binding.contextSlot=slot;}}state.effects.push_back(std::move(binding));}}break;
             case 20:if(state.phantom)state.phantom--;else if(!state.effects.empty())state.effects.pop_back();break;
             case 21:statistics.nullCaches++;break;
-            case 23:{auto instance=at<uint64_t>(payload,8);auto moviePosition=at<uint32_t>(payload,36);auto frame=movies_->frame(replay_->path(i.resource),instance,moviePosition);if(!frame)break;auto s=sprite();s.opcode=3;s.params=drawDefaults();s.frame=frame;s.x=at<int32_t>(payload,16);s.y=at<int32_t>(payload,20);s.layer=i.layer;s.explicitCamera=replay_->version>=17;s.update=true;put(s.params,28,0.f);put(s.params,32,0.f);put(s.params,20,at<float>(payload,24));put(s.params,24,at<float>(payload,28));put(s.params,8,movies_->color(instance,at<uint32_t>(payload,32),replay_->version>=17));auto oldClip=state.clip;std::array<int,4> movieClip;bool any=false;for(int n=0;n<4;n++){movieClip[n]=at<int16_t>(payload,40+n*2);any|=movieClip[n]!=0;}if(any){for(int n=0;n<4;n++)state.clip[n]=n<2?std::max(oldClip[n],movieClip[n]):std::min(oldClip[n],movieClip[n]);if(state.clip[0]>=state.clip[2]||state.clip[1]>=state.clip[3])state.clip=canvasClip();}draw(std::move(s),state);state.clip=oldClip;break;}
+            case 23:{auto instance=at<uint64_t>(payload,8);auto moviePosition=at<uint32_t>(payload,36);auto previousPixels=movies_->pixels(instance);auto frame=movies_->frame(replay_->path(i.resource),instance,moviePosition);if(previousPixels&&(!frame||previousPixels.get()!=frame->texture.get()))gpu_.forgetTexture(previousPixels.get());if(!frame)break;auto s=sprite();s.opcode=3;s.params=drawDefaults();s.frame=frame;s.x=at<int32_t>(payload,16);s.y=at<int32_t>(payload,20);s.layer=i.layer;s.explicitCamera=replay_->version>=17;s.update=true;put(s.params,28,0.f);put(s.params,32,0.f);put(s.params,20,at<float>(payload,24));put(s.params,24,at<float>(payload,28));put(s.params,8,movies_->color(instance,at<uint32_t>(payload,32),replay_->version>=17));auto oldClip=state.clip;std::array<int,4> movieClip;bool any=false;for(int n=0;n<4;n++){movieClip[n]=at<int16_t>(payload,40+n*2);any|=movieClip[n]!=0;}if(any){for(int n=0;n<4;n++)state.clip[n]=n<2?std::max(oldClip[n],movieClip[n]):std::min(oldClip[n],movieClip[n]);if(state.clip[0]>=state.clip[2]||state.clip[1]>=state.clip[3])state.clip=canvasClip();}draw(std::move(s),state);state.clip=oldClip;break;}
             case 24:{auto id=at<uint64_t>(payload,8);if(auto pixels=movies_->pixels(id))gpu_.forgetTexture(pixels.get());movies_->stop(id);break;}
             case 26:case 27:case 28:case 29:{int channel=payload[0];if(channel>=3)break;if(i.opcode==26){state.channel=channel;state.phase=1;state.nextStencil[channel]=std::array{1,64,128}[channel];if(channel==0||channel==2){gpu_.clearStencil(renderTarget(state.context));for(auto& hiddenRefs:state.hiddenStencil)hiddenRefs.clear();}}else if(i.opcode==27){state.channel=channel;state.phase=2;state.reference=std::array{1,64,128}[channel];}else if(i.opcode==28){state.invert=payload[1]!=0;if(state.phase==1){state.reference=state.nextStencil[channel]-int(state.invert);if(!state.invert)state.nextStencil[channel]++;}else state.reference=payload[2];}else{state.channel=-1;state.phase=0;}break;}
             case 32:{Reader grid(payload);grid.take(4);State::Grid value;auto count=grid.get<uint8_t>();while(count--)value.xs.push_back(grid.get<int16_t>());count=grid.get<uint8_t>();while(count--)value.ys.push_back(grid.get<int16_t>());state.grids[{i.resource,i.frame}]=std::move(value);break;}
             case 33:state.grids.erase({i.resource,i.frame});break;
-            case 38:if(i.nativeContextState){contextState(state,i);selectedContext_=state.context;int slot=state.context-219;if(!contexts_[slot])contexts_[slot]=gpu_.target(output_.image.width,output_.image.height);float clear[4]{};gpu_.begin(*contexts_[slot],activated[slot]?nullptr:clear);activated[slot]=true;statistics.contextAllocations++;}break;
+            case 38:if(i.nativeContextState){contextState(state,i);selectedContext_=state.context;int slot=state.context-219;auto value=std::make_shared<ContextVersion>();value->target=gpu_.target(output_.image.width,output_.image.height);value->revision=navigation_->revision;
+                if(auto recipe=navigation_->recording){value->recipe=recipe->outputs[slot].lock();if(!value->recipe){value->recipe=std::make_shared<Navigation::RecipeOutput>();value->recipe->producer=recipe;value->recipe->slot=slot;recipe->outputs[slot]=value->recipe;}}
+                if(activated[slot]&&contexts_[slot])gpu_.copyTarget(contexts_[slot]->target,value->target);contexts_[slot]=std::move(value);navigation_->written[slot]=true;float clear[4]{};gpu_.begin(contexts_[slot]->target,activated[slot]?nullptr:clear);activated[slot]=true;statistics.contextAllocations++;}break;
             case 39:if(i.nativeContextState){contextState(state,i);contextBound_[selectedContext_-219]=true;gpu_.begin(renderTarget(state.context));statistics.contextBindings++;}break;
             case 40:if(i.nativeContextState){if(!state.effects.empty())state.effects.pop_back();statistics.contextReleases++;}break;
             case 51:state.flagsStack.push_back(state.flags);state.flags=at<uint16_t>(payload,0);break;
@@ -442,13 +581,12 @@ void Executor::execute(const Scene& scene){
     }
     data.end();if(!state.blends.empty()||!state.effects.empty()||state.phantom)throw Error("unbalanced scene rendering state at "+std::to_string(scene.timestamp));statistics.scenes++;
 }
-void Executor::redraw(const Scene& scene){if(sceneEntryValid_){cameras_=sceneEntryCameras_;samplerOffsets_=sceneEntryOffsets_;lastBlend_=sceneEntryBlend_;binder_.restoreRandomState(sceneEntryRandom_);}execute(scene);}
+void Executor::redraw(const Scene& scene){redrawSelected(scene);}
+bool Executor::redrawSelected(const Scene& scene,const std::function<bool()>& cancelled,const std::function<bool()>& committing){return executeStable(scene,true,cancelled,committing);}
 void Playback::attach(Replay& replay,Executor& executor){
-    replay_=&replay;executor_=&executor;hasScene_=false;ended_=false;stopped_=true;paused_=false;sequentialState_=true;elapsed_=0;selected=skipped=0;contextDependent_=false;
-    for(const auto& [id,command]:replay.dictionary)for(const auto& i:command.instructions)
-        if(i.nativeContextState&&(i.opcode==38||i.opcode==39))contextDependent_=true;
+    replay_=&replay;executor_=&executor;hasScene_=false;ended_=false;stopped_=true;paused_=false;elapsed_=0;selected=skipped=0;pendingScene_.reset();pendingReads_=0;pendingForced_=false;
 }
-void Playback::start(){if(!replay_)return;replay_->rewind();executor_->resetPlaybackState();hasScene_=ended_=paused_=false;stopped_=false;sequentialState_=true;elapsed_=0;selected=skipped=0;clockElapsed_=0;start_=std::chrono::steady_clock::now();}
+void Playback::start(){if(!replay_)return;replay_->rewind();executor_->resetPlaybackState();hasScene_=ended_=paused_=false;stopped_=false;elapsed_=0;selected=skipped=0;clockElapsed_=0;pendingScene_.reset();pendingReads_=0;pendingForced_=false;start_=std::chrono::steady_clock::now();}
 int64_t Playback::elapsedMilliseconds()const{if(stopped_||paused_||ended_)return elapsed_;return std::max<int64_t>(0,clockElapsed_+int64_t(std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-start_).count()*playbackRate_));}
 void Playback::setPlaybackRate(double rate){
     if(!std::isfinite(rate)||rate<.25||rate>4)throw Error("Playback speed must be between 0.25 and 4");
@@ -457,93 +595,87 @@ void Playback::setPlaybackRate(double rate){
 void Playback::stop(){elapsed_=elapsedMilliseconds();stopped_=true;paused_=false;}
 void Playback::pause(){if(!playing())return;elapsed_=elapsedMilliseconds();paused_=true;}
 void Playback::resume(){if(!replay_||stopped_||ended_||!paused_)return;clockElapsed_=elapsed_;start_=std::chrono::steady_clock::now();paused_=false;}
-bool Playback::refresh(){
-    if(!hasScene_||!executor_)return false;
-    // Context textures may be overwritten later in the same scene. Rebuild
-    // their dependencies instead of retaining copies of all twelve targets.
-    if(contextDependent_){bool wasEnded=ended_;bool changed=rebuildToOrdinal(scene_.ordinal);ended_=wasEnded;return changed;}
-    executor_->redraw(scene_);return true;
+bool Playback::refresh(const std::function<bool()>& cancelled,const std::function<bool()>& committing){
+    return hasScene_&&executor_&&executor_->redrawSelected(scene_,cancelled,committing);
 }
 bool Playback::setCanvasSettings(const CanvasSettings& settings){
     if(!executor_)return false;
-    auto before=executor_->canvasLayout();
-    auto elapsed=elapsedMilliseconds();
-    executor_->setCanvasSettings(settings);
+    auto before=executor_->canvasLayout();auto elapsed=elapsedMilliseconds();executor_->setCanvasSettings(settings);
     if(!replay_||!hasScene_||before==executor_->canvasLayout())return false;
-    bool wasEnded=ended_,wasStopped=stopped_,wasPaused=paused_;
-    auto oldSelected=selected,oldSkipped=skipped;
-    bool changed=rebuildToOrdinal(scene_.ordinal);
-    ended_=wasEnded;stopped_=wasStopped;paused_=wasPaused;
-    elapsed_=elapsed;clockElapsed_=elapsed_;start_=std::chrono::steady_clock::now();
-    selected=oldSelected;skipped=oldSkipped;
-    return changed;
+    auto changed=refresh();setElapsedMilliseconds(elapsed);return changed;
 }
 bool Playback::setNegativeImgOffsetsEnabled(bool enabled){
     if(!executor_||executor_->negativeImgOffsetsEnabled()==enabled)return false;
     auto elapsed=elapsedMilliseconds();executor_->setNegativeImgOffsetsEnabled(enabled);
     if(!replay_||!hasScene_)return false;
-    bool wasEnded=ended_,wasStopped=stopped_,wasPaused=paused_;
-    auto oldSelected=selected,oldSkipped=skipped;
-    bool changed=rebuildToOrdinal(scene_.ordinal);
-    ended_=wasEnded;stopped_=wasStopped;paused_=wasPaused;
-    elapsed_=elapsed;clockElapsed_=elapsed_;start_=std::chrono::steady_clock::now();
-    selected=oldSelected;skipped=oldSkipped;
-    return changed;
+    auto changed=refresh();setElapsedMilliseconds(elapsed);return changed;
 }
 void Playback::setElapsedMilliseconds(int64_t elapsed){elapsed_=std::max<int64_t>(0,elapsed);clockElapsed_=elapsed_;start_=std::chrono::steady_clock::now();}
 void Playback::finishNavigation(int64_t elapsed,bool playing,bool ended,bool stopped){setElapsedMilliseconds(elapsed);ended_=ended;stopped_=stopped;paused_=!playing&&!ended&&!stopped;}
-bool Playback::seek(int64_t elapsed,bool endpointLast,const std::function<bool()>& cancelled,const std::function<void(uint64_t)>& progress){
+bool Playback::navigate(int64_t time,std::optional<uint64_t> ordinal,bool last,
+    const std::function<bool()>& cancelled,const std::function<void(uint64_t)>& progress,
+    const std::function<void(int64_t)>& preparing,const std::function<bool()>& committing){
     if(!replay_||!executor_)return false;
-    elapsed=std::max<int64_t>(0,elapsed);bool changed=false;
-    // Only fully executed sequential state can advance without replaying history.
-    if(!hasScene_||!sequentialState_||(!endpointLast&&scene_.timestamp>=elapsed)){
-        replay_->rewind();executor_->resetPlaybackState();hasScene_=false;sequentialState_=true;
-    }
-    ended_=false;Scene next;
-    auto aborted=[&]{if(cancelled&&cancelled()){sequentialState_=false;return true;}return false;};
+    auto aborted=[&]{return cancelled&&cancelled();};
     if(aborted())return false;
-    while(endpointLast||!hasScene_||scene_.timestamp<elapsed){
-        if(!replay_->next(next)){ended_=true;break;}
-        scene_=std::move(next);hasScene_=true;executor_->execute(scene_);selected++;changed=true;
-        if(progress)progress(scene_.ordinal);if(aborted())return false;
+    // Only this disposable cursor reads history. Skipped records never execute.
+    Replay candidate(*replay_);Scene target;bool found=false,eof=false;uint64_t scanned=0;
+    while(true){
+        if(!candidate.next(target,cancelled)){if(aborted())return false;eof=true;break;}
+        found=true;scanned++;
+        if(progress)progress(target.ordinal);
+        if(aborted())return false;
+        if(ordinal?target.ordinal>=*ordinal:!last&&target.timestamp>=time)break;
     }
-    if(!hasScene_)scene_={};setElapsedMilliseconds(ended_?scene_.timestamp:elapsed);return changed;
-}
-bool Playback::seekOrdinal(uint64_t ordinal,const std::function<bool()>& cancelled,const std::function<void(uint64_t)>& progress,bool forceRebuild){
-    if(!replay_||!executor_)return false;bool changed=false;
-    if(forceRebuild||!hasScene_||!sequentialState_||scene_.ordinal>ordinal){
-        replay_->rewind();executor_->resetPlaybackState();hasScene_=false;sequentialState_=true;
-    }
-    ended_=false;Scene next;
-    auto aborted=[&]{if(cancelled&&cancelled()){sequentialState_=false;return true;}return false;};
+    auto elapsed=found?(ordinal||eof?std::max<int64_t>(0,target.timestamp):std::max<int64_t>(0,time)):0;
+    if(preparing)preparing(elapsed);
     if(aborted())return false;
-    while(!hasScene_||scene_.ordinal<ordinal){
-        if(!replay_->next(next)){ended_=true;break;}
-        scene_=std::move(next);hasScene_=true;executor_->execute(scene_);selected++;changed=true;
-        if(progress)progress(scene_.ordinal);if(aborted())return false;
-    }
-    if(!hasScene_)scene_={};setElapsedMilliseconds(hasScene_?scene_.timestamp:0);return changed;
+    if(found){if(!executor_->executeSelected(target,cancelled,committing))return false;}
+    else if((committing&&!committing())||aborted())return false;
+    replay_->swapCursor(candidate);hasScene_=found;ended_=eof||last;pendingScene_.reset();pendingReads_=0;pendingForced_=false;
+    if(found){scene_=std::move(target);selected++;if(scanned>1)skipped+=scanned-1;}else scene_={};
+    setElapsedMilliseconds(elapsed);return found;
 }
-bool Playback::rebuildToOrdinal(uint64_t ordinal){
-    replay_->rewind();executor_->resetPlaybackState();hasScene_=ended_=false;sequentialState_=true;Scene next;
-    while(replay_->next(next)){scene_=std::move(next);hasScene_=true;executor_->execute(scene_);selected++;if(scene_.ordinal>=ordinal)return true;}
-    ended_=true;if(!hasScene_)scene_={};return false;
+bool Playback::seek(int64_t elapsed,bool endpointLast,const std::function<bool()>& cancelled,
+    const std::function<void(uint64_t)>& progress,const std::function<void(int64_t)>& preparing,
+    const std::function<bool()>& committing){
+    return navigate(std::max<int64_t>(0,elapsed),{},endpointLast,cancelled,progress,preparing,committing);
+}
+bool Playback::seekOrdinal(uint64_t ordinal,const std::function<bool()>& cancelled,
+    const std::function<void(uint64_t)>& progress,bool forceRebuild,
+    const std::function<void(int64_t)>& preparing,const std::function<bool()>& committing){
+    // Kept for existing callers; navigation never rebuilds history.
+    (void)forceRebuild;return navigate(0,ordinal,false,cancelled,progress,preparing,committing);
 }
 bool Playback::step(int direction){
-    if(!direction||!replay_||!executor_)return false;stopped_=false;paused_=true;bool changed=false;
-    if(!hasScene_)changed=rebuildToOrdinal(0);
-    else if(direction<0){if(scene_.ordinal>0)changed=rebuildToOrdinal(scene_.ordinal-1);}
-    else{Scene next;if(replay_->next(next)){
-        if(!sequentialState_)changed=rebuildToOrdinal(next.ordinal);
-        else{scene_=std::move(next);executor_->execute(scene_);selected++;ended_=false;changed=true;}
-    }else{if(!sequentialState_)rebuildToOrdinal(scene_.ordinal);ended_=true;}}
-    elapsed_=hasScene_?std::max<int64_t>(0,scene_.timestamp):0;clockElapsed_=elapsed_;start_=std::chrono::steady_clock::now();return changed;
+    if(!direction||!replay_||!executor_)return false;stopped_=false;paused_=true;
+    if(!hasScene_)return seekOrdinal(0);
+    if(direction<0)return scene_.ordinal?seekOrdinal(scene_.ordinal-1):false;
+    Scene next;if(!replay_->next(next)){ended_=true;return false;}
+    if(!executor_->executeSelected(next))return false;
+    scene_=std::move(next);hasScene_=true;ended_=false;selected++;setElapsedMilliseconds(std::max<int64_t>(0,scene_.timestamp));return true;
 }
-bool Playback::select(int64_t elapsed){
-    if(stopped_||ended_||!replay_)return false;if(hasScene_&&scene_.timestamp>=elapsed)return false;
-    bool changed=false;Scene next;while(!hasScene_||scene_.timestamp<elapsed){if(!replay_->next(next)){ended_=true;break;}if(changed){skipped++;if(!contextDependent_)sequentialState_=false;}scene_=std::move(next);hasScene_=true;changed=true;
-        if(contextDependent_){executor_->execute(scene_);selected++;}}
-    elapsed_=ended_?scene_.timestamp:std::max<int64_t>(0,elapsed);if(changed&&!contextDependent_){executor_->execute(scene_);selected++;}return changed;
+bool Playback::select(int64_t elapsed,const std::function<bool()>& cancelled,const std::function<bool()>& committing){
+    if(stopped_||ended_||!replay_)return false;if(pendingForced_)elapsed=pendingElapsed_;if(hasScene_&&scene_.timestamp>=elapsed&&!pendingForced_)return false;
+    auto aborted=[&]{return cancelled&&cancelled();};if(aborted())return false;
+    Scene next;bool changed=false,eof=false;uint64_t read=pendingReads_;pendingReads_=0;
+    while(true){
+        bool forced=pendingForced_;pendingForced_=false;
+        if(pendingScene_){next=std::move(*pendingScene_);pendingScene_.reset();}
+        else {if(!replay_->next(next)){eof=true;break;}read++;}
+        changed=true;
+        // Keep a complete pending record when a UI request supersedes normal
+        // playback. Never abandon an inflater halfway through a live record.
+        if(aborted()){pendingScene_=std::move(next);pendingReads_=read;return false;}
+        if(next.timestamp>=elapsed||forced)break;
+    }
+    if(changed){
+        try{if(!executor_->executeSelected(next,cancelled,committing)){pendingScene_=std::move(next);pendingReads_=read;return false;}}
+        catch(const ImageSourcesChanged&){pendingScene_=std::move(next);pendingReads_=read;pendingForced_=true;pendingElapsed_=elapsed;throw;}
+        catch(...){pendingScene_=std::move(next);pendingReads_=read;throw;}
+        scene_=std::move(next);hasScene_=true;selected++;if(read>1)skipped+=read-1;
+    }
+    ended_=eof;elapsed_=ended_?(hasScene_?scene_.timestamp:0):std::max<int64_t>(0,elapsed);return changed;
 }
-bool Playback::tick(){if(paused_)return false;return select(elapsedMilliseconds());}
+bool Playback::tick(const std::function<bool()>& cancelled,const std::function<bool()>& committing){if(paused_)return false;return select(elapsedMilliseconds(),cancelled,committing);}
 }

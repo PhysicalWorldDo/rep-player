@@ -36,6 +36,8 @@ Bytes readFile(const std::filesystem::path& path,const std::function<bool()>& ca
 std::string utf8(std::wstring_view text);
 std::wstring wide(std::string_view text, unsigned codepage=65001);
 std::string canonical(std::string text);
+// Canonical Unicode path plus Windows file identity, size and modification time.
+std::string fileIdentityKey(const std::filesystem::path& path);
 
 enum class ProtocolProfile { Dfo, DnfJuly2026, DnfCompatible };
 inline bool dnfProfile(ProtocolProfile profile) { return profile!=ProtocolProfile::Dfo; }
@@ -98,11 +100,14 @@ struct Statistics {
 };
 class Timeline;
 struct ReplayData;
+class RetainedCache;
+class ReplayCache;
 class Replay {
     std::shared_ptr<const ReplayData> data_;
     std::unique_ptr<Timeline> timeline_;
     uint64_t ordinal_=0;
     explicit Replay(std::shared_ptr<const ReplayData> data);
+    friend class ReplayCache;
 public:
     const int& version;
     const uint32_t& versionBits;
@@ -121,12 +126,28 @@ public:
     Replay(const Replay& source);
     Replay& operator=(const Replay&)=delete;
     void rewind();
-    bool next(Scene& scene);
+    // Commit an independent navigation stream without replacing shared data.
+    void swapCursor(Replay& other);
+    // A cancelled candidate cursor may be discarded; the live stream is untouched.
+    bool next(Scene& scene,const std::function<bool()>& cancelled={});
     const Command* command(uint32_t id) const;
     std::string path(int64_t id) const;
     unsigned effectiveCodePage() const;
     bool resourceStringsDecoded() const { return options.decodeResourceStrings; }
+    std::shared_ptr<const void> dataIdentity() const { return data_; }
+    size_t estimatedDataBytes() const;
     Statistics validate(bool retainTimestamps=false);
+};
+// The caller supplies an applied-client/resource domain and a shared retention
+// store. Every returned replay owns a fresh independent timeline cursor.
+class ReplayCache {
+    std::shared_ptr<RetainedCache> cache_;
+    std::string prefix_;
+public:
+    explicit ReplayCache(std::shared_ptr<RetainedCache> cache,std::string domain={});
+    std::unique_ptr<Replay> open(const std::filesystem::path& path,ReplayOptions options={},const std::function<bool()>& cancelled={});
+    void clear();
+    void trim();
 };
 std::array<uint8_t,64> drawDefaults();
 Command decodeCommand(Bytes raw,int version,int minor,ProtocolProfile profile=ProtocolProfile::Dfo);

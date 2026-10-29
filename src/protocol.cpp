@@ -1,6 +1,7 @@
 #include <cstring>
 #include <stdexcept>
 #include "protocol.hpp"
+#include "retained_cache.hpp"
 #include <algorithm>
 #include <cmath>
 #include <fstream>
@@ -62,6 +63,20 @@ std::wstring wide(std::string_view t,unsigned cp) {
 }
 std::string canonical(std::string s) {
     for(auto& c:s) { if(c=='\\') c='/'; else if(c>='A'&&c<='Z') c+=32; } return s;
+}
+std::string fileIdentityKey(const std::filesystem::path& path) {
+    struct File {HANDLE handle=INVALID_HANDLE_VALUE;~File(){if(handle!=INVALID_HANDLE_VALUE)CloseHandle(handle);}} file;
+    file.handle=CreateFileW(path.c_str(),FILE_READ_ATTRIBUTES,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,nullptr,OPEN_EXISTING,FILE_FLAG_BACKUP_SEMANTICS,nullptr);
+    if(file.handle==INVALID_HANDLE_VALUE)throw Error("cannot identify "+utf8(path.wstring()));
+    BY_HANDLE_FILE_INFORMATION info{};if(!GetFileInformationByHandle(file.handle,&info))throw Error("cannot obtain file identity");
+    auto length=GetFinalPathNameByHandleW(file.handle,nullptr,0,FILE_NAME_NORMALIZED|VOLUME_NAME_DOS);
+    if(!length)throw Error("cannot canonicalize file path");std::wstring resolved(length,L'\0');
+    auto written=GetFinalPathNameByHandleW(file.handle,resolved.data(),length,FILE_NAME_NORMALIZED|VOLUME_NAME_DOS);
+    if(!written||written>=length)throw Error("cannot canonicalize file path");resolved.resize(written);
+    std::wstring lower(resolved.size(),L'\0');
+    if(!LCMapStringEx(LOCALE_NAME_INVARIANT,LCMAP_LOWERCASE,resolved.data(),int(resolved.size()),lower.data(),int(lower.size()),nullptr,nullptr,0))lower=resolved;
+    auto name=utf8(lower);auto words=[&](DWORD high,DWORD low){return std::to_string((uint64_t(high)<<32)|low);};
+    return std::to_string(name.size())+":"+name+":"+std::to_string(info.dwVolumeSerialNumber)+":"+words(info.nFileIndexHigh,info.nFileIndexLow)+":"+words(info.nFileSizeHigh,info.nFileSizeLow)+":"+words(info.ftLastWriteTime.dwHighDateTime,info.ftLastWriteTime.dwLowDateTime)+":"+words(info.ftCreationTime.dwHighDateTime,info.ftCreationTime.dwLowDateTime);
 }
 const char* profileName(ProtocolProfile profile) {
     if(profile==ProtocolProfile::DnfCompatible)return "dnf-compatible";
@@ -374,18 +389,51 @@ Replay::Replay(const std::filesystem::path& path,ReplayOptions options,const std
     :Replay(std::make_shared<ReplayData>(path,options,cancelled)){}
 Replay::Replay(const Replay& source):Replay(source.data_){}
 Replay::~Replay()=default;
+size_t Replay::estimatedDataBytes() const {
+    const auto& d=*data_;size_t bytes=sizeof(d)+d.compressedTimeline.capacity()+d.header.raw.capacity()+d.dense.capacity()*sizeof(const Command*);
+    bytes+=d.dictionary.bucket_count()*sizeof(void*)+d.dictionary.size()*(sizeof(std::pair<const uint32_t,Command>)+2*sizeof(void*));
+    for(const auto& [id,command]:d.dictionary){
+        bytes+=command.raw.capacity()+command.instructions.capacity()*sizeof(Instruction);
+        for(const auto& i:command.instructions)bytes+=i.native.capacity()+i.instances.capacity()*sizeof(std::array<int32_t,4>)+i.effect.floats.capacity()*sizeof(float)+i.effect.bits.capacity()*sizeof(uint32_t);
+    }
+    for(const auto* strings:{&d.resources,&d.rawResources}){bytes+=strings->capacity()*sizeof(std::string);for(const auto& text:*strings)bytes+=text.capacity()+1;}
+    bytes+=d.resourceBytes.capacity()*sizeof(Bytes);for(const auto& resource:d.resourceBytes)bytes+=resource.capacity();return bytes;
+}
+ReplayCache::ReplayCache(std::shared_ptr<RetainedCache> cache,std::string domain)
+    :cache_(cache?std::move(cache):std::make_shared<RetainedCache>()),prefix_("replay:"+std::to_string(domain.size())+":"+domain+":"){}
+std::unique_ptr<Replay> ReplayCache::open(const std::filesystem::path& path,ReplayOptions options,const std::function<bool()>& cancelled){
+    checkCancelled(cancelled);auto identity=fileIdentityKey(path);
+    auto key=prefix_+identity+":"+std::to_string(int(options.profile))+":"+(options.resourceCodePage?std::to_string(*options.resourceCodePage):"auto")+":"+std::to_string(options.decodeResourceStrings);
+    auto data=cache_->find<ReplayData>(key);checkCancelled(cancelled);
+    if(data){if(fileIdentityKey(path)!=identity)throw Error("REP changed while loading");return std::unique_ptr<Replay>(new Replay(std::move(data)));}
+    auto replay=std::make_unique<Replay>(path,options,cancelled);checkCancelled(cancelled);
+    if(fileIdentityKey(path)!=identity)throw Error("REP changed while loading");
+    cache_->insert<ReplayData>(std::move(key),replay->data_,replay->estimatedDataBytes());return replay;
+}
+void ReplayCache::clear(){cache_->erasePrefix(prefix_);}
+void ReplayCache::trim(){cache_->trim();}
 void Replay::rewind(){timeline_=std::make_unique<Timeline>(data_->compressedTimeline);ordinal_=0;}
+void Replay::swapCursor(Replay& other){
+    if(data_!=other.data_)throw Error("cannot exchange cursors from different replays");
+    timeline_.swap(other.timeline_);std::swap(ordinal_,other.ordinal_);
+}
 const Command* Replay::command(uint32_t id) const {
     if(!dense.empty())return id<dense.size()?dense[id]:nullptr;
     auto it=dictionary.find(id);return it==dictionary.end()?nullptr:&it->second;
 }
 std::string Replay::path(int64_t id) const {return id>=0&&size_t(id)<resources.size()?resources[id]:std::string{};}
-bool Replay::next(Scene& s) {
+bool Replay::next(Scene& s,const std::function<bool()>& cancelled) {
+    if(cancelled&&cancelled())return false;
     if(!timeline_->available())return false;
     s.timestamp=timeline_->get<int32_t>();s.ordinal=ordinal_++;auto n=timeline_->get<uint32_t>();
-    if(n%4)throw Error("non-DWORD scene ID array");s.ids.resize(n/4);timeline_->read(s.ids.data(),n);
-    n=timeline_->get<uint32_t>();s.aux.resize(n);timeline_->read(s.aux.data(),n);
-    uint64_t expected=0;for(auto id:s.ids)if(auto c=command(id))expected+=c->auxBytes;
+    auto read=[&](void* destination,size_t size){
+        auto out=static_cast<uint8_t*>(destination);
+        while(size){if(cancelled&&cancelled())return false;auto bytes=std::min(size,size_t(65536));timeline_->read(out,bytes);out+=bytes;size-=bytes;}
+        return !(cancelled&&cancelled());
+    };
+    if(n%4)throw Error("non-DWORD scene ID array");s.ids.resize(n/4);if(!read(s.ids.data(),n))return false;
+    n=timeline_->get<uint32_t>();s.aux.resize(n);if(!read(s.aux.data(),n))return false;
+    uint64_t expected=0;size_t checked=0;for(auto id:s.ids){if((++checked&1023)==0&&cancelled&&cancelled())return false;if(auto c=command(id))expected+=c->auxBytes;}
     if(expected!=n)throw Error("scene auxiliary stream length mismatch at scene "+std::to_string(s.ordinal));
     return true;
 }
