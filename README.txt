@@ -1,4 +1,4 @@
-REP 播放器 1.2.3
+REP 播放器 1.3.0
 
 完整解压 Windows x64 运行包后，双击 rep_player.exe。
 保留 WebView2Loader.dll 和 resources；运行需要 Windows 10/11 x64、D3D11 和 Microsoft Edge WebView2 Runtime。
@@ -47,4 +47,4 @@ NPK 补丁支持：
 同包内其他有效 IMG 继续使用，预览、逐帧与导出的资源选择保持一致。
 
 完整使用说明：https://github.com/PhysicalWorldDo/rep-player/blob/main/README.md
-下载：https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.2.3
+下载：https://github.com/PhysicalWorldDo/rep-player/releases/tag/v1.3.0
