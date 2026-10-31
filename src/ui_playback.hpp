@@ -42,6 +42,10 @@ struct PlayerStatus {
     int64_t audioPosition=0;
     uint32_t finalCrc=0,frameCrc=0;
     std::vector<ImgCall> currentImages,allImages;
+    std::vector<std::string> currentOggs,allOggs;
+    std::unordered_set<std::string> hiddenOggs;
+    std::string auditionPath;
+    std::wstring auditionMessage;
     std::unordered_set<std::string> hiddenImages;
     ImageVisibilityPolicy imageVisibility;
     std::string highlightedImage;
@@ -74,6 +78,9 @@ class PlaybackController {
     uint64_t consumed_=0;
     bool stopRequested_=false,toggleRequested_=false,filterRequested_=false,captureRequested_=false,canvasRequested_=false;
     bool audioSettingsRequested_=false,audioMuted_=false;
+    std::unordered_set<std::string> hiddenOggs_;
+    std::optional<std::string> auditionRequested_;
+    std::atomic<uint64_t> auditionSerial_=0;
     bool negativeImgOffsetsRequested_=false,negativeImgOffsetsEnabled_=false;
     float audioVolume_=1;
     double playbackRate_=1;
@@ -81,7 +88,7 @@ class PlaybackController {
     struct NavigationRequest {
         uint64_t serial=0,ordinal=0;
         int64_t time=0;
-        bool byOrdinal=false,last=false,resume=false,redraw=false,preserveState=false,resumeOnly=false;
+        bool byOrdinal=false,last=false,resume=false,redraw=false,preserveState=false,resumeOnly=false,audioOnly=false;
         Phase originalPhase=Phase::Paused;
     };
     std::optional<NavigationRequest> navigationRequested_,activeNavigation_;
@@ -97,7 +104,8 @@ class PlaybackController {
     PlayerStatus status_;
     void run();
     void queueRefreshLocked();
-    void queueNavigationLocked(NavigationRequest request);
+    void queueNavigationLocked(NavigationRequest request,bool stopAudition=true);
+    void cancelAuditionLocked();
 public:
     PlaybackController(HWND canvas,std::filesystem::path root,std::filesystem::path client,bool test,Clock::time_point processStart,ClientProtocolSelection protocol={},CanvasSettings settings={},bool patchesEnabled=true);
     ~PlaybackController();
@@ -120,6 +128,8 @@ public:
     void setNegativeImgOffsetsEnabled(bool enabled);
     void setAudioVolume(float volume);
     void setAudioMuted(bool muted);
+    void setHiddenOggs(std::unordered_set<std::string> paths);
+    void auditionOgg(std::string path);
     void setPlaybackRate(double rate);
     void setHighlightedImage(std::string path);
     void captureFrame();

@@ -16,6 +16,7 @@ struct ExportOptions {
     std::filesystem::path outputDirectory;
     std::wstring fileName;
     std::unordered_set<std::string> hiddenImages;
+    std::unordered_set<std::string> hiddenOggs;
     ImageVisibilityPolicy imageVisibility;
     ClientProtocolSelection protocol;
     CanvasSettings canvas;

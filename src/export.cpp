@@ -148,6 +148,7 @@ ExportResult exportReplay(Gpu& gpu,Assets& assets,const std::filesystem::path& c
     if(options.audio&&!png){
         auto index=options.audioIndex?options.audioIndex:AudioResources::buildIndex(client,assets.patchesEnabled());
         AudioTrack audio(client,cache,replay,cancelled,std::move(index));
+        audio.setHiddenOggs(options.hiddenOggs);
         if(audio.hasEvents()){
             const uint64_t samples=(result.frames*AudioTrack::SampleRate+options.fps-1)/options.fps;
             if(samples>(std::numeric_limits<uint32_t>::max()-36)/8)throw Error("Audio export exceeds the WAV size limit");

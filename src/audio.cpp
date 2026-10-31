@@ -19,6 +19,7 @@ bool specialSlot(int slot){
 }
 struct AudioEvent {
     int64_t sample=0;
+    uint64_t ordinal=0;
     uint32_t opcode=0;
     std::array<int32_t,9> words{};
     bool flag=false;
@@ -30,6 +31,13 @@ struct AudioTimeline {
     std::vector<AudioEvent> events;
     int64_t duration=0;
 };
+std::string oggPath(std::string path){
+    path=canonical(std::move(path));while(!path.empty()&&path.front()=='/')path.erase(path.begin());
+    return path.size()>=4&&path.compare(path.size()-4,4,".ogg")==0?path:std::string{};
+}
+std::unordered_set<std::string> hiddenOggPaths(std::unordered_set<std::string> paths){
+    std::unordered_set<std::string> result;for(auto& path:paths)if(auto normalized=oggPath(path);!normalized.empty())result.insert(std::move(normalized));return result;
+}
 }
 struct AudioTrack::Impl {
     struct Voice {
@@ -42,6 +50,11 @@ struct AudioTrack::Impl {
         int64_t offset=0,forcedEnd=INT64_MAX;
     };
     std::shared_ptr<AudioResources> resources;
+    std::shared_ptr<const AudioClip> singleClip;
+    std::vector<std::string> allOggs;
+    std::unordered_map<uint64_t,std::vector<std::string>> recordOggs;
+    std::unordered_map<std::string,std::string> oggTags;
+    std::unordered_set<std::string> hiddenOggs;
     std::shared_ptr<const AudioTimeline> timeline;
     std::span<const AudioEvent> events;
     std::vector<AudioEvent> pending;
@@ -55,6 +68,16 @@ struct AudioTrack::Impl {
     std::atomic<int64_t> position=0;
     int64_t duration=0;
     ProtocolProfile profile=ProtocolProfile::Dfo;
+
+    void indexOggCalls(){
+        for(const auto& event:events){
+            if(event.opcode!=6)continue;auto definition=resources->definition(event.tag);if(!definition||!definition->playable)continue;
+            auto path=oggPath(definition->file);if(path.empty())continue;
+            recordOggs[event.ordinal].push_back(path);oggTags.try_emplace(std::move(path),event.tag);
+        }
+        for(const auto& [path,tag]:oggTags)allOggs.push_back(path);std::sort(allOggs.begin(),allOggs.end());
+        for(auto& [ordinal,paths]:recordOggs){std::sort(paths.begin(),paths.end());paths.erase(std::unique(paths.begin(),paths.end()),paths.end());}
+    }
 
     void checkSeekCancelled()const{if(seekCancelled&&seekCancelled())throw AudioSeekCancelled{};}
 
@@ -179,7 +202,7 @@ AudioTrack::AudioTrack(const std::filesystem::path& client,const std::filesystem
     auto identity=replay.dataIdentity();auto key="audio/events/"+std::to_string(reinterpret_cast<uintptr_t>(identity.get()));
     if(cacheStore)if(auto timeline=cacheStore->find<AudioTimeline>(key);timeline&&timeline->identity.lock()==identity){
         impl_->timeline=std::move(timeline);impl_->events=impl_->timeline->events;impl_->duration=impl_->timeline->duration;
-        if(!impl_->events.empty())impl_->resources=index?std::make_shared<AudioResources>(std::move(index),cacheStore,cache):std::make_shared<AudioResources>(client,cache,true,cacheStore);replay.rewind();return;
+        if(!impl_->events.empty())impl_->resources=index?std::make_shared<AudioResources>(std::move(index),cacheStore,cache):std::make_shared<AudioResources>(client,cache,true,cacheStore);impl_->indexOggCalls();replay.rewind();return;
     }
     auto timeline=std::make_shared<AudioTimeline>();timeline->identity=identity;
     std::unordered_map<uint32_t,std::vector<AudioEvent>> commands;
@@ -197,12 +220,12 @@ AudioTrack::AudioTrack(const std::filesystem::path& client,const std::filesystem
             commands[id].push_back(std::move(event));
         }
     }
-    replay.rewind();Scene scene;
+    replay.rewind();Scene scene;uint64_t ordinal=0;
     try{while(replay.next(scene)){
         if(cancelled&&cancelled())throw Error("Audio preparation cancelled");
         impl_->duration=std::max<int64_t>(impl_->duration,scene.timestamp);
         size_t references=0;
-        for(auto id:scene.ids){if((++references&1023)==0&&cancelled&&cancelled())throw Error("Audio preparation cancelled");if(auto found=commands.find(id);found!=commands.end())for(auto event:found->second){event.sample=sampleAt(scene.timestamp);timeline->events.push_back(std::move(event));}}
+        for(auto id:scene.ids){if((++references&1023)==0&&cancelled&&cancelled())throw Error("Audio preparation cancelled");if(auto found=commands.find(id);found!=commands.end())for(auto event:found->second){event.sample=sampleAt(scene.timestamp);event.ordinal=ordinal;timeline->events.push_back(std::move(event));}}++ordinal;
     }}catch(...){replay.rewind();throw;}
     replay.rewind();
     std::stable_sort(timeline->events.begin(),timeline->events.end(),[](const AudioEvent& a,const AudioEvent& b){return a.sample<b.sample;});timeline->duration=impl_->duration;
@@ -210,9 +233,14 @@ AudioTrack::AudioTrack(const std::filesystem::path& client,const std::filesystem
     if(cacheStore){size_t bytes=sizeof(AudioTimeline)+timeline->events.capacity()*sizeof(AudioEvent);for(const auto& event:timeline->events)bytes+=event.tag.capacity();cacheStore->insert<AudioTimeline>(key,timeline,bytes);}
     impl_->timeline=std::move(timeline);impl_->events=impl_->timeline->events;
     if(!impl_->events.empty())impl_->resources=index?std::make_shared<AudioResources>(std::move(index),cacheStore,cache):std::make_shared<AudioResources>(client,cache,true,cacheStore);
+    impl_->indexOggCalls();
+}
+AudioTrack::AudioTrack(std::shared_ptr<const AudioClip> clip):impl_(std::make_unique<Impl>()){
+    if(!clip||clip->sampleRate!=SampleRate||clip->channels!=2)throw Error("Audition requires a decoded 48 kHz stereo clip");
+    impl_->singleClip=std::move(clip);impl_->duration=int64_t((impl_->singleClip->frames()*1000+SampleRate-1)/SampleRate);
 }
 AudioTrack::~AudioTrack()=default;
-bool AudioTrack::hasEvents()const{return !impl_->events.empty();}
+bool AudioTrack::hasEvents()const{return !impl_->events.empty()||bool(impl_->singleClip);}
 uint64_t AudioTrack::eventCount()const{return impl_->events.size();}
 uint64_t AudioTrack::missingResources()const{return impl_->resources?impl_->resources->missing():0;}
 int64_t AudioTrack::positionMilliseconds()const{return impl_->position.load()*1000/SampleRate;}
@@ -220,6 +248,13 @@ int64_t AudioTrack::durationMilliseconds()const{return impl_->duration;}
 std::vector<std::string> AudioTrack::diagnostics()const{auto notes=impl_->resources?impl_->resources->diagnostics():std::vector<std::string>{};notes.insert(notes.end(),impl_->notes.begin(),impl_->notes.end());return notes;}
 const void* AudioTrack::eventIdentity()const{return impl_->timeline.get();}
 uint64_t AudioTrack::decoderProcesses()const{return impl_->resources?impl_->resources->decoderProcesses():0;}
+std::vector<std::string> AudioTrack::oggPaths(std::optional<uint64_t> ordinal)const{
+    if(!ordinal)return impl_->allOggs;auto found=impl_->recordOggs.find(*ordinal);return found==impl_->recordOggs.end()?std::vector<std::string>{}:found->second;
+}
+void AudioTrack::setHiddenOggs(std::unordered_set<std::string> paths){impl_->hiddenOggs=hiddenOggPaths(std::move(paths));}
+std::shared_ptr<const AudioClip> AudioTrack::oggClip(const std::string& path,const std::function<bool()>& cancelled)const{
+    if(cancelled&&cancelled())return {};auto found=impl_->oggTags.find(oggPath(path));return found==impl_->oggTags.end()?std::shared_ptr<const AudioClip>{}:impl_->resources->clip(found->second,cancelled);
+}
 void AudioTrack::prepare(int64_t milliseconds,int64_t horizon,const std::function<bool()>& cancelled){
     auto first=sampleAt(milliseconds),last=sampleAt(milliseconds+std::max<int64_t>(0,horizon));
     std::vector<std::string> tags;std::unordered_map<std::string,bool> seen;
@@ -256,6 +291,7 @@ bool AudioTrack::seek(int64_t milliseconds,const std::function<bool()>& cancelle
     struct Clear {std::function<bool()>& value;~Clear(){value={};}} clear{impl_->seekCancelled};
     try{
         impl_->checkSeekCancelled();auto target=sampleAt(milliseconds);
+        if(impl_->singleClip){impl_->position=std::max<int64_t>(0,target);return true;}
         // Acquiring clip bytes has no interpreter side effects. Prepare the
         // conservative past request set in parallel, then run the same exact
         // stop/rank/delay/loop interpreter below. Unreached delayed requests
@@ -278,11 +314,17 @@ bool AudioTrack::seek(int64_t milliseconds,const std::function<bool()>& cancelle
 void AudioTrack::render(std::span<float> output){
     if(output.size()%2)throw Error("Audio buffer must contain stereo frames");
     std::fill(output.begin(),output.end(),0.f);size_t completed=0,total=output.size()/2;
+    if(impl_->singleClip){
+        auto start=uint64_t(impl_->position.load()),length=impl_->singleClip->frames();
+        if(start<length){auto count=size_t(std::min<uint64_t>(total,length-start));std::copy_n(impl_->singleClip->samples.begin()+size_t(start)*2,count*2,output.begin());}
+        impl_->position+=int64_t(total);return;
+    }
     while(completed<total){
         int64_t start=impl_->position.load();impl_->boundary(start);
         auto count=size_t(std::max<int64_t>(1,impl_->nextBoundary(start+int64_t(total-completed))-start));
         count=std::min(count,total-completed);
         for(const auto& voice:impl_->voices){
+            if(impl_->hiddenOggs.contains(oggPath(voice.definition->file)))continue;
             auto length=int64_t(voice.clip->frames());
             for(size_t n=0;n<count;n++){
                 auto time=start+int64_t(n);if(impl_->stopped(voice,time))break;
@@ -310,6 +352,7 @@ struct AudioPlayer::Impl {
     std::atomic<uint64_t> appliedSerial=0,pcmSerial=0,rejectedSerial=0,deviceFrames=0,underruns=0,bufferingEvents=0,prefetchEpoch=0,remainingEpoch=0;
     float volume=1,playbackRate=1;
     bool muted=false;
+    std::unordered_set<std::string> hiddenOggs;
     std::atomic<bool> available=false;
     std::atomic<int64_t> position=0,bufferedMilliseconds=0;
     std::string failure;
@@ -333,8 +376,8 @@ struct AudioPlayer::Impl {
                 deviceFrames=state.SamplesPlayed;position=base+int64_t(state.SamplesPlayed)*1000/AudioTrack::SampleRate;bufferedMilliseconds=std::max<int64_t>(0,track->positionMilliseconds()-position.load());return state;};
             auto freeze=[&](bool){bool wasActive=active;if(active){voice->Stop();active=false;}readClock(wasActive);std::lock_guard lock(mutex);clockRunning=false;if(wasActive&&!buffering)++bufferingEvents;buffering=true;condition.notify_all();};
             while(true){
-                bool wanted,seek,forced;int64_t target;float gain,rate;uint64_t serial;std::function<bool()> cancellation;
-                {std::unique_lock lock(mutex);if(quit)break;wanted=playing;seek=std::exchange(seekRequested,false);forced=forcedBuffering;target=requested;serial=requestedSerial;cancellation=seekCancellation;gain=muted?0.f:volume;rate=playbackRate;}
+                bool wanted,seek,forced;int64_t target;float gain,rate;uint64_t serial;std::function<bool()> cancellation;std::unordered_set<std::string> selection;
+                {std::unique_lock lock(mutex);if(quit)break;wanted=playing;seek=std::exchange(seekRequested,false);forced=forcedBuffering;target=requested;serial=requestedSerial;cancellation=seekCancellation;gain=muted?0.f:volume;rate=playbackRate;if(seek)selection=hiddenOggs;}
                 auto cancelled=[&]{{std::lock_guard lock(mutex);if(quit||requestedSerial!=serial)return true;}return cancellation&&cancellation();};
                 auto reject=[&]{freeze(false);cancelPrefetch();rejectedSerial=serial;std::lock_guard lock(mutex);if(requestedSerial==serial)playing=false;};
                 if(serial&&rejectedSerial.load()==serial){std::unique_lock lock(mutex);condition.wait_for(lock,std::chrono::milliseconds(10),[&]{return quit||seekRequested||requestedSerial!=serial;});continue;}
@@ -345,7 +388,7 @@ struct AudioPlayer::Impl {
                     // clock runs while a selected target is being prepared.
                     freeze(false);cancelPrefetch();base=position.load();voice->DestroyVoice();voice=nullptr;create();voice->SetVolume(gain);voice->SetFrequencyRatio(rate);
                     bufferIndex=0;lastPrefetch=-1;deviceFrames=0;bufferedMilliseconds=0;hadSteadyQueue=false;underrunEpisode=false;windowPrepared=remainingComplete=false;
-                    if(!track->seek(target,cancelled)||cancelled()){reject();continue;}
+                    track->setHiddenOggs(std::move(selection));if(!track->seek(target,cancelled)||cancelled()){reject();continue;}
                     base=target;
                     {std::lock_guard lock(mutex);if(quit||requestedSerial!=serial)continue;position=target;appliedSerial=serial;}
                 }
@@ -427,10 +470,14 @@ void AudioPlayer::setPlaybackRate(double rate){
     if(!std::isfinite(rate)||rate<.25||rate>4)throw Error("Playback speed must be between 0.25 and 4");
     std::lock_guard lock(impl_->mutex);impl_->playbackRate=float(rate);impl_->condition.notify_all();
 }
+std::vector<std::string> AudioPlayer::oggPaths(std::optional<uint64_t> ordinal)const{return impl_->track->oggPaths(ordinal);}
+void AudioPlayer::setHiddenOggs(std::unordered_set<std::string> paths){std::lock_guard lock(impl_->mutex);impl_->hiddenOggs=hiddenOggPaths(std::move(paths));}
+std::shared_ptr<const AudioClip> AudioPlayer::oggClip(const std::string& path,const std::function<bool()>& cancelled)const{return impl_->track->oggClip(path,cancelled);}
 bool AudioPlayer::available()const{return impl_->available;}
 std::string AudioPlayer::error()const{std::lock_guard lock(impl_->mutex);return impl_->failure;}
 std::vector<std::string> AudioPlayer::diagnostics()const{return impl_->track->diagnostics();}
 uint64_t AudioPlayer::missingResources()const{return impl_->track->missingResources();}
 uint64_t AudioPlayer::eventCount()const{return impl_->track->eventCount();}
 int64_t AudioPlayer::positionMilliseconds()const{return impl_->position;}
+int64_t AudioPlayer::durationMilliseconds()const{return impl_->track->durationMilliseconds();}
 }

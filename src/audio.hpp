@@ -13,6 +13,8 @@ public:
     static constexpr int SampleRate=48000;
     AudioTrack(const std::filesystem::path& client,const std::filesystem::path& cache,
                Replay& replay,const std::function<bool()>& cancelled={},AudioResources::IndexPtr index={},std::shared_ptr<RetainedCache> cacheStore={});
+    // A raw decoded clip is auditioned once, independently of REP scheduling.
+    explicit AudioTrack(std::shared_ptr<const AudioClip> clip);
     ~AudioTrack();
     AudioTrack(const AudioTrack&)=delete;AudioTrack& operator=(const AudioTrack&)=delete;
     bool seek(int64_t milliseconds,const std::function<bool()>& cancelled={});
@@ -28,6 +30,9 @@ public:
     std::vector<std::string> diagnostics()const;
     const void* eventIdentity()const;
     uint64_t decoderProcesses()const;
+    std::vector<std::string> oggPaths(std::optional<uint64_t> ordinal={})const;
+    void setHiddenOggs(std::unordered_set<std::string> paths);
+    std::shared_ptr<const AudioClip> oggClip(const std::string& path,const std::function<bool()>& cancelled={})const;
 };
 
 class AudioPlayer {
@@ -58,11 +63,16 @@ public:
     bool resumePrepared(uint64_t seekSerial);
     void volume(float value,bool muted);
     void setPlaybackRate(double rate);
+    std::vector<std::string> oggPaths(std::optional<uint64_t> ordinal={})const;
+    // The immutable selection is applied by the audio worker on the next seek.
+    void setHiddenOggs(std::unordered_set<std::string> paths);
+    std::shared_ptr<const AudioClip> oggClip(const std::string& path,const std::function<bool()>& cancelled={})const;
     bool available()const;
     std::string error()const;
     std::vector<std::string> diagnostics()const;
     uint64_t missingResources()const;
     uint64_t eventCount()const;
     int64_t positionMilliseconds()const;
+    int64_t durationMilliseconds()const;
 };
 }
