@@ -34,11 +34,21 @@ template<class Controller> void exercise(HWND window,int argc,wchar_t** argv){
         player.seekTime(0);auto first=waitFor(player,[](const auto& s){return s.phase==Phase::Paused&&s.ordinal==0;});
         const std::string a="sounds/effect/fixture/tone_a.ogg",b="sounds/effect/fixture/tone_b.ogg";
         require(first.allOggs==std::vector<std::string>({a,b}),"Whole REP OGG list differs");
-        require(first.currentOggs==std::vector<std::string>({a}),"First same-time record does not select A");
+        require(first.currentOggs==std::vector<std::string>({a,b}),"Current OGG list must include both voices alive at timestamp zero");
         player.stepFrame(1);auto second=waitFor(player,[](const auto& s){return s.phase==Phase::Paused&&s.ordinal==1;});
-        require(second.currentOggs==std::vector<std::string>({b}),"Second same-time record does not select B");
+        require(second.currentOggs==std::vector<std::string>({a,b}),"Same timestamp must have the same active voices across record ordinals");
+        player.seekTime(100);auto sustained=waitFor(player,[](const auto& s){return s.phase==Phase::Paused&&s.elapsed==100;});
+        require(sustained.currentOggs==std::vector<std::string>({a,b}),"OGG vanished on a record with no new sound request");
+        std::this_thread::sleep_for(std::chrono::milliseconds(350));
+        require(player.status().currentOggs==sustained.currentOggs,"Paused activity changed with wall time");
+        player.seekTime(400);auto expired=waitFor(player,[](const auto& s){return s.phase==Phase::Paused&&s.elapsed==400;});
+        require(expired.currentOggs==std::vector<std::string>({a}),"Finished OGG must disappear while continuous loop remains");
+        player.seekTime(500);auto retriggered=waitFor(player,[](const auto& s){return s.phase==Phase::Paused&&s.elapsed==500;});
+        require(retriggered.currentOggs==std::vector<std::string>({a,b}),"Retriggered OGG did not reappear");
+        second=retriggered;
         player.setHiddenOggs({a});auto muted=waitFor(player,[&](const auto& s){return s.phase==Phase::Paused&&s.hiddenOggs.contains(a)&&s.completedNavigationSerial==s.navigationSerial;});
         require(muted.ordinal==second.ordinal&&muted.elapsed==second.elapsed,"Paused mute moved REP");
+        require(muted.currentOggs==std::vector<std::string>({a,b}),"Muted OGG must remain available for re-enabling");
         player.auditionOgg(a);auto audition=waitFor(player,[&](const auto& s){return s.auditionPath==a;});
         require(audition.phase==Phase::Paused&&audition.elapsed==muted.elapsed&&audition.hiddenOggs.contains(a),"Audition changed position or enabled hidden OGG");
         auto finished=waitFor(player,[](const auto& s){return s.auditionPath.empty();});
@@ -68,12 +78,21 @@ template<class Controller> void exercise(HWND window,int argc,wchar_t** argv){
         require(refreshed.hiddenOggs.contains(b),"NPK refresh lost OGG choices");
         player.open(argv[4]);auto changed=waitFor(player,[](const auto& s){return s.phase==Phase::Playing&&s.frameCount>0&&s.allOggs.size()==1;});
         require(changed.hiddenOggs.empty()&&changed.allOggs==std::vector<std::string>({b}),"New REP did not reset OGG choices");
+        player.seekTime(200);waitFor(player,[](const auto& s){return s.phase==Phase::Playing&&s.elapsed>=200;});
         player.auditionOgg(b);waitFor(player,[&](const auto& s){return s.auditionPath==b;});
-        player.stop();waitFor(player,[](const auto& s){return s.phase==Phase::Stopped&&s.auditionPath.empty();});
+        player.stop();auto stopped=waitFor(player,[](const auto& s){return s.phase==Phase::Stopped&&s.auditionPath.empty();});
+        require(stopped.currentOggs.empty(),"Stopped replay retained active OGGs");
         player.auditionOgg(b);waitFor(player,[&](const auto& s){return s.auditionPath==b;});
-        player.seekTime(0);waitFor(player,[](const auto& s){return s.phase==Phase::Paused&&s.auditionPath.empty();});
+        auto stoppedPreview=player.status();
+        rep::CanvasSettings larger;larger.mode=rep::CanvasMode::Multiple;larger.factor=2;player.setCanvasSettings(larger);
+        auto redrawn=waitFor(player,[](const auto& s){return s.phase==Phase::Paused&&s.canvasWidth==32;});
+        require(redrawn.elapsed==stoppedPreview.elapsed&&redrawn.audioPosition==redrawn.elapsed&&redrawn.currentOggs==std::vector<std::string>({b}),"Paused redraw after Stop/audition must restore preserved audio target");
+        player.seekTime(0);auto restored=waitFor(player,[](const auto& s){return s.phase==Phase::Paused&&s.auditionPath.empty();});
+        require(restored.currentOggs==std::vector<std::string>({b}),"Seek after Stop must restore target audio activity");
         player.auditionOgg("sounds/not-recorded.ogg");auto rejected=waitFor(player,[](const auto& s){return !s.auditionMessage.empty();});
         require(rejected.phase==Phase::Paused&&rejected.auditionPath.empty(),"Failed audition disturbed playback");
+        player.togglePause();auto ended=waitFor(player,[](const auto& s){return s.phase==Phase::Ended;});
+        require(ended.currentOggs.empty(),"Ended replay retained active OGGs");
         std::cout<<"{\"implemented\":true,\"ordinal_lists\":true,\"paused_mute\":true,\"playing_mute\":true,\"audition_once\":true,\"disabled_audition\":true,\"audition_replace_stop\":true,\"replay_refresh_choices\":true,\"switch_reset\":true,\"invalid_audition\":true}\n";
     }
 }

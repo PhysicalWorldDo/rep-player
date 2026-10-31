@@ -7,8 +7,12 @@ namespace rep {
 // One sample clock and one event interpreter serve device playback and export.
 // Rendering pictures, rebuilding cameras and reading back pixels never emit sound.
 class AudioTrack {
+    friend class AudioPlayer;
     struct Impl;
     std::unique_ptr<Impl> impl_;
+    struct OggRange {int64_t firstSample=0,lastSample=0;std::vector<std::string> paths;};
+    void renderActivity(std::span<float> output,std::vector<OggRange>* activity);
+    bool renderPreparedActivity(std::span<float> output,std::vector<OggRange>* activity);
 public:
     static constexpr int SampleRate=48000;
     AudioTrack(const std::filesystem::path& client,const std::filesystem::path& cache,
@@ -31,6 +35,7 @@ public:
     const void* eventIdentity()const;
     uint64_t decoderProcesses()const;
     std::vector<std::string> oggPaths(std::optional<uint64_t> ordinal={})const;
+    std::vector<std::string> activeOggs()const;
     void setHiddenOggs(std::unordered_set<std::string> paths);
     std::shared_ptr<const AudioClip> oggClip(const std::string& path,const std::function<bool()>& cancelled={})const;
 };
@@ -56,6 +61,14 @@ public:
         uint64_t bufferingEvents=0;
     };
     Statistics stats()const;
+    struct OggActivity {
+        uint64_t seekSerial=0;
+        int64_t sample=0,milliseconds=0;
+        bool ready=false;
+        std::vector<std::string> paths;
+    };
+    // One device-clock snapshot: prepared PCM ahead of this sample is excluded.
+    OggActivity oggActivity()const;
     // stats().buffering acknowledges the device has actually stopped.
     void pauseBuffering(bool paused);
     // Gate optional far-future work independently of near/current PCM.

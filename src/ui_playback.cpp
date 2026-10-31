@@ -294,6 +294,11 @@ void PlaybackController::run(){try{
     };
     auto updateAudio=[&]{
         status_.auditionPath=auditionPath;status_.auditionMessage=auditionMessage;
+        if(status_.phase==Phase::Empty||status_.phase==Phase::Loading||status_.phase==Phase::Stopped||status_.phase==Phase::Ended||status_.phase==Phase::Error||!audio||!audio->available())status_.currentOggs.clear();
+        else if(status_.phase!=Phase::Seeking){
+            auto activity=audio->oggActivity();
+            if(activity.ready&&activity.seekSerial==audioClockSerial)status_.currentOggs=std::move(activity.paths);
+        }
         status_.audioAvailable=audio&&audio->available();status_.audioMessage=audioMessage;
         status_.missingSoundCount=audio?audio->missingResources():0;status_.audioEvents=audio?audio->eventCount():0;
         status_.audioPosition=audio?(status_.phase==Phase::Ended?status_.duration:audio->positionMilliseconds()):0;
@@ -331,7 +336,7 @@ void PlaybackController::run(){try{
         return prepared;
     };
     auto applyAudio=[&](PreparedAudio prepared){audio=std::move(prepared.player);audioEpoch=std::move(prepared.epoch);audioMessage=std::move(prepared.message);};
-    auto updateImages=[&]{if(!executor)return;status_.currentImages=executor->currentImages();status_.allImages=executor->allImages();status_.hiddenImages=executor->hiddenImages();if(audio){status_.currentOggs=audio->oggPaths(status_.ordinal);status_.allOggs=audio->oggPaths();}};
+    auto updateImages=[&]{if(!executor)return;status_.currentImages=executor->currentImages();status_.allImages=executor->allImages();status_.hiddenImages=executor->hiddenImages();if(audio)status_.allOggs=audio->oggPaths();};
     auto updateCanvas=[&]{if(!executor)return;const auto& layout=executor->canvasLayout();status_.canvasWidth=layout.width;status_.canvasHeight=layout.height;status_.canvasLeft=layout.left;status_.canvasTop=layout.top;status_.canvasRight=layout.right;status_.canvasBottom=layout.bottom;};
     auto present=[&](bool commit=false){
         presentRequested_=false;if(commit){frozenPicture.reset();frozenHighlights.reset();}
@@ -502,10 +507,19 @@ void PlaybackController::run(){try{
                 playback.finishNavigation(playback.elapsedMilliseconds(),false);if(audio)audio->pause();
                 auto cancelled=[this,generation,serial=request.serial]{return quitting_||generation_!=generation||navigationSerial_!=serial;};
                 DemandCancellationScope demandScope(*assets,demandCancelled,cancelled);
+                bool restoredAudio=false;
+                // Stop releases the device player but retains the replay. A
+                // subsequent seek/step must rebuild its target sound state.
+                if(!audio&&!(request.preserveState&&request.originalPhase==Phase::Stopped)){
+                    auto aborted=std::make_shared<std::atomic<bool>>(false);
+                    auto future=std::async(std::launch::async,[&,source=std::make_unique<Replay>(*replay),index=audioIndex,generation,aborted]{return prepareAudio(*source,activeClient,index,generation,aborted);});
+                    while(future.wait_for(std::chrono::milliseconds(1))!=std::future_status::ready)if(cancelled())aborted->store(true);
+                    auto prepared=future.get();if(cancelled())continue;applyAudio(std::move(prepared));restoredAudio=bool(audio);
+                }
                 uint64_t navigationAudioSerial=0;int64_t navigationAudioTarget=request.time;
                 auto preparing=[&](int64_t elapsed,bool force=false){
                     bool changed=navigationAudioTarget!=elapsed;navigationAudioTarget=elapsed;
-                    if(audio&&(force||request.audioOnly||!request.preserveState||request.resume)&&(!navigationAudioSerial||changed)){
+                    if(audio&&(force||restoredAudio||request.audioOnly||!request.preserveState||request.resume)&&(!navigationAudioSerial||changed)){
                         audio->setHiddenOggs(hiddenOggs);
                         navigationAudioSerial=audio->seek(elapsed,false,cancelled);audioClockSerial=navigationAudioSerial;audioClockTarget=elapsed;
                     }

@@ -7,6 +7,7 @@
 #include <atomic>
 #include <cmath>
 #include <condition_variable>
+#include <deque>
 #include <future>
 #include <mutex>
 #include <thread>
@@ -66,6 +67,7 @@ struct AudioTrack::Impl {
     std::vector<std::string> notes;
     size_t cursor=0;
     std::atomic<int64_t> position=0;
+    std::optional<int64_t> trackedEndBoundary;
     int64_t duration=0;
     ProtocolProfile profile=ProtocolProfile::Dfo;
 
@@ -184,6 +186,11 @@ struct AudioTrack::Impl {
             else n++;
         }
     }
+    void renderBoundary(int64_t at){
+        // Tracking may already have consumed the previous buffer's end here.
+        // Skip only that added call; ordinary seek/render ordering is retained.
+        bool consumed=trackedEndBoundary&&*trackedEndBoundary==at;trackedEndBoundary.reset();if(!consumed)boundary(at);
+    }
     int64_t nextBoundary(int64_t limit)const {
         if(cursor<events.size())limit=std::min(limit,events[cursor].sample);
         for(const auto& event:pending){checkSeekCancelled();limit=std::min(limit,event.sample);}
@@ -251,6 +258,13 @@ uint64_t AudioTrack::decoderProcesses()const{return impl_->resources?impl_->reso
 std::vector<std::string> AudioTrack::oggPaths(std::optional<uint64_t> ordinal)const{
     if(!ordinal)return impl_->allOggs;auto found=impl_->recordOggs.find(*ordinal);return found==impl_->recordOggs.end()?std::vector<std::string>{}:found->second;
 }
+std::vector<std::string> AudioTrack::activeOggs()const{
+    std::vector<std::string> paths;auto at=impl_->position.load();
+    for(const auto& voice:impl_->voices)if(voice.start<=at&&!impl_->stopped(voice,at)){
+        auto path=oggPath(voice.definition->file);if(!path.empty())paths.push_back(std::move(path));
+    }
+    std::sort(paths.begin(),paths.end());paths.erase(std::unique(paths.begin(),paths.end()),paths.end());return paths;
+}
 void AudioTrack::setHiddenOggs(std::unordered_set<std::string> paths){impl_->hiddenOggs=hiddenOggPaths(std::move(paths));}
 std::shared_ptr<const AudioClip> AudioTrack::oggClip(const std::string& path,const std::function<bool()>& cancelled)const{
     if(cancelled&&cancelled())return {};auto found=impl_->oggTags.find(oggPath(path));return found==impl_->oggTags.end()?std::shared_ptr<const AudioClip>{}:impl_->resources->clip(found->second,cancelled);
@@ -278,13 +292,14 @@ bool AudioTrack::prepareRender(int64_t horizon,const std::function<bool()>& canc
     for(size_t n=0;n<std::min<size_t>(4,tags.size());n++)jobs.push_back(std::async(std::launch::async,[&]{for(size_t k;(k=next++)<tags.size();){if(cancelled&&cancelled())return;auto clip=impl_->resources->clip(tags[k],cancelled?cancelled:impl_->cancelled);std::lock_guard lock(pinMutex);clips.emplace(tags[k],std::move(clip));}}));
     for(auto& job:jobs)job.get();if(cancelled&&cancelled())return false;impl_->preparedClips=std::move(clips);impl_->resources->trimCache();return true;
 }
-bool AudioTrack::renderPrepared(std::span<float> output){
-    if(!impl_->resources){render(output);return true;}auto last=impl_->position.load()+int64_t(output.size()/2);auto clips=impl_->preparedClips;
+bool AudioTrack::renderPrepared(std::span<float> output){return renderPreparedActivity(output,nullptr);}
+bool AudioTrack::renderPreparedActivity(std::span<float> output,std::vector<OggRange>* activity){
+    if(!impl_->resources){renderActivity(output,activity);return true;}auto last=impl_->position.load()+int64_t(output.size()/2);auto clips=impl_->preparedClips;
     for(const auto& voice:impl_->voices)clips.try_emplace(voice.event.tag,voice.clip);
     auto add=[&](const AudioEvent& event){if(event.opcode!=6||clips.contains(event.tag))return true;auto found=impl_->resources->prepared(event.tag);if(!found.ready)return false;clips.emplace(event.tag,std::move(found.clip));return true;};
     for(size_t n=impl_->cursor;n<impl_->events.size()&&impl_->events[n].sample<=last;n++)if(!add(impl_->events[n]))return false;
     for(const auto& event:impl_->pending)if(event.sample<=last&&!add(event))return false;
-    impl_->preparedClips=std::move(clips);impl_->preparedOnly=true;struct Reset{Impl& impl;~Reset(){impl.preparedOnly=false;impl.preparedClips.clear();}} reset{*impl_};render(output);return true;
+    impl_->preparedClips=std::move(clips);impl_->preparedOnly=true;struct Reset{Impl& impl;~Reset(){impl.preparedOnly=false;impl.preparedClips.clear();}} reset{*impl_};renderActivity(output,activity);return true;
 }
 bool AudioTrack::seek(int64_t milliseconds,const std::function<bool()>& cancelled){
     impl_->seekCancelled=[&]{return (cancelled&&cancelled())||(impl_->cancelled&&impl_->cancelled());};
@@ -307,22 +322,29 @@ bool AudioTrack::seek(int64_t milliseconds,const std::function<bool()>& cancelle
         std::atomic<bool> aborted=false;std::mutex cancellationMutex;
         auto preparationCancelled=[&]{std::lock_guard lock(cancellationMutex);if(aborted)return true;if(impl_->seekCancelled&&impl_->seekCancelled()){aborted=true;return true;}return false;};
         auto pinned=impl_->resources?impl_->resources->prepareClips(tags,preparationCancelled):std::vector<std::shared_ptr<const AudioClip>>{};if(aborted)throw AudioSeekCancelled{};
-        impl_->checkSeekCancelled();impl_->cursor=0;impl_->position=0;impl_->voices.clear();impl_->pending.clear();impl_->ranks.clear();impl_->loopCounters.clear();impl_->advance(target);
+        impl_->checkSeekCancelled();impl_->trackedEndBoundary.reset();impl_->cursor=0;impl_->position=0;impl_->voices.clear();impl_->pending.clear();impl_->ranks.clear();impl_->loopCounters.clear();impl_->advance(target);
         impl_->checkSeekCancelled();pinned.clear();if(impl_->resources)impl_->resources->trimCache();return true;
     }catch(const AudioSeekCancelled&){if(impl_->resources)impl_->resources->trimCache();return false;}
 }
-void AudioTrack::render(std::span<float> output){
+void AudioTrack::render(std::span<float> output){renderActivity(output,nullptr);}
+void AudioTrack::renderActivity(std::span<float> output,std::vector<OggRange>* activity){
     if(output.size()%2)throw Error("Audio buffer must contain stereo frames");
+    if(activity)activity->clear();
     std::fill(output.begin(),output.end(),0.f);size_t completed=0,total=output.size()/2;
     if(impl_->singleClip){
         auto start=uint64_t(impl_->position.load()),length=impl_->singleClip->frames();
         if(start<length){auto count=size_t(std::min<uint64_t>(total,length-start));std::copy_n(impl_->singleClip->samples.begin()+size_t(start)*2,count*2,output.begin());}
-        impl_->position+=int64_t(total);return;
+        impl_->position+=int64_t(total);if(activity){activity->push_back({int64_t(start),impl_->position.load(),{}});activity->push_back({impl_->position.load(),impl_->position.load(),{}});}return;
     }
     while(completed<total){
-        int64_t start=impl_->position.load();impl_->boundary(start);
+        int64_t start=impl_->position.load();impl_->renderBoundary(start);
         auto count=size_t(std::max<int64_t>(1,impl_->nextBoundary(start+int64_t(total-completed))-start));
         count=std::min(count,total-completed);
+        if(activity){
+            auto paths=activeOggs();auto last=start+int64_t(count);
+            if(!activity->empty()&&activity->back().lastSample==start&&activity->back().paths==paths)activity->back().lastSample=last;
+            else activity->push_back({start,last,std::move(paths)});
+        }
         for(const auto& voice:impl_->voices){
             if(impl_->hiddenOggs.contains(oggPath(voice.definition->file)))continue;
             auto length=int64_t(voice.clip->frames());
@@ -334,6 +356,11 @@ void AudioTrack::render(std::span<float> output){
             }
         }
         completed+=count;impl_->position=start+int64_t(count);
+    }
+    if(activity){
+        // Prepared acquisition includes events at the buffer end. Capture that
+        // exact boundary for a device stopped precisely at the submitted tail.
+        auto at=impl_->position.load();impl_->renderBoundary(at);impl_->trackedEndBoundary=at;activity->push_back({at,at,activeOggs()});
     }
     for(float& value:output)value=std::clamp(value,-1.f,1.f);
 }
@@ -356,6 +383,9 @@ struct AudioPlayer::Impl {
     std::atomic<bool> available=false;
     std::atomic<int64_t> position=0,bufferedMilliseconds=0;
     std::string failure;
+    uint64_t oggRangesSerial=0;
+    std::deque<AudioTrack::OggRange> oggRanges;
+    OggActivity oggSnapshot;
     // Source PCM stays valid until the corresponding voice is destroyed.
     std::array<std::array<float,960>,4> buffers{};
     void run(){
@@ -369,17 +399,25 @@ struct AudioPlayer::Impl {
             format.wBitsPerSample=32;format.nBlockAlign=8;format.nAvgBytesPerSec=format.nSamplesPerSec*8;
             auto create=[&]{if(FAILED(engine->CreateSourceVoice(&voice,&format,0,4,nullptr)))throw Error("Cannot create REP audio output voice");};create();
             {std::lock_guard lock(mutex);available=true;ready=true;condition.notify_all();}
-            size_t bufferIndex=0;bool active=false,hadSteadyQueue=false,underrunEpisode=false,windowPrepared=false,remainingComplete=false;int64_t base=0,lastPrefetch=-1,windowEnd=0;uint64_t currentTicket=0,remainingTicket=0;
+            size_t bufferIndex=0;bool active=false,hadSteadyQueue=false,underrunEpisode=false,windowPrepared=false,remainingComplete=false;int64_t base=0,lastPrefetch=-1,windowEnd=0;uint64_t currentTicket=0,remainingTicket=0,sourceSerial=0;
             auto readClock=[&](bool wasActive=false){XAUDIO2_VOICE_STATE state{};voice->GetState(&state);
                 if(state.BuffersQueued>=3)hadSteadyQueue=true;
                 if((active||wasActive)&&hadSteadyQueue&&state.SamplesPlayed>0&&state.BuffersQueued==0){if(!underrunEpisode)++underruns;underrunEpisode=true;}else if(state.BuffersQueued>0)underrunEpisode=false;
-                deviceFrames=state.SamplesPlayed;position=base+int64_t(state.SamplesPlayed)*1000/AudioTrack::SampleRate;bufferedMilliseconds=std::max<int64_t>(0,track->positionMilliseconds()-position.load());return state;};
+                auto sample=sampleAt(base)+int64_t(state.SamplesPlayed);
+                deviceFrames=state.SamplesPlayed;position=sample*1000/AudioTrack::SampleRate;bufferedMilliseconds=std::max<int64_t>(0,track->positionMilliseconds()-position.load());
+                {std::lock_guard lock(mutex);if(sourceSerial==requestedSerial&&oggRangesSerial==sourceSerial){
+                    // Keep only the current submitted interval and its queued
+                    // successors, including a single exact end-point snapshot.
+                    while(oggRanges.size()>1&&oggRanges.front().lastSample<=sample)oggRanges.pop_front();
+                    oggSnapshot={sourceSerial,sample,position.load(),false,{}};
+                    for(const auto& range:oggRanges)if(range.firstSample<=sample&&(sample<range.lastSample||(range.firstSample==range.lastSample&&sample==range.firstSample))){oggSnapshot.ready=true;oggSnapshot.paths=range.paths;break;}
+                }}return state;};
             auto freeze=[&](bool){bool wasActive=active;if(active){voice->Stop();active=false;}readClock(wasActive);std::lock_guard lock(mutex);clockRunning=false;if(wasActive&&!buffering)++bufferingEvents;buffering=true;condition.notify_all();};
             while(true){
                 bool wanted,seek,forced;int64_t target;float gain,rate;uint64_t serial;std::function<bool()> cancellation;std::unordered_set<std::string> selection;
                 {std::unique_lock lock(mutex);if(quit)break;wanted=playing;seek=std::exchange(seekRequested,false);forced=forcedBuffering;target=requested;serial=requestedSerial;cancellation=seekCancellation;gain=muted?0.f:volume;rate=playbackRate;if(seek)selection=hiddenOggs;}
                 auto cancelled=[&]{{std::lock_guard lock(mutex);if(quit||requestedSerial!=serial)return true;}return cancellation&&cancellation();};
-                auto reject=[&]{freeze(false);cancelPrefetch();rejectedSerial=serial;std::lock_guard lock(mutex);if(requestedSerial==serial)playing=false;};
+                auto reject=[&]{freeze(false);cancelPrefetch();rejectedSerial=serial;std::lock_guard lock(mutex);if(requestedSerial==serial){playing=false;oggRanges.clear();oggSnapshot.ready=false;oggSnapshot.paths.clear();}};
                 if(serial&&rejectedSerial.load()==serial){std::unique_lock lock(mutex);condition.wait_for(lock,std::chrono::milliseconds(10),[&]{return quit||seekRequested||requestedSerial!=serial;});continue;}
                 voice->SetVolume(gain);voice->SetFrequencyRatio(rate);
                 if(forced)freeze(false);
@@ -389,8 +427,8 @@ struct AudioPlayer::Impl {
                     freeze(false);cancelPrefetch();base=position.load();voice->DestroyVoice();voice=nullptr;create();voice->SetVolume(gain);voice->SetFrequencyRatio(rate);
                     bufferIndex=0;lastPrefetch=-1;deviceFrames=0;bufferedMilliseconds=0;hadSteadyQueue=false;underrunEpisode=false;windowPrepared=remainingComplete=false;
                     track->setHiddenOggs(std::move(selection));if(!track->seek(target,cancelled)||cancelled()){reject();continue;}
-                    base=target;
-                    {std::lock_guard lock(mutex);if(quit||requestedSerial!=serial)continue;position=target;appliedSerial=serial;}
+                    base=target;sourceSerial=serial;
+                    {std::lock_guard lock(mutex);if(quit||requestedSerial!=serial)continue;position=target;appliedSerial=serial;oggRanges.clear();oggRangesSerial=serial;oggSnapshot={serial,sampleAt(target),target,false,{}};}
                 }
                 if(cancelled()){reject();continue;}
                 if(!serial){std::unique_lock lock(mutex);condition.wait_for(lock,std::chrono::milliseconds(10));continue;}
@@ -399,15 +437,17 @@ struct AudioPlayer::Impl {
                 if(needInitial||(wanted&&!forced)){
                     while(state.BuffersQueued<3&&!cancelled()){
                         auto& buffer=buffers[bufferIndex%buffers.size()];
-                        if(!track->renderPrepared(buffer)){
+                        std::vector<AudioTrack::OggRange> activity;
+                        if(!track->renderPreparedActivity(buffer,&activity)){
                             freeze(active);cancelPrefetch();
                             if(!track->prepareRender(10,cancelled)||cancelled())break;
-                            if(!track->renderPrepared(buffer))throw Error("Prepared REP audio buffer lost a required clip");
+                            if(!track->renderPreparedActivity(buffer,&activity))throw Error("Prepared REP audio buffer lost a required clip");
                         }
                         if(cancelled())break;
                         XAUDIO2_BUFFER submission{};submission.AudioBytes=DWORD(buffer.size()*sizeof(float));submission.pAudioData=reinterpret_cast<BYTE*>(buffer.data());
                         if(FAILED(voice->SubmitSourceBuffer(&submission)))throw Error("REP audio output rejected PCM buffer");
-                        ++bufferIndex;voice->GetState(&state);
+                        {std::lock_guard lock(mutex);if(requestedSerial==serial&&oggRangesSerial==serial){for(auto& range:activity)oggRanges.push_back(std::move(range));}}
+                        ++bufferIndex;state=readClock();
                     }
                     if(cancelled()){reject();continue;}
                     readClock();
@@ -445,7 +485,7 @@ struct AudioPlayer::Impl {
                 }
                 std::unique_lock lock(mutex);condition.wait_for(lock,std::chrono::milliseconds(active?2:10),[&]{return quit||seekRequested||forcedBuffering!=forced||playing!=wanted;});
             }
-        }catch(const std::exception& e){std::lock_guard lock(mutex);failure=e.what();available=false;ready=true;clockRunning=false;buffering=false;condition.notify_all();}
+        }catch(const std::exception& e){std::lock_guard lock(mutex);failure=e.what();available=false;ready=true;clockRunning=false;buffering=false;oggRanges.clear();oggSnapshot.ready=false;oggSnapshot.paths.clear();condition.notify_all();}
         cancelPrefetch();close();
     }
 };
@@ -458,10 +498,15 @@ void AudioPlayer::play(int64_t milliseconds){seek(milliseconds,true);}
 void AudioPlayer::pause(){std::lock_guard lock(impl_->mutex);impl_->playing=false;impl_->condition.notify_all();}
 void AudioPlayer::resume(int64_t milliseconds){seek(milliseconds,true);}
 void AudioPlayer::stop(){seek(0,false);}
-uint64_t AudioPlayer::seek(int64_t milliseconds,bool playing,const std::function<bool()>& cancelled){std::lock_guard lock(impl_->mutex);impl_->requested=std::max<int64_t>(0,milliseconds);impl_->playing=playing;impl_->seekCancellation=cancelled;impl_->seekRequested=true;auto serial=++impl_->requestedSerial;impl_->condition.notify_all();return serial;}
+uint64_t AudioPlayer::seek(int64_t milliseconds,bool playing,const std::function<bool()>& cancelled){std::lock_guard lock(impl_->mutex);impl_->requested=std::max<int64_t>(0,milliseconds);impl_->playing=playing;impl_->seekCancellation=cancelled;impl_->seekRequested=true;auto serial=++impl_->requestedSerial;impl_->oggRanges.clear();impl_->oggSnapshot={serial,sampleAt(impl_->requested),impl_->requested,false,{}};impl_->condition.notify_all();return serial;}
 uint64_t AudioPlayer::appliedSeekSerial()const{return impl_->appliedSerial;}
 uint64_t AudioPlayer::pcmReadySerial()const{return impl_->pcmSerial;}
 AudioPlayer::Statistics AudioPlayer::stats()const{std::lock_guard lock(impl_->mutex);return {impl_->appliedSerial.load(),impl_->pcmSerial.load(),impl_->deviceFrames.load(),impl_->underruns.load(),impl_->bufferedMilliseconds.load(),impl_->buffering,impl_->forcedBuffering,impl_->clockRunning,impl_->bufferingEvents.load()};}
+AudioPlayer::OggActivity AudioPlayer::oggActivity()const{
+    std::lock_guard lock(impl_->mutex);auto result=impl_->oggSnapshot;
+    result.ready=result.ready&&impl_->available&&result.seekSerial==impl_->requestedSerial&&impl_->pcmSerial.load()>=result.seekSerial&&impl_->rejectedSerial.load()!=result.seekSerial;
+    if(!result.ready)result.paths.clear();return result;
+}
 void AudioPlayer::pauseBuffering(bool paused){std::lock_guard lock(impl_->mutex);impl_->forcedBuffering=paused;if(paused){++impl_->prefetchEpoch;++impl_->remainingEpoch;if(!impl_->clockRunning)impl_->buffering=true;}impl_->condition.notify_all();}
 void AudioPlayer::setRemainingPrefetchEnabled(bool enabled){std::lock_guard lock(impl_->mutex);impl_->remainingEnabled=enabled;if(!enabled)++impl_->remainingEpoch;impl_->condition.notify_all();}
 bool AudioPlayer::resumePrepared(uint64_t serial){std::lock_guard lock(impl_->mutex);if(impl_->requestedSerial!=serial||impl_->rejectedSerial.load()==serial||impl_->appliedSerial.load()<serial||impl_->pcmSerial.load()<serial)return false;impl_->playing=true;impl_->condition.notify_all();return true;}

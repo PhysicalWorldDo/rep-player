@@ -22,7 +22,7 @@ class OggControllerTests(unittest.TestCase):
         self.exercise(True)
 
     def exercise(self, gated):
-        folder = ROOT / 'validation/ogg_controls_20261031/controller' / ('run_' + uuid.uuid4().hex[:8])
+        folder = ROOT / 'validation/ogg_active_20261031/controller' / ('run_' + uuid.uuid4().hex[:8])
         inputs = make_fixture(folder, ROOT / 'build/ffmpeg.exe')
         shutil.copy2(ROOT / 'build/ffmpeg.exe', folder / 'ffmpeg.exe')
         shutil.copytree(ROOT / 'assets/shaders', folder / 'assets/shaders')
