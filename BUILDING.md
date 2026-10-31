@@ -132,7 +132,7 @@ GUI、`rep_export` 和GPU验证工具也接受 `--profile` / `--codepage`。GUI�
 .\build\rep_export.exe --client $CLIENT --replay (Join-Path $CLIENT 'Replay\SkillReplay\Swordman\BloodyRave.rep') --format mov --fps 60 --alpha 1 --output .\exports --name BloodyRave
 ```
 
-`rep_gpu` 与 `rep_export` 可添加一个画布选项：`--canvas-scale 2`、`--canvas-size 1920x1080` 或 `--canvas-padding 256,128,256,128`（左、上、右、下）。选项扩大实际渲染纹理，原始投影尺寸保持不变；指定宽高不足时按 REP 原始尺寸容纳。默认不扩展。实际宽度或高度超过 REP 原始尺寸时关闭矩形 scissor，保留素材源矩形、蒙版和模板遮罩；实际尺寸未扩大时保留 REP 矩形裁剪。输出宽高为实际画布，GPU 报告另保留 `original_width/original_height`。
+`rep_gpu` 与 `rep_export` 可添加一个画布选项：`--canvas-scale 2`、`--canvas-size 1920x1080` 或 `--canvas-padding 256,128,256,128`（左、上、右、下）。选项扩大实际渲染纹理，原始投影尺寸保持不变；指定宽高不足时按 REP 原始尺寸容纳。默认不扩展。实际宽度或高度超过 REP 原始尺寸时，逐边放开原屏幕坐标中左/上不大于零、右/下达到原宽/高的边界，保留内部有限边界并平移留边；空裁剪保持为空，现代相机的无界哨兵保留其方向含义。四边都开放时关闭 scissor，仍有有限边时继续裁剪。素材源矩形、蒙版和模板遮罩保持原有规则；实际尺寸未扩大时保留 REP 原始裁剪。输出宽高为实际画布，GPU 报告另保留 `original_width/original_height`。
 
 随后完整解压用户 ZIP 到其他可写目录，直接启动根 EXE，检查客户端选择、名称显示、播放、暂停、前后帧、重播和导出。运行依赖须以解压包自身验证。
 
