@@ -25,7 +25,7 @@ def effect(kind, values):
 class CanvasPixelTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.folder = ROOT / 'validation' / 'canvas_20261007' / ('gpu_' + uuid.uuid4().hex[:8])
+        cls.folder = ROOT / 'validation' / 'chargeburst_unclip_20261031' / ('gpu_' + uuid.uuid4().hex[:8])
         cls.assets = cls.folder / 'assets'
         (cls.folder / 'build').mkdir(parents=True)
         cls.binary = cls.folder / 'build' / 'rep_gpu.exe'
@@ -104,13 +104,13 @@ class CanvasPixelTests(unittest.TestCase):
         pixels, _ = self.render([(draw, aux)], ['--canvas-padding', '4,3,8,6'], (28, 25))
         self.assert_rectangles(pixels, (28, 25), [(20, 3, 28, 11)])
 
-    def test_finite_world_clip_retains_camera_transform_and_padding_translation(self):
+    def test_expanded_canvas_releases_finite_world_clip_preserving_camera_projection(self):
         draw, aux = draw43(2, -1, 2)
         raw = camera(2, y=-4) + clip((-16, -16, 16, 2)) + draw
         for profile in ('dfo', 'dnf-july'):
             with self.subTest(profile=profile):
                 pixels, _ = self.render([(raw, aux)], ['--canvas-padding', '4,3,5,6'], (25, 25), profile)
-                self.assert_rectangles(pixels, (25, 25), [(6, 6, 10, 9)])
+                self.assert_rectangles(pixels, (25, 25), [(6, 6, 10, 10)])
 
     def test_large_finite_legacy_clip_stays_visible_after_padding_translation(self):
         # These are legal signed op60 edges, not the special +/-1000000 reset.
@@ -121,14 +121,65 @@ class CanvasPixelTests(unittest.TestCase):
         pixels, _ = self.render([(raw, aux)], ['--canvas-padding', '4,3,5,6'], (25, 25))
         self.assert_rectangles(pixels, (25, 25), [(2, 2, 6, 6)])
 
-    def test_full_unbounded_reset_extends_canvas_but_partial_sentinels_keep_clip(self):
+    def test_expanded_canvas_releases_full_and_partial_sentinel_clips(self):
         draw, aux = draw43(-2, -2, 2)
         for rectangle, expected in (((-1000000, -1000000, 1000000, 1000000), (2, 1, 6, 5)),
-                                    ((-1000000, -1000000, 1000000, 2), (4, 3, 6, 5))):
+                                    ((-1000000, -1000000, 1000000, 2), (2, 1, 6, 5))):
             with self.subTest(rectangle=rectangle):
                 pixels, _ = self.render([(camera(2) + clip(rectangle) + draw, aux)],
                                         ['--canvas-padding', '4,3,5,6'], (25, 25))
                 self.assert_rectangles(pixels, (25, 25), [expected])
+
+    def test_expanded_canvas_releases_legacy_rectangles_in_all_canvas_modes(self):
+        draw, aux = legacy(2, 2)
+        rectangles = ((3, 3, 4, 4), (3, 3, 3, 3), (30, 30, 40, 40))
+        modes = ((['--canvas-padding', '4,3,5,6'], (25, 25), (6, 5, 10, 9)),
+                 (['--canvas-scale', '2'], (32, 32), (10, 10, 14, 14)),
+                 (['--canvas-size', '25x23'], (25, 23), (6, 5, 10, 9)))
+        for rectangle in rectangles:
+            raw = op(2, struct.pack('<4h', *rectangle)) + draw
+            for options, size, expected in modes:
+                with self.subTest(rectangle=rectangle, options=options):
+                    pixels, _ = self.render([(raw, aux)], options, size)
+                    self.assert_rectangles(pixels, size, [expected])
+
+    def test_expanded_canvas_releases_modern_finite_empty_and_external_clips(self):
+        draw, aux = draw43(2, 2, 2)
+        for profile in ('dfo', 'dnf-july'):
+            for rectangle in ((3, 3, 4, 4), (3, 3, 3, 3), (30, 30, 40, 40)):
+                with self.subTest(profile=profile, rectangle=rectangle):
+                    pixels, _ = self.render([(camera(2) + clip(rectangle) + draw, aux)],
+                                           ['--canvas-padding', '4,3,5,6'], (25, 25), profile)
+                    self.assert_rectangles(pixels, (25, 25), [(6, 5, 10, 9)])
+
+    def test_actual_original_size_retains_recorded_clip_in_all_canvas_modes(self):
+        legacy_draw, legacy_aux = legacy(2, 2)
+        modern_draw, modern_aux = draw43(2, 2, 2)
+        modes = ([], ['--canvas-scale', '1'], ['--canvas-padding', '0,0,0,0'],
+                 ['--canvas-size', '16x16'], ['--canvas-size', '8x8'])
+        for options in modes:
+            for modern in (False, True):
+                for rectangle, expected in (((3, 3, 4, 4), [(3, 3, 4, 4)]),
+                                            ((3, 3, 3, 3), []), ((30, 30, 40, 40), [])):
+                    with self.subTest(options=options, modern=modern, rectangle=rectangle):
+                        raw = (camera(2) + clip(rectangle) + modern_draw if modern else
+                               op(2, struct.pack('<4h', *rectangle)) + legacy_draw)
+                        pixels, _ = self.render([(raw, modern_aux if modern else legacy_aux)], options)
+                        self.assert_rectangles(pixels, (16, 16), expected)
+
+    def test_expanded_canvas_empty_legacy_clip_preserves_img_source_rectangle(self):
+        draw, aux = legacy(2, 2, source=(1, 0, 3, 4))
+        raw = op(2, struct.pack('<4h', 0, 0, 0, 0)) + draw
+        pixels, _ = self.render([(raw, aux)], ['--canvas-padding', '4,3,5,6'], (25, 25))
+        self.assert_rectangles(pixels, (25, 25), [(6, 5, 8, 9)])
+
+    def test_expanded_canvas_empty_modern_clip_preserves_local_capture_mask(self):
+        capture = op(58, struct.pack('<Ii7f4B', 0, 0, 1, 1, -2, -1, 0, 0, 0, 0, 0, 0, 0))
+        draw, aux = draw43(-4, -3, 0, scale=(3, 3))
+        offscreen = op(46) + draw[4:]
+        raw = camera(0) + clip((0, 0, 0, 0)) + capture + offscreen + op(59)
+        pixels, _ = self.render([(raw, aux)], ['--canvas-padding', '4,3,5,6'], (25, 25))
+        self.assert_rectangles(pixels, (25, 25), [(0, 0, 2, 3)])
 
     def test_zero_padding_is_byte_identical_to_original_output(self):
         draw, aux = draw43(6, -1, 2)
@@ -194,7 +245,7 @@ class CanvasPixelTests(unittest.TestCase):
 class CanvasPlaybackTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.folder = ROOT / 'validation' / 'canvas_20261007' / ('playback_' + uuid.uuid4().hex[:8])
+        cls.folder = ROOT / 'validation' / 'chargeburst_unclip_20261031' / ('playback_' + uuid.uuid4().hex[:8])
         cls.assets = cls.folder / 'assets'
         cls.folder.mkdir(parents=True)
         shutil.copytree(ROOT / 'assets' / 'shaders', cls.assets / 'shaders')
@@ -242,6 +293,27 @@ class CanvasPlaybackTests(unittest.TestCase):
                                 capture_output=True, text=True, timeout=120)
         if result.returncode:
             raise RuntimeError(result.stderr)
+
+        scissor_object = cls.folder / 'canvas_scissor_native.o'
+        result = subprocess.run([str(compiler), *options, '-c', str(ROOT / 'tests/canvas_scissor_native.cpp'),
+                                 '-o', str(scissor_object)], capture_output=True, text=True, timeout=120)
+        if result.returncode:
+            raise RuntimeError(result.stderr)
+        cls.scissor_binary = cls.folder / 'canvas_scissor_native.exe'
+        result = subprocess.run([str(compiler), '-municode', '-static', *map(str, objects), str(scissor_object),
+                                 str(ROOT / 'vendor/freetype/libfreetype.a'), str(ROOT / 'vendor/zlib/libz.a'),
+                                 '-ld3d11', '-ldxgi', '-ld3dcompiler', '-ldxguid', '-o', str(cls.scissor_binary)],
+                                capture_output=True, text=True, timeout=120)
+        if result.returncode:
+            raise RuntimeError(result.stderr)
+
+    def test_expansion_disables_native_gpu_scissor_and_original_size_restores_it(self):
+        result = subprocess.run([str(self.scissor_binary), str(self.folder), str(self.replay), str(self.assets)],
+                                capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = json.loads(result.stdout)
+        (self.folder / 'scissor_state.json').write_text(json.dumps(report, indent=2), encoding='utf-8')
+        self.assertEqual(report['scissor_enabled'], [True, False, True, False, False, True])
 
     def test_resize_preserves_navigation_state_hidden_images_and_persistent_dependencies(self):
         for mode in ('paused', 'hidden', 'ended', 'stopped', 'running', 'context'):

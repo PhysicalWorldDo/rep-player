@@ -72,6 +72,7 @@ private:
     bool negativeImgFrameSuppressed(const Frame& frame)const;
     Target& renderTarget(int context);
     void resizeCanvas(const CanvasLayout& layout);
+    bool expandedCanvas()const;
     std::array<int,4> canvasClip()const;
     std::array<int,4> physicalClip(std::array<int,4> clip)const;
     void draw(Sprite sprite,State& state);

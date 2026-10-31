@@ -36,6 +36,7 @@ struct HighlightDraw {
     std::vector<Vertex> vertices;
     std::shared_ptr<GpuTexture> texture;
     std::array<int,4> clip{};
+    bool scissorEnabled=true;
 };
 struct HighlightFrame {int width=0,height=0;std::vector<HighlightDraw> draws;};
 class Gpu {
@@ -53,7 +54,7 @@ class Gpu {
     Com<ID3D11RenderTargetView> backbuffer_;
     Com<ID3D11Buffer> vertices_,matrices_,globals_;
     UINT vertexCursor_=65536;
-    Com<ID3D11RasterizerState> rasterizer_;
+    std::array<Com<ID3D11RasterizerState>,2> rasterizers_;
     std::unordered_map<int,std::unique_ptr<Program>> programs_;
     std::unordered_map<const Pixels*,std::shared_ptr<GpuTexture>> textures_;
     uint64_t textureClock_=0;
@@ -66,9 +67,9 @@ class Gpu {
     Material pendingMaterial_;
     std::array<int,4> pendingClip_{};
     unsigned pendingStencil_=0,pendingReference_=0;
-    bool pendingColor_=true;
+    bool pendingColor_=true,pendingScissorEnabled_=true;
     Target straightTarget_,highlightTarget_;
-    void submit(std::span<const Vertex> vertices,Material& material,std::array<int,4> clip,unsigned stencil,unsigned reference,bool writeColor);
+    void submit(std::span<const Vertex> vertices,Material& material,std::array<int,4> clip,unsigned stencil,unsigned reference,bool writeColor,bool scissorEnabled);
 public:
     std::string adapter;
     bool hardware=true;
@@ -81,7 +82,7 @@ public:
     std::shared_ptr<GpuTexture> floatTexture(std::span<const float> values,int width,int height);
     Target target(int width,int height,bool depth=true);
     void begin(Target& target,const float* clear=nullptr);
-    void draw(std::span<const Vertex> vertices,Material& material,std::array<int,4> clip,unsigned stencil=0,unsigned reference=0,bool writeColor=true);
+    void draw(std::span<const Vertex> vertices,Material& material,std::array<int,4> clip,unsigned stencil=0,unsigned reference=0,bool writeColor=true,bool scissorEnabled=true);
     void capture(Target& source,Target& destination);
     void copyTarget(Target& source,Target& destination);
     std::shared_ptr<GpuTexture> view(Target& target);

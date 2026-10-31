@@ -22,7 +22,9 @@ Gpu::Gpu(std::filesystem::path shaders,HWND window):shaderPath_(std::move(shader
     check(device_->CreateBuffer(&b,nullptr,vertices_.out()),"CreateVertexBuffer");b.ByteWidth=128;b.Usage=D3D11_USAGE_DEFAULT;b.BindFlags=D3D11_BIND_CONSTANT_BUFFER;b.CPUAccessFlags=0;
     check(device_->CreateBuffer(&b,nullptr,matrices_.out()),"CreateMatrixBuffer");b.ByteWidth=512;check(device_->CreateBuffer(&b,nullptr,globals_.out()),"CreateGlobalsBuffer");
     D3D11_RASTERIZER_DESC rs{};rs.FillMode=D3D11_FILL_SOLID;rs.CullMode=D3D11_CULL_NONE;rs.DepthClipEnable=TRUE;rs.ScissorEnable=TRUE;
-    check(device_->CreateRasterizerState(&rs,rasterizer_.out()),"CreateRasterizerState");
+    check(device_->CreateRasterizerState(&rs,rasterizers_[1].out()),"CreateRasterizerState");
+    rs.ScissorEnable=FALSE;
+    check(device_->CreateRasterizerState(&rs,rasterizers_[0].out()),"CreateRasterizerStateWithoutScissor");
 }
 Gpu::Program& Gpu::program(int id) {
     if(auto it=programs_.find(id);it!=programs_.end())return *it->second;
@@ -162,21 +164,21 @@ void Gpu::begin(Target& t,const float* clear) {
     flush();activeTarget_=t.view.get();
     ID3D11ShaderResourceView* nulls[16]{};context_->PSSetShaderResources(0,16,nulls);
     auto view=t.view.get();context_->OMSetRenderTargets(1,&view,t.depthView.get());viewportWidth_=t.image.width;viewportHeight_=t.image.height;
-    D3D11_VIEWPORT vp{0,0,float(viewportWidth_),float(viewportHeight_),0,1};context_->RSSetViewports(1,&vp);context_->RSSetState(rasterizer_.get());
+    D3D11_VIEWPORT vp{0,0,float(viewportWidth_),float(viewportHeight_),0,1};context_->RSSetViewports(1,&vp);context_->RSSetState(rasterizers_[1].get());
     if(clear){context_->ClearRenderTargetView(view,clear);if(t.depthView)context_->ClearDepthStencilView(t.depthView.get(),D3D11_CLEAR_DEPTH|D3D11_CLEAR_STENCIL,1,0);}
     std::array<float,32> m{};m[0]=m[5]=m[10]=m[15]=1;m[16]=2.f/viewportWidth_;m[19]=-1;m[21]=-2.f/viewportHeight_;m[23]=1;m[26]=m[31]=1;
     context_->UpdateSubresource(matrices_.get(),0,nullptr,m.data(),0,0);
 }
-void Gpu::draw(std::span<const Vertex> verts,Material& material,std::array<int,4> clip,unsigned stencil,unsigned reference,bool writeColor) {
-    bool compatible=!pending_.empty()&&pendingMaterial_.program==material.program&&pendingMaterial_.blend==material.blend&&pendingClip_==clip&&pendingStencil_==stencil&&pendingReference_==reference&&pendingColor_==writeColor&&std::memcmp(pendingMaterial_.constants.data(),material.constants.data(),sizeof(material.constants))==0;
+void Gpu::draw(std::span<const Vertex> verts,Material& material,std::array<int,4> clip,unsigned stencil,unsigned reference,bool writeColor,bool scissorEnabled) {
+    bool compatible=!pending_.empty()&&pendingMaterial_.program==material.program&&pendingMaterial_.blend==material.blend&&pendingClip_==clip&&pendingStencil_==stencil&&pendingReference_==reference&&pendingColor_==writeColor&&pendingScissorEnabled_==scissorEnabled&&std::memcmp(pendingMaterial_.constants.data(),material.constants.data(),sizeof(material.constants))==0;
     for(int i=0;i<4&&compatible;i++){auto a=pendingMaterial_.textures[i],b=material.textures[i];compatible=(!a&&!b)||(a&&b&&a->view.get()==b->view.get());}
     if(!compatible||pending_.size()+verts.size()>65536)flush();
-    if(pending_.empty()){pendingMaterial_=material;pendingClip_=clip;pendingStencil_=stencil;pendingReference_=reference;pendingColor_=writeColor;}
+    if(pending_.empty()){pendingMaterial_=material;pendingClip_=clip;pendingStencil_=stencil;pendingReference_=reference;pendingColor_=writeColor;pendingScissorEnabled_=scissorEnabled;}
     pending_.insert(pending_.end(),verts.begin(),verts.end());
 }
-void Gpu::flush(){if(pending_.empty())return;submit(pending_,pendingMaterial_,pendingClip_,pendingStencil_,pendingReference_,pendingColor_);pending_.clear();}
+void Gpu::flush(){if(pending_.empty())return;submit(pending_,pendingMaterial_,pendingClip_,pendingStencil_,pendingReference_,pendingColor_,pendingScissorEnabled_);pending_.clear();}
 void Gpu::forgetTexture(const Pixels* pixels){flush();textures_.erase(pixels);}
-void Gpu::submit(std::span<const Vertex> verts,Material& material,std::array<int,4> clip,unsigned stencil,unsigned reference,bool writeColor) {
+void Gpu::submit(std::span<const Vertex> verts,Material& material,std::array<int,4> clip,unsigned stencil,unsigned reference,bool writeColor,bool scissorEnabled) {
     if(verts.empty())return;auto& p=program(material.program);
     // Append into untouched storage. DISCARD starts a new backing allocation
     // only when this stream fills, so queued draws keep their original vertices.
@@ -190,8 +192,11 @@ void Gpu::submit(std::span<const Vertex> verts,Material& material,std::array<int
     context_->UpdateSubresource(globals_.get(),0,nullptr,material.constants.data(),0,0);ID3D11Buffer* cb[]={matrices_.get(),globals_.get()};context_->VSSetConstantBuffers(0,2,cb);context_->PSSetConstantBuffers(0,2,cb);context_->GSSetConstantBuffers(0,2,cb);
     ID3D11ShaderResourceView* srvs[16]{};for(int i=0;i<4;i++)if(material.textures[i])srvs[i]=material.textures[i]->view.get();context_->PSSetShaderResources(0,16,srvs);
     ID3D11SamplerState* samplers[16]{};for(int i=0;i<16;i++)samplers[i]=p.samplers[i].get();context_->PSSetSamplers(0,16,samplers);
-    D3D11_RECT rect{std::clamp(clip[0],0,viewportWidth_),std::clamp(clip[1],0,viewportHeight_),std::clamp(clip[2],0,viewportWidth_),std::clamp(clip[3],0,viewportHeight_)};
-    if(rect.left>=rect.right||rect.top>=rect.bottom)return;context_->RSSetScissorRects(1,&rect);
+    if(scissorEnabled){
+        D3D11_RECT rect{std::clamp(clip[0],0,viewportWidth_),std::clamp(clip[1],0,viewportHeight_),std::clamp(clip[2],0,viewportWidth_),std::clamp(clip[3],0,viewportHeight_)};
+        if(rect.left>=rect.right||rect.top>=rect.bottom)return;context_->RSSetScissorRects(1,&rect);
+    }
+    context_->RSSetState(rasterizers_[scissorEnabled].get());
     unsigned key=material.blend|(writeColor?0u:0x10000u);
     if(!blends_.contains(key)){D3D11_BLEND_DESC d{};auto& r=d.RenderTarget[0];r.BlendEnable=material.blend!=0x8000;r.RenderTargetWriteMask=writeColor?D3D11_COLOR_WRITE_ENABLE_ALL:0;r.BlendOp=r.BlendOpAlpha=D3D11_BLEND_OP_ADD;r.SrcBlendAlpha=D3D11_BLEND_ONE;r.DestBlendAlpha=D3D11_BLEND_INV_SRC_ALPHA;
         r.SrcBlend=D3D11_BLEND_SRC_ALPHA;r.DestBlend=D3D11_BLEND_INV_SRC_ALPHA;
@@ -215,7 +220,7 @@ Target* Gpu::buildHighlightMask(const HighlightFrame& frame,std::string_view sel
     if(!found)return nullptr;
     if(highlightTarget_.image.width!=frame.width||highlightTarget_.image.height!=frame.height)highlightTarget_=target(frame.width,frame.height,false);
     float clear[4]{};begin(highlightTarget_,clear);
-    for(const auto& item:frame.draws)if(item.path==path||item.actualPath==path){Material material;material.program=-4;material.textures[0]=item.texture;material.constants[0]=float(item.blend);draw(item.vertices,material,item.clip);}
+    for(const auto& item:frame.draws)if(item.path==path||item.actualPath==path){Material material;material.program=-4;material.textures[0]=item.texture;material.constants[0]=float(item.blend);draw(item.vertices,material,item.clip,0,0,true,item.scissorEnabled);}
     flush();return &highlightTarget_;
 }
 void Gpu::drawHighlight(Target& mask,std::array<float,4> placement,int width,int height){
