@@ -72,8 +72,15 @@ Application icon
   No client artwork was used as input. Prompt and ICO conversion instructions:
   https://github.com/PhysicalWorldDo/rep-player/blob/main/assets/icon/README.md
 
+BC7 image decoding
+  bcdec by Sergii Kudlai, MIT License, revision
+  80859ed3b7afb1c527a2a99d70c61457bea72d0c (https://github.com/iOrange/bcdec).
+  BC7Prep inverse transform adapted from the DNF DB Reader port of
+  CUE4Parse BC7PrepDecoder (Apache-2.0). Notices: BCDEC_LICENSE.txt and
+  BC7PREP_LICENSE.txt. Oodle uses the selected client's oo2core_9_win64.dll.
+
 Client inputs and shader resources
-  REP/NPK/IMG/font/video files, game executables and the installed bink2w64.dll
+  REP/NPK/IMG/font/video files, game executables and client Oodle and Bink DLLs
   are not distributed. Users select their own complete client folder. All such
   input files are read-only. The player does not start or modify the game.
   The required DXBC programs embedded in the player were extracted from the

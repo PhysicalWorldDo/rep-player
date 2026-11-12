@@ -25,6 +25,7 @@ struct Frame {
     std::shared_ptr<Pixels> texture;
     Bytes cropped() const;
 };
+class OodleDecoder;
 class Img {
     friend class Assets;
     mutable std::recursive_timed_mutex mutex_;
@@ -34,11 +35,14 @@ class Img {
     std::vector<Bytes> palettes_;
     std::unordered_map<uint64_t,std::shared_ptr<Frame>> frames_;
     std::unordered_map<int,std::shared_ptr<Pixels>> atlasTextures_;
+    std::shared_ptr<OodleDecoder> oodle_;
+    Bytes decodeOodle(std::span<const uint8_t> payload,size_t expected) const;
     std::shared_ptr<Pixels> atlas(int index);
     std::shared_ptr<Frame> frameInner(int index,int palette,std::unordered_set<int>& visiting);
 public:
     int version=0;
-    explicit Img(Bytes data);
+    explicit Img(Bytes data,std::shared_ptr<OodleDecoder> oodle={});
+    Img(Bytes data,const std::filesystem::path& oodleClient);
     size_t count() const { return records_.size(); }
     void validateFrames();
     void validateFrames(const std::function<bool()>& cancelled);

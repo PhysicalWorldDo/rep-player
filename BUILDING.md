@@ -118,6 +118,8 @@ $CLIENT = Read-Host '输入完整客户端根目录'
 
 请改为客户端中实际存在的录像。
 
+BC7 和 BC7Prep 随 C++ 播放器编译。Oodle 压缩的 IMG 使用所选客户端的 `oo2core_9_win64.dll`。可用 `rep_gpu --no-patches --profile dnf-compatible --consume FILE.rep REPORT.json FRAME.rgba IMAGEPACKS2` 逐条渲染原版录像。独立 IMG 的 Oodle 检查使用 `rep_resources --img FILE.img FRAME PALETTE CLIENT`。
+
 检查DNF兼容播放时用 `--profile dnf-compatible`，严格7.09原生读取用 `--profile dnf-july`，DFO来源用 `--profile dfo`。仅验证结构且不解码字符串时加入 `--structural`；`--dump` 仍保留原字符串字节与使用的profile。`--codepage N` 可覆盖资源字符串代码页。批量检查接受UTF-8路径列表：
 
 ```powershell

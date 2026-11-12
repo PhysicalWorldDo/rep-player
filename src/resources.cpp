@@ -1,4 +1,5 @@
 #include "resources.hpp"
+#include "bc7_dds.hpp"
 #include <algorithm>
 #include <fstream>
 #include <mutex>
@@ -6,6 +7,7 @@
 #include <chrono>
 #include <deque>
 #include <thread>
+#include <windows.h>
 
 namespace rep {
 namespace {
@@ -22,6 +24,52 @@ auto lockImage(std::recursive_timed_mutex& mutex,const std::function<bool()>& ca
     while(!lock.try_lock_for(std::chrono::milliseconds(2)))checkResourceCancelled(cancelled);
     checkResourceCancelled(cancelled);return lock;
 }
+
+bool isOodle(std::span<const uint8_t> payload){
+    return payload.size()>=2&&(payload[0]==0x8c||payload[0]==0xcc);
+}
+}
+
+class OodleDecoder {
+    using Size = std::ptrdiff_t;
+    using Decompress = Size (*)(const void*,Size,void*,Size,int,int,int,void*,Size,void*,void*,void*,Size,int);
+    std::filesystem::path library_;
+    std::once_flag loaded_;
+    HMODULE module_=nullptr;
+    Decompress decompress_=nullptr;
+public:
+    explicit OodleDecoder(const std::filesystem::path& client):library_(client/L"oo2core_9_win64.dll"){}
+    ~OodleDecoder(){if(module_)FreeLibrary(module_);}
+
+    Bytes decode(std::span<const uint8_t> payload,size_t expected){
+        constexpr size_t maxSize=128*1024*1024;
+        if(!expected||expected>maxSize||payload.size()>maxSize)throw Error("invalid Oodle IMG payload size");
+        checkResourceCancelled(resourceCancellation);
+        std::call_once(loaded_,[&] {
+            const auto path=std::filesystem::absolute(library_).lexically_normal();
+            auto module=LoadLibraryExW(path.c_str(),nullptr,LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR|LOAD_LIBRARY_SEARCH_SYSTEM32);
+            if(!module){
+                const auto error=GetLastError();
+                throw Error("cannot load client Oodle library "+utf8(path.wstring())+" (Windows error "+std::to_string(error)+")");
+            }
+            auto fn=reinterpret_cast<Decompress>(GetProcAddress(module,"OodleLZ_Decompress"));
+            if(!fn){FreeLibrary(module);throw Error("client Oodle library lacks OodleLZ_Decompress");}
+            module_=module;
+            decompress_=fn;
+        });
+        Bytes decoded(expected);
+        constexpr int fuzzSafe=1,checkCrc=1,verbosity=0,unthreaded=3;
+        auto written=decompress_(payload.data(),Size(payload.size()),decoded.data(),Size(expected),
+            fuzzSafe,checkCrc,verbosity,nullptr,0,nullptr,nullptr,nullptr,0,unthreaded);
+        checkResourceCancelled(resourceCancellation);
+        if(written!=Size(expected))throw Error("Oodle IMG payload decompression failed or size mismatched");
+        return decoded;
+    }
+};
+
+Bytes Img::decodeOodle(std::span<const uint8_t> payload,size_t expected) const {
+    if(!oodle_)throw Error("Oodle IMG payload requires a client with oo2core_9_win64.dll");
+    return oodle_->decode(payload,expected);
 }
 std::shared_ptr<Pixels> nativeImageTexture(std::shared_ptr<Pixels> pixels){
     int w=pixels->width,h=pixels->height;pixels->logicalWidth=w;pixels->logicalHeight=h;
@@ -31,7 +79,15 @@ std::shared_ptr<Pixels> nativeImageTexture(std::shared_ptr<Pixels> pixels){
 }
 static std::shared_ptr<Pixels> rawPixels(std::span<const uint8_t> raw,int fmt,int w,int h,const Bytes* palette=nullptr) {
     if(w<=0||h<=0)throw Error("invalid IMG dimensions");
-    auto out=std::make_shared<Pixels>();out->width=w;out->height=h;out->rgba.resize(size_t(w)*h*4);
+    constexpr int bc7Format=24;
+    auto out=std::make_shared<Pixels>();out->width=w;out->height=h;
+    if(fmt==bc7Format&&!palette){
+        checkResourceCancelled(resourceCancellation);
+        out->rgba=bc7::decodeDds(raw,w,h);
+        checkResourceCancelled(resourceCancellation);
+        return out;
+    }
+    out->rgba.resize(size_t(w)*h*4);
     auto& b=out->rgba;
     if(palette) {
         if(raw.size()!=size_t(w)*h)throw Error("invalid palette pixel length");
@@ -78,7 +134,10 @@ Bytes Frame::cropped() const {
     }
     return out;
 }
-Img::Img(Bytes data):data_(std::move(data)) {
+Img::Img(Bytes data,const std::filesystem::path& oodleClient)
+    :Img(std::move(data),std::make_shared<OodleDecoder>(oodleClient)){}
+
+Img::Img(Bytes data,std::shared_ptr<OodleDecoder> oodle):data_(std::move(data)),oodle_(std::move(oodle)) {
     Reader r(data_);auto magic=r.take(16);uint32_t indexBytes=0,n=0;
     if(!std::memcmp(magic.data(),"Neople Img File\0",16)){indexBytes=r.get<uint32_t>();r.take(4);version=r.get<uint32_t>();n=r.get<uint32_t>();}
     else if(data_.size()>=32&&!std::memcmp(data_.data(),"Neople Image File\0",18)){r.pos=20;r.take(4);version=r.get<uint32_t>();n=r.get<uint32_t>();}
@@ -113,8 +172,18 @@ Img::Img(Bytes data):data_(std::move(data)) {
 std::shared_ptr<Pixels> Img::atlas(int index) {
     if(auto it=atlasTextures_.find(index);it!=atlasTextures_.end())return it->second;
     if(index<0||size_t(index)>=atlases_.size())throw Error("atlas index out of range");
-    const auto& a=atlases_[index];auto raw=inflateAll(std::span(data_).subspan(atlasOffsets_[index],a[3]));
-    if(raw.size()!=size_t(a[4]))throw Error("atlas raw length mismatch");return atlasTextures_[index]=nativeImageTexture(rawPixels(raw,a[1],a[5],a[6]));
+    const auto& a=atlases_[index];
+    std::span<const uint8_t> raw=std::span(data_).subspan(atlasOffsets_[index],a[3]);
+    Bytes decoded;
+    if(isOodle(raw)){
+        decoded=decodeOodle(raw,size_t(a[4]));
+        raw=decoded;
+    }else if(raw.size()<4||std::memcmp(raw.data(),"DDS ",4)){
+        decoded=inflateAll(raw);
+        raw=decoded;
+    }
+    if(raw.size()!=size_t(a[4]))throw Error("atlas raw length mismatch");
+    return atlasTextures_[index]=nativeImageTexture(rawPixels(raw,a[1],a[5],a[6]));
 }
 std::shared_ptr<Frame> Img::frameInner(int index,int palette,std::unordered_set<int>& visiting) {
     checkResourceCancelled(resourceCancellation);
@@ -133,11 +202,23 @@ std::shared_ptr<Frame> Img::frameInner(int index,int palette,std::unordered_set<
         if(a[15]!=0&&a[15]!=1)throw Error("invalid atlas rotation");
         if(f->rect[0]<0||f->rect[1]<0||f->rect[2]>f->texture->width||f->rect[3]>f->texture->height)throw Error("atlas crop out of range");
         int w=f->rect[2]-f->rect[0],h=f->rect[3]-f->rect[1];if((f->rotated?h:w)!=f->width||(f->rotated?w:h)!=f->height)throw Error("atlas crop dimensions mismatch");}
-    else {auto s=std::span(data_).subspan(offsets_[index],a[4]);Bytes decoded;if(a[1]==6){decoded=inflateAll(s);s=decoded;}
+    else {
+        std::span<const uint8_t> payload=std::span(data_).subspan(offsets_[index],a[4]);
         const Bytes* p=nullptr;
         if(a[1]==6&&a[0]==14&&std::any_of(palettes_.begin(),palettes_.end(),[](const auto& b){return !b.empty();})) {
             if(palette<0||size_t(palette)>=palettes_.size())throw Error("IMG palette index out of range");p=&palettes_[palette];if(p->empty())throw Error("empty IMG palette");}
-        f->texture=nativeImageTexture(rawPixels(s,a[0],f->width,f->height,p));f->rect={0,0,f->width,f->height};}
+        Bytes decoded;
+        if(a[1]==6){
+            if(isOodle(payload)){
+                const size_t pixelSize=p?1:a[0]==16?4:(a[0]==14||a[0]==15)?2:0;
+                if(!pixelSize)throw Error("unsupported Oodle IMG frame format "+std::to_string(a[0]));
+                decoded=decodeOodle(payload,size_t(f->width)*f->height*pixelSize);
+            }else decoded=inflateAll(payload);
+            payload=decoded;
+        }
+        f->texture=nativeImageTexture(rawPixels(payload,a[0],f->width,f->height,p));
+        f->rect={0,0,f->width,f->height};
+    }
     return frames_[key]=f;
 }
 std::shared_ptr<Frame> Img::frame(int index,int palette,const std::function<bool()>& cancelled){auto lock=lockImage(mutex_,cancelled);ResourceCancellationScope scope(cancelled);std::unordered_set<int> visiting;return frameInner(index,palette,visiting);}
@@ -160,6 +241,7 @@ void Img::validateFrames(const std::function<bool()>& cancelled){
 static std::string normalize(std::string name) {name=canonical(name);while(!name.empty()&&name[0]=='/')name.erase(0,1);if(name.rfind("sprite/",0)!=0)name="sprite/"+name;return name;}
 struct Assets::Index {
     std::filesystem::path root;
+    std::shared_ptr<OodleDecoder> oodle;
     bool patchesEnabled=true;
     std::unordered_map<std::string,Entry> entries,originals;
     std::unordered_set<std::string> packages;
@@ -273,6 +355,9 @@ Assets::PrefetchStats Assets::prefetchStats()const{if(!prefetch_)return {};std::
 bool Assets::patchesEnabled()const{return index_->patchesEnabled;}
 Assets::IndexPtr Assets::buildIndex(std::filesystem::path root,bool patchesEnabled){
     auto index=std::make_shared<Index>();index->root=std::move(root);index->patchesEnabled=patchesEnabled;
+    auto packs=std::filesystem::absolute(index->root.empty()?std::filesystem::path(L"."):index->root).lexically_normal();
+    if(!packs.has_filename())packs=packs.parent_path();
+    index->oodle=std::make_shared<OodleDecoder>(packs.parent_path());
     if(!patchesEnabled){indexNative(*index);return index;}
     std::vector<std::wstring> names;
     if(std::filesystem::is_directory(index->root))for(const auto& file:std::filesystem::directory_iterator(index->root)){
@@ -411,7 +496,7 @@ std::shared_ptr<Img> Assets::preloadInner(std::string logical,const std::functio
             std::ifstream input(root_/wide(entry.package),std::ios::binary);if(!input)throw Error("NPK file absent: "+entry.package);
             Bytes bytes(entry.length);input.seekg(entry.offset);size_t offset=0;
             while(offset<bytes.size()){checkResourceCancelled(cancelled);auto count=std::min<size_t>(1048576,bytes.size()-offset);input.read(reinterpret_cast<char*>(bytes.data()+offset),std::streamsize(count));if(!input)throw Error("truncated IMG entry");offset+=count;}
-            image=std::make_shared<Img>(std::move(bytes));
+            image=std::make_shared<Img>(std::move(bytes),index_->oodle);
             if(entry.patch){
                 bool rejected,validate;
                 {std::lock_guard lock(index_->rejected->mutex);rejected=index_->rejected->paths.contains(name);validate=!index_->rejected->validated.contains(name);}

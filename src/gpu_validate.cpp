@@ -33,14 +33,15 @@ static void shaderFixture(rep::Gpu& gpu,rep::Binder& binder,rep::Replay* replay,
     std::cout<<"{\"type\":"<<e.type<<",\"program\":"<<material.program<<",\"draws\":"<<gpu.draws-before<<",\"parameters\":[";for(int n=0;n<6;n++){if(n)std::cout<<',';if(std::isfinite(material.parameters[n]))std::cout<<material.parameters[n];else std::cout<<"null";}std::cout<<"]}"<<std::endl;
 }
 int wmain(int argc,wchar_t** argv){try{
-    rep::ClientProtocolSelection selection;rep::CanvasSettings canvasSettings;bool negativeImgOffsets=false;std::vector<wchar_t*> positional{argv[0]};
+    rep::ClientProtocolSelection selection;rep::CanvasSettings canvasSettings;bool negativeImgOffsets=false,patchesEnabled=true;std::vector<wchar_t*> positional{argv[0]};
     for(int n=1;n<argc;n++){
         std::wstring_view key=argv[n];
         if(key==L"--profile"||key==L"--codepage"){
             if(n+1>=argc)throw rep::Error("Missing replay option value");
             if(key==L"--profile")selection.profile=rep::clientProfile(argv[++n]);
             else selection.codePage=rep::clientCodePage(argv[++n]);
-        }else if(key==L"--negative-img-offsets"){
+        }else if(key==L"--no-patches")patchesEnabled=false;
+        else if(key==L"--negative-img-offsets"){
             if(n+1>=argc)throw rep::Error("Missing negative IMG offsets value");
             std::wstring_view value(argv[++n]);if(value!=L"0"&&value!=L"1")throw rep::Error("Negative IMG offsets must be 0 or 1");
             negativeImgOffsets=value==L"1";
@@ -102,7 +103,7 @@ int wmain(int argc,wchar_t** argv){try{
         auto pixels=gpu.readback(target);std::cout<<"{\"formats\":["<<a->format<<','<<b->format<<"],\"alpha\":[";for(int y=0;y<4;y++){if(y)std::cout<<',';std::cout<<'[';for(int x=0;x<4;x++){if(x)std::cout<<',';std::cout<<int(pixels[(y*4+x)*4+3]);}std::cout<<']';}std::cout<<"]}\n";
     }
     else if(argc>=4&&std::wstring_view(argv[1])==L"--consume") {
-        auto begin=std::chrono::steady_clock::now();rep::Assets assets(argc>=6?std::filesystem::path(argv[5]):std::filesystem::path(L"D:\\115us\\client\\ImagePacks2"));rep::Replay replay(argv[2],replayOptions);rep::Executor executor(gpu,assets,root/L"runtime"/L"cache");executor.setNegativeImgOffsetsEnabled(negativeImgOffsets);executor.setCanvasSettings(canvasSettings);executor.attach(replay);executor.prepare();auto ready=std::chrono::steady_clock::now();rep::Scene scene;int32_t last=0;uint64_t bytes=0;double maxFrame=0;rep::Bytes snapshot;
+        auto begin=std::chrono::steady_clock::now();rep::Assets assets(argc>=6?std::filesystem::path(argv[5]):std::filesystem::path(L"D:\\115us\\client\\ImagePacks2"),patchesEnabled);rep::Replay replay(argv[2],replayOptions);rep::Executor executor(gpu,assets,root/L"runtime"/L"cache");executor.setNegativeImgOffsetsEnabled(negativeImgOffsets);executor.setCanvasSettings(canvasSettings);executor.attach(replay);executor.prepare();auto ready=std::chrono::steady_clock::now();rep::Scene scene;int32_t last=0;uint64_t bytes=0;double maxFrame=0;rep::Bytes snapshot;
         while(replay.next(scene)){auto before=std::chrono::steady_clock::now();executor.execute(scene);gpu.flush();maxFrame=std::max(maxFrame,std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-before).count());last=scene.timestamp;bytes+=scene.aux.size();if(argc>=7&&scene.ordinal==uint64_t(std::stoull(argv[6])))snapshot=gpu.readback(executor.output());}
         auto pixels=gpu.readback(executor.output());double load=std::chrono::duration<double>(ready-begin).count(),seconds=std::chrono::duration<double>(std::chrono::steady_clock::now()-ready).count();std::ofstream out{std::filesystem::path(argv[3])};auto& s=executor.statistics;
         out<<"{\"version\":"<<replay.version/10.<<",\"minor\":"<<replay.header.minor<<",\"width\":"<<executor.output().image.width<<",\"height\":"<<executor.output().image.height<<",\"original_width\":"<<replay.header.width()<<",\"original_height\":"<<replay.header.height()<<",\"scenes\":"<<s.scenes<<",\"gpu_draws\":"<<gpu.draws<<",\"exact_eof\":true,\"prepare_seconds\":"<<load<<",\"execute_seconds\":"<<seconds<<",\"max_cpu_frame_ms\":"<<maxFrame<<",\"last_timestamp\":"<<last<<",\"aux_bytes\":"<<bytes<<",\"pixel_crc32\":"<<rep::crc(pixels);

@@ -14,7 +14,7 @@ New-Item -ItemType Directory -Path (Join-Path $packageRoot 'resources\licenses')
 Copy-Item -LiteralPath (Join-Path $taskRoot 'build\rep_player.exe') -Destination (Join-Path $packageRoot 'rep_player.exe')
 # The release uses the selected static FFmpeg build; no external runtime DLLs.
 Copy-Item -LiteralPath (Join-Path $FFmpegDirectory 'ffmpeg.exe') -Destination (Join-Path $packageRoot 'resources\ffmpeg.exe')
-foreach ($name in @('FREETYPE_FTL.txt', 'FREETYPE_LICENSE.txt', 'FREETYPE_BDF_NOTICE.txt', 'FREETYPE_PCF_NOTICE.txt', 'ZLIB_1.2.11.txt', 'FFMPEG_GPLv3.txt', 'FFMPEG_BUILD.txt')) {
+foreach ($name in @('FREETYPE_FTL.txt', 'FREETYPE_LICENSE.txt', 'FREETYPE_BDF_NOTICE.txt', 'FREETYPE_PCF_NOTICE.txt', 'ZLIB_1.2.11.txt', 'FFMPEG_GPLv3.txt', 'FFMPEG_BUILD.txt', 'BCDEC_LICENSE.txt', 'BC7PREP_LICENSE.txt')) {
     Copy-Item -LiteralPath (Join-Path $taskRoot "licenses\$name") -Destination (Join-Path $packageRoot 'resources\licenses')
 }
 Copy-Item -LiteralPath (Join-Path $taskRoot 'licenses\LLVM_MINGW') -Destination (Join-Path $packageRoot 'resources\licenses\LLVM_MINGW') -Recurse
