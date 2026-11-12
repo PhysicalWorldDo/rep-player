@@ -1,6 +1,9 @@
 BC7Prep scalar inverse transform adapted to C++ from the DNF DB Reader port.
 Copyright (c) CUE4Parse contributors.
 
+CUE4Parse independently implemented the decoder using Epic Games' Oodle
+SDK 2.9.14 bc7prep_decode.cpp as a format reference under the Unreal Engine EULA.
+
 CUE4Parse BC7PrepDecoder, adapted to Go (scalar operations and full-width integer intermediates).
 Source: https://github.com/FabianFG/CUE4Parse/blob/master/CUE4Parse/UE4/Assets/Exports/Texture/BC7PrepDecoder.cs
 Source SHA256: 4308bcab3327e7674fa147a460693d6c8935502e6e647dc276e5c35c2dad842c

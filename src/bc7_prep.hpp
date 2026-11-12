@@ -7,6 +7,8 @@ namespace rep::bc7 {
 
 // Scalar BC7Prep inverse transform adapted from the DNF DB Reader port of
 // CUE4Parse BC7PrepDecoder. Copyright (c) CUE4Parse contributors.
+// CUE4Parse independently implemented the decoder using Epic Games' Oodle
+// SDK 2.9.14 bc7prep_decode.cpp as a format reference under the Unreal Engine EULA.
 // Apache-2.0, see licenses/BC7PREP_LICENSE.txt.
 
 inline uint64_t prepGet64(std::span<const uint8_t> bytes, size_t offset) {
