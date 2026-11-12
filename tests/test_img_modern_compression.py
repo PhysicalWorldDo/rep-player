@@ -50,7 +50,9 @@ class ModernImgCompressionTests(unittest.TestCase):
             if not client:
                 self.skipTest('set REP_PLAYER_TEST_OODLE_CLIENT to a client with oo2core_9_win64.dll')
             extra = ['0', client]
-        with tempfile.TemporaryDirectory(dir=ROOT / 'validation') as folder:
+        validation = ROOT / 'validation'
+        validation.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=validation) as folder:
             img = Path(folder) / 'texture.img'
             img.write_bytes(data)
             result = subprocess.run(
