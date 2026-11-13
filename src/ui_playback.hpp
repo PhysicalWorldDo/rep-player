@@ -59,6 +59,7 @@ struct ResourceExportSnapshot {
     Assets::IndexPtr images;
     AudioResources::IndexPtr audio;
     std::vector<ImgCall> imageCalls;
+    std::unordered_set<std::string> uncheckedImagePaths;
     std::vector<std::string> oggPaths;
 };
 

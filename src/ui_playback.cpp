@@ -163,14 +163,18 @@ ResourceExportSnapshot PlaybackController::resourceExportSnapshot(bool ogg,bool 
     if(ogg){
         snapshot.audio=audioIndex_;
         snapshot.oggPaths=current?status_.currentOggs:status_.allOggs;
+        std::erase_if(snapshot.oggPaths,[&](const auto& path){return hiddenOggs_.contains(path);});
     }else{
         if(!current&&!status_.frameCount)
             throw Error("Wait for the IMG list to be ready / 请等待 IMG 列表就绪");
         snapshot.images=imageIndex_;
         snapshot.imageCalls=current?status_.currentImages:status_.allImages;
+        for(const auto& call:status_.allImages)
+            if(imageVisibility_.hidden(call.path))snapshot.uncheckedImagePaths.insert(call.path);
+        std::erase_if(snapshot.imageCalls,[&](const auto& call){return snapshot.uncheckedImagePaths.contains(call.path);});
     }
     if(snapshot.oggPaths.empty()&&snapshot.imageCalls.empty())
-        throw Error("No resources to export / 当前范围没有可导出的资源");
+        throw Error("No checked resources to export / 当前范围没有勾选的资源");
     if(!snapshot.images&&!snapshot.audio)
         throw Error("Applied resource index is not ready / 资源索引尚未就绪");
     return snapshot;
