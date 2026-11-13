@@ -127,6 +127,29 @@ class OggExportTests(unittest.TestCase):
         self.assertNotEqual(self.decode(muted['output']).returncode, 0)
         self.assertEqual(self.video_crc(original['output']), self.video_crc(muted['output']))
 
+    def test_export_to_external_folder_preserves_existing_diagnostics(self):
+        folder = self.folder.parent / ('独立%导出_' + uuid.uuid4().hex[:8])
+        folder.mkdir()
+        log = folder / '媒体.ffmpeg.log'
+        log.write_bytes(b'keep these diagnostics')
+        command = [str(self.exe), '--client', str(self.fixture['client']),
+                   '--replay', str(self.fixture['replay']), '--format', 'mp4',
+                   '--audio', '0', '--output', str(folder), '--name', '媒体']
+        result = subprocess.run(command, capture_output=True, text=True, encoding='utf8', timeout=60)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        output = folder / '媒体.mp4'
+        self.assertEqual(Path(json.loads(result.stdout)['output']), output)
+        self.assertEqual(self.decode(output, audio=False).returncode, 0)
+        self.assertEqual(log.read_bytes(), b'keep these diagnostics')
+
+        command[command.index('mp4')] = 'png'
+        result = subprocess.run(command, capture_output=True, text=True, encoding='utf8', timeout=60)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        output = folder / '媒体'
+        self.assertEqual(Path(json.loads(result.stdout)['output']), output)
+        self.assertTrue((output / 'frame_000000.png').is_file())
+        self.assertEqual(log.read_bytes(), b'keep these diagnostics')
+
 
 if __name__ == '__main__':
     unittest.main()

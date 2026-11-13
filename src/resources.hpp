@@ -1,5 +1,5 @@
 #pragma once
-#include "protocol.hpp"
+#include "resource_archive.hpp"
 #include <unordered_set>
 #include <functional>
 #include <atomic>
@@ -135,5 +135,8 @@ public:
     PrefetchStats prefetchStats()const;
     std::shared_ptr<Img> preload(std::string logical);
     std::shared_ptr<Frame> frame(std::string logical,int index,int palette=0,bool fallback=true);
+    // Resolve with the applied index, preserving the raw IMG and any alias's source path.
+    std::optional<ResourceArchiveEntry> exportEntry(std::string logical,
+        const std::function<bool()>& cancelled={},std::span<const int> frames={});
 };
 }

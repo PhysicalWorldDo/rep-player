@@ -1,5 +1,5 @@
 #pragma once
-#include "protocol.hpp"
+#include "resource_archive.hpp"
 #include <atomic>
 #include <condition_variable>
 #include <functional>
@@ -57,6 +57,7 @@ private:
     static void readPackage(const std::filesystem::path& package,std::unordered_map<std::string,Entry>& entries,bool patch=false);
     std::shared_ptr<const PackageTable> indexPackage(const std::filesystem::path& package);
     std::optional<Entry> resolve(const std::string& logical,bool original=false);
+    static Bytes readEntry(const Entry& entry,const std::function<bool()>& cancelled);
     void report(const std::string& key,std::string message,bool missing=false);
 public:
     AudioResources(std::filesystem::path clientRoot,std::filesystem::path cacheRoot,bool patchesEnabled=true,std::shared_ptr<RetainedCache> cache={});
@@ -68,6 +69,7 @@ public:
     std::vector<std::shared_ptr<const AudioClip>> prepareClips(const std::vector<std::string>& tags,const std::function<bool()>& cancelled={});
     const SoundDefinition* definition(const std::string& tag)const;
     std::shared_ptr<const AudioClip> clip(const std::string& tag,const std::function<bool()>& cancelled={});
+    std::optional<ResourceArchiveEntry> exportEntry(std::string logical,const std::function<bool()>& cancelled={});
     std::vector<std::string> diagnostics()const;
     uint64_t decoded()const{return decoded_.load();}
     uint64_t missing()const{return missing_.load();}

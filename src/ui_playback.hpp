@@ -55,6 +55,13 @@ struct PlayerStatus {
     int64_t navigationTarget=0;
 };
 
+struct ResourceExportSnapshot {
+    Assets::IndexPtr images;
+    AudioResources::IndexPtr audio;
+    std::vector<ImgCall> imageCalls;
+    std::vector<std::string> oggPaths;
+};
+
 // UI commands cross this boundary; all immediate-context and replay access stays
 // on the render thread. Resource inspection has its own Replay stream.
 class PlaybackController {
@@ -76,10 +83,12 @@ class PlaybackController {
     std::atomic<uint64_t> presentationSerial_=0;
     std::atomic<uint64_t> generation_=0;
     uint64_t consumed_=0;
+    uint64_t completedStopGeneration_=0;
     bool stopRequested_=false,toggleRequested_=false,filterRequested_=false,captureRequested_=false,canvasRequested_=false;
     bool audioSettingsRequested_=false,audioMuted_=false;
     std::unordered_set<std::string> hiddenOggs_;
     std::optional<std::string> auditionRequested_;
+    bool auditionStarting_=false;
     std::atomic<uint64_t> auditionSerial_=0;
     bool negativeImgOffsetsRequested_=false,negativeImgOffsetsEnabled_=false;
     float audioVolume_=1;
@@ -103,6 +112,7 @@ class PlaybackController {
     bool refreshImagesRequested_=false;
     PlayerStatus status_;
     void run();
+    void queueStopLocked();
     void queueRefreshLocked();
     void queueNavigationLocked(NavigationRequest request,bool stopAudition=true);
     void cancelAuditionLocked();
@@ -112,6 +122,9 @@ public:
     void open(const std::filesystem::path& path);
     void replay();
     void stop();
+    ResourceExportSnapshot resourceExportSnapshot(bool ogg,bool current);
+    uint64_t stopForExport();
+    void waitForExportStop(uint64_t generation);
     void togglePause();
     void stepFrame(int direction,bool repeated=false);
     void beginScrub();

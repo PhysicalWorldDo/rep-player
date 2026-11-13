@@ -556,6 +556,35 @@ std::shared_ptr<Frame> Assets::frame(std::string logical,int index,int palette,b
     // immutable placement metadata still identifies the native fallback exactly.
     notifyFrame(key.logical,index);if(result->actualPath!=key.logical||result->actualFrame!=index){fallbacks++;notifyFrame(result->actualPath,result->actualFrame);}else decodedFrames++;return result;
 }
+std::optional<ResourceArchiveEntry> Assets::exportEntry(std::string logical,
+    const std::function<bool()>& cancelled,std::span<const int> frames){
+    auto name=normalize(std::move(logical));
+    if(!name.ends_with(".img"))return {};
+    ResourceCancellationScope scope(cancelled);
+    for(;;){
+        checkResourceCancelled(cancelled);
+        const auto revision=sourceRevision();
+        try{
+            std::string source;
+            if(frames.empty()){
+                // A negative frame resolves the IMG source without requiring a decoded frame.
+                decodeFrame(name,-1,0,&source);
+            }else for(auto frame:frames){
+                std::string candidate;
+                if(decodeFrame(name,frame,0,&candidate))source=std::move(candidate);
+            }
+            if(sourceRevision()!=revision)continue;
+            if(source.empty())return {};
+            auto img=preloadInner(source,cancelled);
+            if(!img)return {};
+            checkResourceCancelled(cancelled);
+            ResourceArchiveEntry result{std::move(source),img->data_};
+            if(sourceRevision()==revision)return result;
+        }catch(const ResourceCancelled&){throw;}
+        catch(const Error&){if(sourceRevision()==revision)return {};}
+        catch(const std::out_of_range&){if(sourceRevision()==revision)return {};}
+    }
+}
 void Assets::touchImage(const std::string& name){if(images_.contains(name))imageTouches_[name]=++imageClock_;}
 size_t Assets::decodedImageBytes()const{
     std::lock_guard lock(mutex_);

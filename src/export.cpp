@@ -25,13 +25,6 @@ std::wstring quote(const std::wstring& value){
     for(wchar_t c:value){if(c==L'\\'){slashes++;continue;}out.append(c==L'\"'?slashes*2+1:slashes,L'\\');slashes=0;out+=c;}
     out.append(slashes*2,L'\\');out+=L'\"';return out;
 }
-bool within(const std::filesystem::path& root,const std::filesystem::path& child){
-    auto base=std::filesystem::weakly_canonical(root),path=std::filesystem::weakly_canonical(child);
-    auto a=base.begin(),b=path.begin();
-    for(;a!=base.end();++a,++b){if(b==path.end())return false;auto x=a->wstring(),y=b->wstring();
-        std::transform(x.begin(),x.end(),x.begin(),std::towlower);std::transform(y.begin(),y.end(),y.begin(),std::towlower);if(x!=y)return false;}
-    return true;
-}
 std::string encoderError(const std::filesystem::path& log){
     std::ifstream input(log,std::ios::binary);std::string bytes((std::istreambuf_iterator<char>(input)),{});
     if(bytes.size()>3000)bytes=bytes.substr(bytes.size()-3000);return bytes.empty()?"No encoder diagnostics":bytes;
@@ -45,7 +38,12 @@ public:
         SECURITY_ATTRIBUTES security{sizeof(security),nullptr,TRUE};HANDLE reader=nullptr,writer=nullptr;
         if(!CreatePipe(&reader,&writer,&security,0))throw Error("Cannot create export encoder pipe");
         Handle readHandle(reader);writer_.reset(writer);SetHandleInformation(writer_.get(),HANDLE_FLAG_INHERIT,0);
-        Handle logHandle(CreateFileW(log.c_str(),GENERIC_WRITE,FILE_SHARE_READ,&security,CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,nullptr));
+        Handle logHandle;
+        for(size_t suffix=2;;++suffix){
+            logHandle.reset(CreateFileW(log_.c_str(),GENERIC_WRITE,FILE_SHARE_READ,&security,CREATE_NEW,FILE_ATTRIBUTE_NORMAL,nullptr));
+            if(logHandle.get()!=INVALID_HANDLE_VALUE||GetLastError()!=ERROR_FILE_EXISTS)break;
+            log_=log.parent_path()/(log.stem().wstring()+L"-"+std::to_wstring(suffix)+log.extension().wstring());
+        }
         Handle nullHandle(CreateFileW(L"NUL",GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE,&security,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,nullptr));
         if(logHandle.get()==INVALID_HANDLE_VALUE||nullHandle.get()==INVALID_HANDLE_VALUE)throw Error("Cannot create export encoder diagnostics");
         STARTUPINFOEXW startup{};startup.StartupInfo.cb=sizeof(startup);startup.StartupInfo.dwFlags=STARTF_USESTDHANDLES;
@@ -116,7 +114,6 @@ ExportResult exportReplay(Gpu& gpu,Assets& assets,const std::filesystem::path& c
     auto root=applicationDirectory();
     auto directory=options.outputDirectory.empty()?root/L"exports":options.outputDirectory;
     if(directory.is_relative())directory=root/directory;
-    if(!within(root,directory))throw Error("Export directory must be inside rep_player");
     auto name=options.fileName.empty()?replayPath.stem().wstring():options.fileName;
     if(name.empty()||name==L"."||name==L".."||name.find_first_of(L"<>:\"/\\|?*")!=std::wstring::npos)
         throw Error("Export file name contains an invalid character");
@@ -143,7 +140,8 @@ ExportResult exportReplay(Gpu& gpu,Assets& assets,const std::filesystem::path& c
     executor.setCanvasSettings(options.canvas);executor.attach(replay);
     result.width=executor.output().image.width;result.height=executor.output().image.height;
     executor.prepare(cancelled);checkCancelled();
-    std::filesystem::create_directories(directory);if(png)std::filesystem::create_directory(staging);
+    std::filesystem::create_directories(directory);
+    if(png&&!std::filesystem::create_directory(staging))throw Error("Partial export already exists; choose another file name");
     std::unique_ptr<AudioFile> audioFile;
     if(options.audio&&!png){
         auto index=options.audioIndex?options.audioIndex:AudioResources::buildIndex(client,assets.patchesEnabled());
@@ -165,7 +163,13 @@ ExportResult exportReplay(Gpu& gpu,Assets& assets,const std::filesystem::path& c
         result.missingSoundCount=audio.missingResources();replay.rewind();
     }
     checkCancelled();
-    auto target=png?staging/L"frame_%06d.png":staging;
+    auto target=staging.wstring();
+    if(png){
+        // image2 interprets percent signs throughout the numbered path.
+        for(size_t position=0;(position=target.find(L'%',position))!=std::wstring::npos;position+=2)
+            target.insert(position,1,L'%');
+        target+=L"\\frame_%06d.png";
+    }
     std::wstring arguments=L" -hide_banner -loglevel error -nostdin -n -f rawvideo -pixel_format rgba -video_size "+
         std::to_wstring(result.width)+L"x"+std::to_wstring(result.height)+L" -framerate "+std::to_wstring(options.fps)+L" -i pipe:0 ";
     if(audioFile){
@@ -178,7 +182,7 @@ ExportResult exportReplay(Gpu& gpu,Assets& assets,const std::filesystem::path& c
     case ExportFormat::Mp4:arguments+=L"-c:v libx264 -preset medium -crf 18 -pix_fmt ";arguments+=(result.width%2||result.height%2)?L"yuv444p ":L"yuv420p ";arguments+=L"-movflags +faststart -f mp4 ";break;
     case ExportFormat::Png:arguments+=L"-c:v png -pix_fmt rgba -start_number 0 -f image2 ";break;
     }
-    arguments+=quote(target.wstring());Encoder encoder(ffmpeg,arguments,directory/(name+L".ffmpeg.log"));
+    arguments+=quote(target);Encoder encoder(ffmpeg,arguments,directory/(name+L".ffmpeg.log"));
     bool hasScene=false,ended=false;update.stage=L"Rendering";
     for(uint64_t frame=0;frame<result.frames;frame++){
         checkCancelled();int64_t sample=int64_t(frame*1000/options.fps);
@@ -190,7 +194,11 @@ ExportResult exportReplay(Gpu& gpu,Assets& assets,const std::filesystem::path& c
         if(progress)progress(update);
     }
     update.stage=L"Encoding";if(progress)progress(update);encoder.finish(cancelled);checkCancelled();
-    std::filesystem::rename(staging,output);result.executedScenes=executor.statistics.scenes;
+    if(!MoveFileW(staging.c_str(),output.c_str())){
+        if(std::filesystem::exists(output))throw Error("Export destination already exists; choose another file name");
+        throw Error("Cannot save media to the export destination");
+    }
+    result.executedScenes=executor.statistics.scenes;
     result.hiddenImageCount=executor.hiddenImages().size();
     result.compatibilityIgnoredInstructions=executor.statistics.compatibilityIgnoredInstructions;
     update.stage=L"Complete";if(progress)progress(update);return result;

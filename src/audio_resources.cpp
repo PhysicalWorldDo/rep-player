@@ -94,6 +94,18 @@ Decoded decode(const std::filesystem::path& ffmpeg,const Bytes& input,const std:
     if(exit||ioFailure||result.data.empty()||result.data.size()%(sizeof(float)*2)){if(result.error.empty())result.error="audio decoder produced no valid stereo PCM";result.data.clear();}
     return result;
 }
+std::shared_ptr<const AudioClip> decodeClip(const std::filesystem::path& ffmpeg,const Bytes& input,
+    const std::function<bool()>& cancelled,std::atomic<uint64_t>& processes){
+    auto decoded=decode(ffmpeg,input,cancelled,&processes);
+    if(decoded.cancelled)return {};
+    if(decoded.data.empty())throw Error("audio decode failed: "+decoded.error);
+    auto clip=std::make_shared<AudioClip>();
+    clip->samples.resize(decoded.data.size()/sizeof(float));
+    std::memcpy(clip->samples.data(),decoded.data.data(),decoded.data.size());
+    if(!std::all_of(clip->samples.begin(),clip->samples.end(),[](float sample){return std::isfinite(sample);}))
+        throw Error("audio decoder returned non-finite PCM");
+    return clip;
+}
 // Enable explicit input mapping only where the elementary/container bytes
 // prove there is one audio stream. Everything else keeps FFmpeg's original
 // single-input automatic best-stream selection.
@@ -259,6 +271,56 @@ std::optional<AudioResources::Entry> AudioResources::resolve(const std::string& 
     for(const auto& package:index_->officialPackages){auto table=indexPackage(package);if(auto it=table->entries.find(logical);it!=table->entries.end())return it->second;}
     return {};
 }
+Bytes AudioResources::readEntry(const Entry& entry,const std::function<bool()>& cancelled){
+    std::ifstream input(entry.package,std::ios::binary);
+    input.seekg(entry.offset);
+    if(!input)throw Error("cannot read sound NPK payload");
+    Bytes data(entry.length);
+    for(size_t position=0;position<data.size();){
+        if(cancelled&&cancelled())throw Error("Audio resource read cancelled");
+        auto count=std::min<size_t>(1048576,data.size()-position);
+        input.read(reinterpret_cast<char*>(data.data()+position),std::streamsize(count));
+        if(!input)throw Error("cannot read sound NPK payload");
+        position+=count;
+    }
+    return data;
+}
+std::optional<ResourceArchiveEntry> AudioResources::exportEntry(std::string logical,const std::function<bool()>& cancelled){
+    auto path=logicalPath(std::move(logical));
+    if(!path.ends_with(".ogg"))return {};
+    auto checkCancelled=[&]{if(cancelled&&cancelled())throw Error("OGG export cancelled");};
+    checkCancelled();
+    try{
+        if(!path.starts_with("sounds/")){
+            const std::filesystem::path relative=wide(path);
+            if(relative.has_root_path()||std::find(relative.begin(),relative.end(),L"..")!=relative.end())return {};
+            auto bytes=readFile(index_->client/relative,cancelled);
+            if(bytes.empty())return {};
+            return ResourceArchiveEntry{std::move(path),std::move(bytes)};
+        }
+        while(auto entry=resolve(path)){
+            checkCancelled();
+            try{
+                auto bytes=readEntry(*entry,cancelled);
+                if(entry->patch){
+                    // Reject the same damaged overlays that playback would fall back from.
+                    if(!decodeClip(ffmpeg_,bytes,cancelled,decoderProcesses_))return {};
+                    std::lock_guard lock(index_->rejected->mutex);
+                    if(index_->rejected->paths.contains(path))continue;
+                }
+                if(bytes.empty())return {};
+                return ResourceArchiveEntry{std::move(path),std::move(bytes)};
+            }catch(const Error&){
+                checkCancelled();
+                if(!entry->patch)return {};
+                std::lock_guard lock(index_->rejected->mutex);
+                index_->rejected->paths.insert(path);
+            }
+        }
+    }catch(const Error&){checkCancelled();}
+    catch(const std::filesystem::filesystem_error&){checkCancelled();}
+    return {};
+}
 std::shared_ptr<const AudioClip> AudioResources::clip(const std::string& tag,const std::function<bool()>& cancelled){
     if(cancelled&&cancelled())return {};auto source=definition(tag);if(!source){report("tag:"+tag,"Unknown audio TAG: "+tag,true);return {};}if(!source->playable)return {};
     if(auto known=prepared(tag);known.ready){if(!known.clip)report("file:"+logicalPath(source->file),"Audio TAG "+tag+": resource is unavailable",true);return known.clip;}
@@ -282,23 +344,14 @@ std::shared_ptr<const AudioClip> AudioResources::clip(const std::string& tag,con
     std::shared_ptr<const AudioClip> result;bool wasCancelled=false;
     bool fellBack=false;
     try{
-        auto readEntry=[](const Entry& entry){Bytes input(entry.length);std::ifstream stream(entry.package,std::ios::binary);stream.seekg(entry.offset);
-            stream.read(reinterpret_cast<char*>(input.data()),input.size());if(!stream)throw Error("cannot read sound NPK payload");return input;};
-        auto decodeClip=[&](const Bytes& input){
-            auto decoded=decode(ffmpeg_,input,cancelled,&decoderProcesses_);if(decoded.cancelled)return std::shared_ptr<const AudioClip>{};
-            if(decoded.data.empty())throw Error("audio decode failed: "+decoded.error);
-            auto clip=std::make_shared<AudioClip>();clip->samples.resize(decoded.data.size()/sizeof(float));std::memcpy(clip->samples.data(),decoded.data.data(),decoded.data.size());
-            if(!std::all_of(clip->samples.begin(),clip->samples.end(),[](float sample){return std::isfinite(sample);}))throw Error("audio decoder returned non-finite PCM");
-            return std::shared_ptr<const AudioClip>(std::move(clip));
-        };
         if(file.rfind("sounds/",0)==0){
-            try{result=decodeClip(readEntry(*entry));}
+            try{result=decodeClip(ffmpeg_,readEntry(*entry,cancelled),cancelled,decoderProcesses_);}
             catch(...){
                 if(!entry->patch||(cancelled&&cancelled()))throw;
                 {std::lock_guard lock(index_->rejected->mutex);index_->rejected->paths.insert(file);}
                 fellBack=true;result=clip(tag,cancelled);
             }
-        }else{auto path=index_->client/wide(source->file);if(!std::filesystem::is_regular_file(path))throw Error("audio file is absent: "+source->file);result=decodeClip(readFile(path));}
+        }else{auto path=index_->client/wide(source->file);if(!std::filesystem::is_regular_file(path))throw Error("audio file is absent: "+source->file);result=decodeClip(ffmpeg_,readFile(path),cancelled,decoderProcesses_);}
         wasCancelled=!result;if(result&&!fellBack)decoded_++;
     }catch(const std::exception& error){wasCancelled=cancelled&&cancelled();if(!wasCancelled)report("file:"+file,"Audio TAG "+tag+": "+error.what(),true);}
     if(cancelled&&cancelled()){result.reset();wasCancelled=true;}
@@ -349,8 +402,7 @@ std::vector<std::shared_ptr<const AudioClip>> AudioResources::prepareClips(const
         auto* current=item.get();localOwners.emplace(item->key,current);work.push_back(std::move(item));
         try{
             if(workRoot_.empty()){settle(*current,{},true);continue;}
-            if(entry){std::ifstream input(entry->package,std::ios::binary);input.seekg(entry->offset);current->input.resize(entry->length);size_t position=0;
-                while(position<current->input.size()){if(stopped())break;auto count=std::min<size_t>(1048576,current->input.size()-position);input.read(reinterpret_cast<char*>(current->input.data()+position),std::streamsize(count));if(!input)throw Error("cannot read sound NPK batch payload");position+=count;}}
+            if(entry)current->input=readEntry(*entry,stopped);
             else current->input=readFile(index_->client/wide(definition->file),stopped);
             current->batch=!stopped()&&singleAudioStream(current->input);if(!current->batch){current->input.clear();settle(*current,{},true);}
         }catch(...){current->input.clear();settle(*current,{},true);}
